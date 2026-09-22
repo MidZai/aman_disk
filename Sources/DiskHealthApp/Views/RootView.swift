@@ -46,7 +46,7 @@ struct RootView: View {
                         if let smart = selectedDisk.smart {
                             SmartTable(smart: smart)
                         } else {
-                            UnsupportedDiskView()
+                            UnsupportedDiskView(physical: selectedDisk.physical)
                         }
                     }
                 }
