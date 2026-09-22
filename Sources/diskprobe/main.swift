@@ -88,6 +88,54 @@ if args.count > 1 {
         } catch {
             print("Error reading NVMe data: \(error)")
         }
+    } else if command == "raw-ata" {
+        if args.count < 3 {
+            print("Usage: diskprobe raw-ata <bsdName> [--save <folder>]")
+            exit(1)
+        }
+        let bsdName = args[2]
+        
+        var saveFolder: String? = nil
+        if let idx = args.firstIndex(of: "--save"), idx + 1 < args.count {
+            saveFolder = args[idx + 1]
+        }
+        
+        do {
+            let smartData = try ATAReader.readSmartData(bsdName: bsdName)
+            print("ATA SMART Data (512 bytes):")
+            printHexDump(data: smartData, limit: 128)
+            
+            let thresholdsData = try ATAReader.readSmartThresholds(bsdName: bsdName)
+            print("\nATA SMART Thresholds (512 bytes):")
+            printHexDump(data: thresholdsData, limit: 128)
+            
+            let identifyData = try ATAReader.readIdentify(bsdName: bsdName)
+            print("\nATA Identify Data (512 bytes):")
+            printHexDump(data: identifyData, limit: 128)
+            
+            let status = try ATAReader.readSmartStatus(bsdName: bsdName)
+            print("\nATA SMART Status (Threshold Exceeded): \(status)")
+            
+            if let folder = saveFolder {
+                let fm = FileManager.default
+                if !fm.fileExists(atPath: folder) {
+                    try fm.createDirectory(atPath: folder, withIntermediateDirectories: true)
+                }
+                let smartURL = URL(fileURLWithPath: folder).appendingPathComponent("smart.bin")
+                let thresholdsURL = URL(fileURLWithPath: folder).appendingPathComponent("thresholds.bin")
+                let identifyURL = URL(fileURLWithPath: folder).appendingPathComponent("identify.bin")
+                let statusURL = URL(fileURLWithPath: folder).appendingPathComponent("status.txt")
+                
+                try smartData.write(to: smartURL)
+                try thresholdsData.write(to: thresholdsURL)
+                try identifyData.write(to: identifyURL)
+                try "\(status)".data(using: .utf8)?.write(to: statusURL)
+                
+                print("\nSaved to \(folder)")
+            }
+        } catch {
+            print("Error reading ATA data: \(error)")
+        }
     } else if command == "smart" {
         if args.count < 3 {
             print("Usage: diskprobe smart <bsdName> [--json]")
