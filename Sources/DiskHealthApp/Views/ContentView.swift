@@ -59,8 +59,7 @@ struct ContentView: View {
                     switch selection {
                     case .physicalDisk(let id):
                         if let disk = appManager.disks.first(where: { $0.id == id }) {
-                            Text("Détail du disque \(disk.physical.model)")
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            DiskDetailView(disk: disk)
                         } else {
                             Text("Disque introuvable")
                         }
