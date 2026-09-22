@@ -3,6 +3,7 @@ import AppKit
 import DiskHealthCore
 
 struct RootView: View {
+    @StateObject private var appManager = AppManager()
     @State private var chromeVisible = false
     @State private var selectedDiskIndex = 0
     @State private var hoverWindow: NSWindow?
@@ -11,86 +12,108 @@ struct RootView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            let selectedDisk = DemoData.disks[selectedDiskIndex]
-            
-            // Halo background
-            HealthHalo(status: selectedDisk.health.status)
-            
-            // Main content
-            VStack(spacing: 22) {
-                // Hero Zone
-                HStack(spacing: 32) {
-                    HealthGauge(assessment: selectedDisk.health)
-                    
-                    VStack(alignment: .leading, spacing: 22) {
-                        HeroHeader(physical: selectedDisk.physical, assessment: selectedDisk.health)
-                        StatTilesRow(physical: selectedDisk.physical, smart: selectedDisk.smart)
-                    }
-                    Spacer()
-                }
+            if appManager.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if appManager.disks.isEmpty {
+                Text("Aucun disque physique trouvé.")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                let validIndex = min(selectedDiskIndex, max(0, appManager.disks.count - 1))
+                let selectedDisk = appManager.disks[validIndex]
                 
-                // Bottom Zone
-                HStack(alignment: .top, spacing: 26) {
-                    InfoList(physical: selectedDisk.physical, smart: selectedDisk.smart, identify: selectedDisk.identify)
-                    
-                    if let smart = selectedDisk.smart {
-                        SmartTable(smart: smart)
-                    } else {
-                        UnsupportedDiskView()
-                    }
-                }
-            }
-            .padding(.top, 66)
-            .padding(.bottom, 26)
-            .padding(.horizontal, 26)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            
-            // Floating chrome
-            HStack(alignment: .top) {
-                // Disk selector (left, 80pt offset)
-                HStack(spacing: 8) {
-                    ForEach(0..<DemoData.disks.count, id: \.self) { index in
-                        let disk = DemoData.disks[index]
-                        Button(action: {
-                            selectedDiskIndex = index
-                        }) {
-                            HStack {
-                                Circle()
-                                    .fill(statusColor(disk.health.status))
-                                    .frame(width: 7, height: 7)
-                                Text(disk.physical.volumeNames.first ?? disk.physical.model)
-                                    .foregroundColor(.primary)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(selectedDiskIndex == index ? Color.primary.opacity(0.12) : Color.clear)
-                            .clipShape(Capsule())
+                // Halo background
+                HealthHalo(status: selectedDisk.health.status)
+                
+                // Main content
+                VStack(spacing: 22) {
+                    // Hero Zone
+                    HStack(spacing: 32) {
+                        HealthGauge(assessment: selectedDisk.health)
+                        
+                        VStack(alignment: .leading, spacing: 22) {
+                            HeroHeader(physical: selectedDisk.physical, assessment: selectedDisk.health)
+                            StatTilesRow(physical: selectedDisk.physical, smart: selectedDisk.smart)
                         }
-                        .buttonStyle(.plain)
+                        Spacer()
+                    }
+                    
+                    // Bottom Zone
+                    HStack(alignment: .top, spacing: 26) {
+                        InfoList(physical: selectedDisk.physical, smart: selectedDisk.smart, identify: selectedDisk.identify)
+                        
+                        if let smart = selectedDisk.smart {
+                            SmartTable(smart: smart)
+                        } else {
+                            UnsupportedDiskView()
+                        }
                     }
                 }
-                .glassCapsule()
-                .padding(.leading, 80)
+                .padding(.top, 66)
+                .padding(.bottom, 26)
+                .padding(.horizontal, 26)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 
-                Spacer()
-                
-                // Action buttons (right, 12pt offset)
-                HStack(spacing: 4) {
-                    ActionButton(icon: "arrow.clockwise", help: Strings.refresh) {}
-                    ActionButton(icon: "doc.on.doc", help: Strings.copyReport) {}
-                    ActionButton(icon: "clock.arrow.circlepath", help: Strings.history) {}
-                        .disabled(true)
+                // Floating chrome
+                HStack(alignment: .top) {
+                    // Disk selector (left, 80pt offset)
+                    HStack(spacing: 8) {
+                        ForEach(0..<appManager.disks.count, id: \.self) { index in
+                            let disk = appManager.disks[index]
+                            Button(action: {
+                                selectedDiskIndex = index
+                            }) {
+                                HStack {
+                                    Circle()
+                                        .fill(statusColor(disk.health.status))
+                                        .frame(width: 7, height: 7)
+                                    Text(disk.physical.volumeNames.first ?? disk.physical.model)
+                                        .foregroundColor(.primary)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(selectedDiskIndex == index ? Color.primary.opacity(0.12) : Color.clear)
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .glassCapsule()
+                    .padding(.leading, 80)
+                    
+                    Spacer()
+                    
+                    // Action buttons (right, 12pt offset)
+                    HStack(spacing: 4) {
+                        ActionButton(icon: "arrow.clockwise", help: Strings.refresh) {
+                            appManager.loadDisks()
+                        }
+                        ActionButton(icon: "doc.on.doc", help: Strings.copyReport) {}
+                        ActionButton(icon: "clock.arrow.circlepath", help: Strings.history) {}
+                            .disabled(true)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .glassCapsule()
+                    .padding(.trailing, 12)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .glassCapsule()
-                .padding(.trailing, 12)
+                .padding(.top, 12)
+                .opacity(chromeVisible ? 1 : 0)
+                .offset(y: chromeVisible ? 0 : -8)
+                .allowsHitTesting(chromeVisible)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chromeVisible)
+                
+                if appManager.needsSudo && !appManager.ignoreSudo {
+                    Color.black.opacity(0.4)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .edgesIgnoringSafeArea(.all)
+                    
+                    SudoRequestView {
+                        appManager.ignoreSudo = true
+                    }
+                }
             }
-            .padding(.top, 12)
-            .opacity(chromeVisible ? 1 : 0)
-            .offset(y: chromeVisible ? 0 : -8)
-            .allowsHitTesting(chromeVisible)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chromeVisible)
         }
         .frame(minWidth: 980, minHeight: 640)
         .windowAccessor(onWindow: { window in
@@ -109,6 +132,17 @@ struct RootView: View {
             setChromeVisible(inside)
         })
         .onAppear {
+            if ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] != "1" {
+                appManager.loadDisks()
+            } else {
+                appManager.isLoading = false
+                // Load DemoData here
+                let demoDisks = DemoData.disks.map { 
+                    RealDisk(physical: $0.physical, smart: $0.smart, identify: $0.identify, health: $0.health)
+                }
+                appManager.disks = demoDisks
+            }
+            
             setChromeVisible(true)
             initialTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { _ in
                 self.initialTimer = nil
