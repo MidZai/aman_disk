@@ -28,9 +28,20 @@ class AppManager: ObservableObject {
     @Published var needsSudo: Bool = false
     @Published var ignoreSudo: Bool = false
     @Published var isLoading: Bool = true
+    private var refreshTimer: Timer?
     
-    func loadDisks() {
-        isLoading = true
+    public init() {
+        startTimer()
+    }
+    
+    private func startTimer() {
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.loadDisks(isAutoRefresh: true) }
+        }
+    }
+    
+    func loadDisks(isAutoRefresh: Bool = false) {
+        if !isAutoRefresh { isLoading = true }
         // On background queue
         DispatchQueue.global(qos: .userInitiated).async {
             let physicalDisks = DiskDiscovery.listPhysicalDisks()
@@ -46,26 +57,42 @@ class AppManager: ObservableObject {
                         if let smartLog = NVMeSmartParser.parse(smartData),
                            let identify = NVMeIdentifyParser.parse(identifyData) {
                             let health = HealthEngine.evaluate(smart: smartLog, identify: identify)
-                            newDisks.append(RealDisk(physical: physical, smart: smartLog, identify: identify, health: health))
+                            newDisks.append(RealDisk(physical: physical, smart: smartLog, identify: identify, health: health, lastRead: Date()))
+                            
+                            // Save to history
+                            if ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] != "1" {
+                                let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
+                                let sample = HistorySample(
+                                    date: Date(),
+                                    temperatureC: smartLog.temperatureCelsius,
+                                    percentageUsed: smartLog.percentageUsed,
+                                    dataUnitsWritten: smartLog.dataUnitsWritten,
+                                    dataUnitsRead: smartLog.dataUnitsRead,
+                                    powerOnHours: smartLog.powerOnHours,
+                                    mediaErrors: smartLog.mediaErrors,
+                                    availableSpare: smartLog.availableSpare
+                                )
+                                HistoryStore.shared.append(sample, for: key)
+                            }
                         } else {
                             let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Données SMART illisibles"])
-                            newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health))
+                            newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health, lastRead: Date()))
                         }
                     } catch {
                         privilegesMissing = true
                         let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Erreur de lecture: \(error.localizedDescription)"])
-                        newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health))
+                        newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health, lastRead: Date()))
                     }
                 } else {
                     let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Santé non lisible"])
-                    newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health))
+                    newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health, lastRead: Date()))
                 }
             }
             
             DispatchQueue.main.async {
                 self.disks = newDisks
                 self.needsSudo = privilegesMissing
-                self.isLoading = false
+                if !isAutoRefresh { self.isLoading = false }
             }
         }
     }
