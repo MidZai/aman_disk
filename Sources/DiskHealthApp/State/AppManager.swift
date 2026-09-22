@@ -104,7 +104,7 @@ class AppManager: ObservableObject {
             self.disks = DemoData.disks.map { 
                 RealDisk(physical: $0.physical, snapshot: $0.snapshot, health: $0.health, lastRead: Date()) 
             }
-            self.volumes = []
+            self.volumes = DemoData.volumes
             self.isLoading = false
             return
         }
@@ -114,95 +114,101 @@ class AppManager: ObservableObject {
         Task.detached {
             let physicalDisks = DiskDiscovery.listPhysicalDisks()
             var newDisks: [RealDisk] = []
-            var privilegesMissing = false
             
             for physical in physicalDisks {
+                var currentPhysical = physical
                 var snapshot: DiskHealthSnapshot? = nil
                 var health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Pas d'information S.M.A.R.T. disponible."])
                 
-                do {
-                    if physical.protocolType == .nvme {
-                        snapshot = try NVMeBackend.read(bsdName: physical.bsdName)
-                    } else if physical.protocolType == .ata || physical.protocolType == .pcieAhci {
-                        snapshot = try ATABackend.read(bsdName: physical.bsdName)
-                    }
-                    
-                    if let snap = snapshot {
-                        switch snap {
-                        case .nvme(let smartLog, let identify):
-                            health = HealthEngine.evaluate(smart: smartLog, identify: identify)
-                            let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
-                            let sample = HistorySample(
-                                date: Date(),
-                                temperatureC: smartLog.temperatureCelsius,
-                                percentageUsed: Int(smartLog.percentageUsed),
-                                dataUnitsWritten: smartLog.dataUnitsWritten,
-                                dataUnitsRead: smartLog.dataUnitsRead,
-                                powerOnHours: smartLog.powerOnHours,
-                                mediaErrors: smartLog.mediaErrors,
-                                availableSpare: Int(smartLog.availableSpare)
-                            )
-                            HistoryStore.shared.append(sample, for: key)
-                            
-                        case .ata(let ataSnapshot):
-                            health = ATAHealthEvaluator.evaluate(snapshot: ataSnapshot)
-                            let profile = ATACatalog.profile(for: ataSnapshot.model)
-                            
-                            var temp: Int? = nil
-                            var written: UInt64? = nil
-                            var read: UInt64? = nil
-                            var hours: UInt64? = nil
-                            var used: Int? = nil
-                            var errors: UInt64? = nil
-                            var spare: Int? = nil
-                            
-                            for attr in ataSnapshot.attributes {
-                                let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-                                switch info.role {
-                                case .temperature: temp = attr.value(for: .temperature).map { Int($0) }
-                                case .hostWritesBytes(let mult): written = (attr.rawValue * mult) / 512000
-                                case .hostReadsBytes(let mult): read = (attr.rawValue * mult) / 512000
-                                case .powerOnHours: hours = attr.value(for: .powerOnHours)
-                                case .lifeRemainingPercentNormalized: used = 100 - Int(attr.current)
-                                case .reallocated, .pending, .uncorrectable: errors = (errors ?? 0) + attr.rawValue
-                                default: break
-                                }
-                            }
-                            
-                            let key = DiskIdentity.key(model: ataSnapshot.model, serial: ataSnapshot.serialNumber)
-                            let sample = HistorySample(
-                                date: Date(),
-                                temperatureC: temp,
-                                percentageUsed: used,
-                                dataUnitsWritten: written,
-                                dataUnitsRead: read,
-                                powerOnHours: hours,
-                                mediaErrors: errors,
-                                availableSpare: spare
-                            )
-                            HistoryStore.shared.append(sample, for: key)
+                if currentPhysical.healthCapability == .supported {
+                    do {
+                        if currentPhysical.protocolType == .nvme {
+                            snapshot = try NVMeBackend.read(bsdName: currentPhysical.bsdName)
+                        } else if currentPhysical.protocolType == .ata || currentPhysical.protocolType == .pcieAhci {
+                            snapshot = try ATABackend.read(bsdName: currentPhysical.bsdName)
                         }
+                        
+                        if let snap = snapshot {
+                            switch snap {
+                            case .nvme(let smartLog, let identify):
+                                health = HealthEngine.evaluate(smart: smartLog, identify: identify)
+                                let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
+                                let sample = HistorySample(
+                                    date: Date(),
+                                    temperatureC: smartLog.temperatureCelsius,
+                                    percentageUsed: Int(smartLog.percentageUsed),
+                                    dataUnitsWritten: smartLog.dataUnitsWritten,
+                                    dataUnitsRead: smartLog.dataUnitsRead,
+                                    powerOnHours: smartLog.powerOnHours,
+                                    mediaErrors: smartLog.mediaErrors,
+                                    availableSpare: Int(smartLog.availableSpare)
+                                )
+                                HistoryStore.shared.append(sample, for: key)
+                                
+                            case .ata(let ataSnapshot):
+                                health = ATAHealthEvaluator.evaluate(snapshot: ataSnapshot)
+                                let profile = ATACatalog.profile(for: ataSnapshot.model)
+                                
+                                var temp: Int? = nil
+                                var written: UInt64? = nil
+                                var read: UInt64? = nil
+                                var hours: UInt64? = nil
+                                var used: Int? = nil
+                                var errors: UInt64? = nil
+                                let spare: Int? = nil
+                                
+                                for attr in ataSnapshot.attributes {
+                                    let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
+                                    switch info.role {
+                                    case .temperature: temp = attr.value(for: .temperature).map { Int($0) }
+                                    case .hostWritesBytes(let mult): written = (attr.rawValue * mult) / 512000
+                                    case .hostReadsBytes(let mult): read = (attr.rawValue * mult) / 512000
+                                    case .powerOnHours: hours = attr.value(for: .powerOnHours)
+                                    case .lifeRemainingPercentNormalized: used = 100 - Int(attr.current)
+                                    case .reallocated, .pending, .uncorrectable: errors = (errors ?? 0) + attr.rawValue
+                                    default: break
+                                    }
+                                }
+                                
+                                let key = DiskIdentity.key(model: ataSnapshot.model, serial: ataSnapshot.serialNumber)
+                                let sample = HistorySample(
+                                    date: Date(),
+                                    temperatureC: temp,
+                                    percentageUsed: used,
+                                    dataUnitsWritten: written,
+                                    dataUnitsRead: read,
+                                    powerOnHours: hours,
+                                    mediaErrors: errors,
+                                    availableSpare: spare
+                                )
+                                HistoryStore.shared.append(sample, for: key)
+                            }
+                        }
+                    } catch let error as ATAReadError where error == .smartDisabled {
+                        currentPhysical = currentPhysical.withCapability(.unsupported(reason: .smartDisabled))
+                    } catch {
+                        currentPhysical = currentPhysical.withCapability(.unsupported(reason: .readFailed(code: "\(error)")))
                     }
-                } catch {
-                    privilegesMissing = true
                 }
                 
-                newDisks.append(RealDisk(physical: physical, snapshot: snapshot, health: health, lastRead: Date()))
+                newDisks.append(RealDisk(physical: currentPhysical, snapshot: snapshot, health: health, lastRead: Date()))
             }
             
             let volumes = VolumeDiscovery.listVolumes()
+            let finalDisks = newDisks
+            let finalVolumes = volumes
 
             DispatchQueue.main.async {
                 // Hotplug detection for toasts
                 if !self.disks.isEmpty {
                     let oldIds = Set(self.disks.map { $0.id })
-                    let newIds = Set(newDisks.map { $0.id })
+                    let newIds = Set(finalDisks.map { $0.id })
                     
                     let added = newIds.subtracting(oldIds)
                     let removed = oldIds.subtracting(newIds)
                     
                     for id in added {
-                        if let disk = newDisks.first(where: { $0.id == id }) {
+                        if let disk = finalDisks.first(where: { $0.id == id }) {
                             ToastCenter.shared.show(message: "\(disk.physical.model) connecté", systemImage: "externaldrive.badge.plus")
                         }
                     }
@@ -211,7 +217,7 @@ class AppManager: ObservableObject {
                             ToastCenter.shared.show(message: "\(disk.physical.model) déconnecté", systemImage: "externaldrive.badge.minus")
                             
                             if case .physicalDisk(let selId) = self.selection, selId == id {
-                                if let internalDisk = newDisks.first(where: { $0.physical.isInternal }) {
+                                if let internalDisk = finalDisks.first(where: { $0.physical.isInternal }) {
                                     self.selection = .physicalDisk(internalDisk.id)
                                 } else {
                                     self.selection = nil
@@ -222,7 +228,7 @@ class AppManager: ObservableObject {
                     
                     // Health change detection
                     if isAutoRefresh {
-                        for newDisk in newDisks {
+                        for newDisk in finalDisks {
                             if let oldDisk = self.disks.first(where: { $0.id == newDisk.id }) {
                                 if oldDisk.health.status != newDisk.health.status {
                                     let statusStr = newDisk.health.status == .good ? "En bonne santé" : (newDisk.health.status == .caution ? "À surveiller" : "Défaillance probable")
@@ -233,12 +239,14 @@ class AppManager: ObservableObject {
                     }
                 }
                 
-                self.disks = newDisks
-                self.volumes = volumes
-
-                self.needsSudo = privilegesMissing
+                self.disks = finalDisks
+                self.volumes = finalVolumes
                 if !isAutoRefresh { self.isLoading = false }
             }
         }
+    }
+    
+    func isFusionDriveMember(_ disk: RealDisk) -> Bool {
+        volumes.contains { $0.physicalDiskBSDNames.count >= 2 && $0.physicalDiskBSDNames.contains(disk.physical.bsdName) }
     }
 }

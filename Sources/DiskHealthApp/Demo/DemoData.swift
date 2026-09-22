@@ -9,13 +9,23 @@ public enum DemoData {
         let health: HealthAssessment
     }
     
-        public static let disks: [DemoDisk] = [
+    public static let disks: [DemoDisk] = [
         makeDisk1(),
         makeDisk2(),
         makeDisk3(),
-        makeDisk4(),
         makeDisk5(),
-        makeDisk6()
+        makeDisk6(),
+        makeDisk4(),
+        makeDiskSD(),
+        makeDiskSmartDisabled(),
+        makeDiskVirtual(),
+        makeDiskNoSmart()
+    ]
+    
+    public static let volumes: [Volume] = [
+        Volume(bsdName: "disk1s1", name: "Macintosh HD", mountPoint: "/", format: "APFS", totalBytes: 2_000_000_000_000, availableBytes: 1_200_000_000_000, physicalDiskBSDNames: ["disk0"]),
+        Volume(bsdName: "disk2s1", name: "Fusion HD", mountPoint: "/Volumes/Fusion HD", format: "APFS", totalBytes: 1_500_000_000_000, availableBytes: 900_000_000_000, physicalDiskBSDNames: ["disk4", "disk5"]),
+        Volume(bsdName: "disk3s1", name: "Sauvegardes", mountPoint: "/Volumes/Sauvegardes", format: "ExFAT", totalBytes: 1_000_000_000_000, availableBytes: 400_000_000_000, physicalDiskBSDNames: ["disk3"])
     ]
     
     private static func makeDisk1() -> DemoDisk {
@@ -270,6 +280,30 @@ public enum DemoData {
     private static func makeDisk4() -> DemoDisk {
         let physical = PhysicalDisk(bsdName: "disk3", model: "External SSD", sizeBytes: 1_000_000_000_000, isInternal: false, connection: .usb, volumeNames: ["Sauvegardes"], usbVendorID: 0x0BDA, usbProductID: 0x9210, protocolType: .usb, mediumType: .solidState, healthCapability: .unsupported(reason: .usbBridge))
         let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Santé non lisible"])
+        return DemoDisk(physical: physical, snapshot: nil, health: health)
+    }
+
+    private static func makeDiskSD() -> DemoDisk {
+        let physical = PhysicalDisk(bsdName: "disk6", model: "Apple SD Card Reader", sizeBytes: 64_000_000_000, isInternal: true, connection: .other, volumeNames: ["SD_CARD"], usbVendorID: nil, usbProductID: nil, protocolType: .sdCard, mediumType: .solidState, healthCapability: .unsupported(reason: .sdCardReader))
+        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [Strings.sdCardReaderText])
+        return DemoDisk(physical: physical, snapshot: nil, health: health)
+    }
+
+    private static func makeDiskSmartDisabled() -> DemoDisk {
+        let physical = PhysicalDisk(bsdName: "disk7", model: "ST3500418AS (SMART Désactivé)", sizeBytes: 500_000_000_000, isInternal: true, connection: .sata, volumeNames: ["OldData"], usbVendorID: nil, usbProductID: nil, protocolType: .ata, mediumType: .rotational, healthCapability: .unsupported(reason: .smartDisabled))
+        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [Strings.smartDisabledText])
+        return DemoDisk(physical: physical, snapshot: nil, health: health)
+    }
+
+    private static func makeDiskVirtual() -> DemoDisk {
+        let physical = PhysicalDisk(bsdName: "disk8", model: "VMware Virtual SATA Disk", sizeBytes: 120_000_000_000, isInternal: true, connection: .sata, volumeNames: ["VM_Disk"], usbVendorID: nil, usbProductID: nil, protocolType: .virtualDisk, mediumType: .solidState, healthCapability: .unsupported(reason: .virtualDisk))
+        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [Strings.virtualDiskText])
+        return DemoDisk(physical: physical, snapshot: nil, health: health)
+    }
+
+    private static func makeDiskNoSmart() -> DemoDisk {
+        let physical = PhysicalDisk(bsdName: "disk9", model: "Generic Storage Device", sizeBytes: 250_000_000_000, isInternal: true, connection: .other, volumeNames: ["UnknownMedia"], usbVendorID: nil, usbProductID: nil, protocolType: .unknown, mediumType: .unknown, healthCapability: .unsupported(reason: .noSmartInterface))
+        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [Strings.noSmartInterfaceText])
         return DemoDisk(physical: physical, snapshot: nil, health: health)
     }
 }

@@ -56,4 +56,24 @@ enum Strings {
     static let unsupportedText2 = "Exportez un diagnostic anonymisé et joignez-le à une demande sur GitHub. Chaque boîtier documenté peut être pris en charge dans une prochaine version."
     static let exportDiagnostic = "Exporter le diagnostic…"
     static let viewSupported = "Voir les boîtiers pris en charge"
+    
+    // Phase F
+    static let sdCardReaderTitle = "Lecteur de carte SD"
+    static let sdCardReaderText = "Ce lecteur de carte SD ne fournit pas de données de santé. Les cartes SD n'ont pas d'interface S.M.A.R.T. accessible depuis macOS."
+    
+    static let smartDisabledTitle = "S.M.A.R.T. désactivé"
+    static let smartDisabledText = "Ce disque prend en charge S.M.A.R.T., mais la fonction est désactivée. Disk Health ne modifie jamais les réglages d'un disque."
+    
+    static let virtualDiskTitle = "Disque virtuel"
+    static let virtualDiskText = "Ce disque est virtuel : il est fourni par un logiciel de virtualisation. Sa santé dépend du disque réel de l'ordinateur hôte."
+    
+    static let noSmartInterfaceTitle = "Santé non disponible"
+    static let noSmartInterfaceText = "macOS n'expose aucune interface de santé pour ce disque. Exportez un diagnostic pour nous aider à le prendre en charge."
+    
+    static let readErrorTitle = "Erreur de lecture"
+    static func readErrorText(code: String) -> String {
+        "La lecture des données de santé a échoué (\(code)). Réessayez ; si le problème persiste, exportez un diagnostic."
+    }
+    
+    static let fusionDriveMember = "Fait partie d'un Fusion Drive"
 }

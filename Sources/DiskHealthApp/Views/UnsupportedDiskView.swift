@@ -4,55 +4,143 @@ import DiskHealthCore
 
 struct UnsupportedDiskView: View {
     let physical: PhysicalDisk
-    @State private var showWhy = false
+    
+    private var reason: UnsupportedReason {
+        if case .unsupported(let r) = physical.healthCapability {
+            return r
+        }
+        return .noSmartInterface
+    }
+    
+    private var iconName: String {
+        switch reason {
+        case .sdCardReader, .smartDisabled, .virtualDisk, .usbBridge:
+            return "info.circle"
+        case .noSmartInterface, .readFailed:
+            return "exclamationmark.triangle"
+        }
+    }
+    
+    private var titleText: String {
+        switch reason {
+        case .sdCardReader:
+            return Strings.sdCardReaderTitle
+        case .smartDisabled:
+            return Strings.smartDisabledTitle
+        case .virtualDisk:
+            return Strings.virtualDiskTitle
+        case .noSmartInterface:
+            return Strings.noSmartInterfaceTitle
+        case .readFailed:
+            return Strings.readErrorTitle
+        case .usbBridge:
+            return Strings.unsupportedTitle
+        }
+    }
+    
+    private var messageText: String {
+        switch reason {
+        case .sdCardReader:
+            return Strings.sdCardReaderText
+        case .smartDisabled:
+            return Strings.smartDisabledText
+        case .virtualDisk:
+            return Strings.virtualDiskText
+        case .noSmartInterface:
+            return Strings.noSmartInterfaceText
+        case .readFailed(let code):
+            return Strings.readErrorText(code: code)
+        case .usbBridge:
+            return Strings.unsupportedText1
+        }
+    }
+    
+    private var showExportButton: Bool {
+        switch reason {
+        case .sdCardReader, .smartDisabled, .virtualDisk:
+            return false
+        case .noSmartInterface, .readFailed, .usbBridge:
+            return true
+        }
+    }
     
     var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            
-            Image(systemName: "cable.connector.slash")
-                .font(.system(size: 40))
-                .foregroundColor(.secondary)
-            
-            Text("Disque non supporté")
-                .font(.headline)
-            
-            
-            HStack(spacing: 12) {
-                Button("Pourquoi ?") {
-                    showWhy.toggle()
-                }
-                .popover(isPresented: $showWhy, arrowEdge: .bottom) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Protocoles S.M.A.R.T.").font(.headline)
-                        Text("Les disques USB et certains adaptateurs ne transmettent pas les commandes NVMe natives nécessaires pour lire l'état de santé du disque. macOS empêche cet accès pour des raisons de sécurité et de pilotes.")
-                            .font(.callout)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Header
+                HStack(spacing: 16) {
+                    DiskIconProvider.icon(for: physical)
+                        .font(.system(size: 48))
+                        .frame(width: 56, height: 56)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(physical.model)
+                            .font(.system(size: 24, weight: .semibold))
+                        
+                        let sizeStr = Formatters.bytes(physical.sizeBytes)
+                        let locStr = physical.isInternal ? "Interne" : "Externe"
+                        let connStr: String = {
+                            switch physical.connection {
+                            case .nvmeInternal, .nvmeExternal: return "NVMe"
+                            case .sata: return "SATA"
+                            case .usb: return "USB"
+                            case .other: return physical.protocolType.rawValue
+                            }
+                        }()
+                        
+                        Text("\(sizeStr) · \(connStr) · \(locStr)")
+                            .font(.body)
                             .foregroundColor(.secondary)
                     }
-                    .padding()
-                    .frame(width: 300)
+                    Spacer()
                 }
                 
-                Button("Exporter le diagnostic") {
-                    exportDiagnostic()
-                }
-                .buttonStyle(.borderedProminent)
+                Divider()
                 
-                if ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] != "1" {
-                    Button("Mode Démo") {
-                        restartInDemoMode()
+                // Orange card
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: iconName)
+                        .font(.system(size: 22))
+                        .foregroundColor(.orange)
+                        .frame(width: 24, height: 24)
+                    
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(titleText)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Text(messageText)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        
+                        if showExportButton {
+                            Button(Strings.exportDiagnostic) {
+                                exportDiagnostic()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .padding(.top, 4)
+                        }
                     }
                 }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+                )
+                
+                Spacer()
             }
-            .padding(.top, 8)
-            
-            Spacer()
+            .padding(24)
+            .frame(maxWidth: 1400, alignment: .top)
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private func exportDiagnostic() {
-        // keep the same
         let diag = Diagnostic(physical: physical)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -62,24 +150,27 @@ struct UnsupportedDiskView: View {
         
         let panel = NSSavePanel()
         panel.title = "Enregistrer le diagnostic DiskHealth"
-        let vid = physical.usbVendorID.map { String(format: "0x%04X", $0) } ?? "0xXXXX"
-        let pid = physical.usbProductID.map { String(format: "0x%04X", $0) } ?? "0xYYYY"
-        panel.nameFieldStringValue = "DiskHealth_Diagnostic_\(vid)_\(pid).json"
+        
+        let filename: String
+        if let vid = physical.usbVendorID, let pid = physical.usbProductID {
+            let vidStr = String(format: "0x%04X", vid)
+            let pidStr = String(format: "0x%04X", pid)
+            filename = "DiskHealth_Diagnostic_\(vidStr)_\(pidStr).json"
+        } else {
+            filename = "DiskHealth_Diagnostic_\(physical.bsdName).json"
+        }
+        
+        panel.nameFieldStringValue = filename
         panel.allowedContentTypes = [.json]
         
         if panel.runModal() == .OK, let url = panel.url {
-            try? data.write(to: url)
+            do {
+                try data.write(to: url)
+                ToastCenter.shared.show(message: "Diagnostic exporté", systemImage: "checkmark.circle")
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            } catch {
+                ToastCenter.shared.show(message: "L'export a échoué", systemImage: "xmark.octagon")
+            }
         }
-    }
-    
-    private func restartInDemoMode() {
-        let process = Process()
-        let executableURL = Bundle.main.executableURL!
-        process.executableURL = executableURL
-        var env = ProcessInfo.processInfo.environment
-        env["DISKHEALTH_DEMO"] = "1"
-        process.environment = env
-        try? process.run()
-        NSApplication.shared.terminate(nil)
     }
 }

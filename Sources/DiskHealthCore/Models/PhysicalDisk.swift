@@ -32,4 +32,20 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         self.mediumType = mediumType
         self.healthCapability = healthCapability
     }
+    
+    public func withCapability(_ capability: HealthCapability) -> PhysicalDisk {
+        PhysicalDisk(
+            bsdName: bsdName,
+            model: model,
+            sizeBytes: sizeBytes,
+            isInternal: isInternal,
+            connection: connection,
+            volumeNames: volumeNames,
+            usbVendorID: usbVendorID,
+            usbProductID: usbProductID,
+            protocolType: protocolType,
+            mediumType: mediumType,
+            healthCapability: capability
+        )
+    }
 }

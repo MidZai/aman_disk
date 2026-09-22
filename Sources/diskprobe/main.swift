@@ -224,7 +224,7 @@ if args.count > 1 {
             print("Found \(volumes.count) volume(s):")
             for vol in volumes {
                 let sizeGB = Double(vol.totalBytes) / 1_000_000_000.0
-                let phys = vol.physicalDiskBSDName ?? "None"
+                let phys = vol.physicalDiskBSDNames.isEmpty ? "None" : vol.physicalDiskBSDNames.joined(separator: ", ")
                 print(String(format: "%-8@ %-20@ %6.1f GB  %-8@ %-30@ (Phys: %@)", vol.bsdName, vol.name, sizeGB, vol.format, vol.mountPoint, phys))
             }
         }

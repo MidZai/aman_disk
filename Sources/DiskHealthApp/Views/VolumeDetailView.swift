@@ -90,32 +90,42 @@ struct VolumeDetailView: View {
                         .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
                 )
                 
-                if let physID = volume.physicalDiskBSDName, let physDisk = appManager.disks.first(where: { $0.id == physID }) {
+                let backingDisks = volume.physicalDiskBSDNames.compactMap { bsd in
+                    appManager.disks.first(where: { $0.id == bsd })
+                }
+                
+                if !backingDisks.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Disque physique").font(.headline)
+                        Text(backingDisks.count > 1 ? "Disques physiques (\(backingDisks.count))" : "Disque physique")
+                            .font(.headline)
                         
-                        HStack(spacing: 12) {
-                            DiskIconProvider.icon(for: physDisk)
-                                .font(.system(size: 28))
-                                .frame(width: 32, height: 32)
-                            
-                            VStack(alignment: .leading) {
-                                Text(physDisk.physical.model)
-                                    .fontWeight(.medium)
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(healthColor(for: physDisk))
-                                        .frame(width: 8, height: 8)
-                                    Text(healthLabel(for: physDisk))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                        ForEach(backingDisks) { physDisk in
+                            HStack(spacing: 12) {
+                                DiskIconProvider.icon(for: physDisk)
+                                    .font(.system(size: 28))
+                                    .frame(width: 32, height: 32)
+                                
+                                VStack(alignment: .leading) {
+                                    Text(physDisk.physical.model)
+                                        .fontWeight(.medium)
+                                    HStack(spacing: 6) {
+                                        Circle()
+                                            .fill(healthColor(for: physDisk))
+                                            .frame(width: 8, height: 8)
+                                        Text(healthLabel(for: physDisk))
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                Button("Afficher le disque") {
+                                    appManager.selection = .physicalDisk(physDisk.id)
                                 }
                             }
-                            
-                            Spacer()
-                            
-                            Button("Afficher le disque") {
-                                appManager.selection = .physicalDisk(physID)
+                            if physDisk.id != backingDisks.last?.id {
+                                Divider()
                             }
                         }
                     }

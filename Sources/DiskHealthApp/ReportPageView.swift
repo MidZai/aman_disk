@@ -190,25 +190,27 @@ struct ReportPageView: View {
                     }
                 case .ata(let ataSnap):
                     let profile = ATACatalog.profile(for: ataSnap.model)
-                    ForEach(ataSnap.attributes, id: \.id) { attr in
+                    let unified = ataSnap.attributes.map { attr -> UnifiedAttribute in
                         let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-                        var stateStr = "Normal"
+                        var state: AttributeState = .normal
                         if attr.threshold > 0 && attr.current <= attr.threshold {
-                            stateStr = "Critique"
+                            state = .critical
                         } else if info.role == .reallocated || info.role == .pending || info.role == .uncorrectable {
-                            if attr.rawValue > 0 { stateStr = "Attention" }
+                            if attr.rawValue > 0 { state = .warning }
                         }
                         let displayValue = attr.value(for: info.role).map { Formatters.integer($0) } ?? "\(attr.current)"
-                        
+                        return UnifiedAttribute(id: attr.id, name: info.name, explanation: info.explanation, current: "\(attr.current)", worst: "\(attr.worst)", threshold: "\(attr.threshold)", rawValue: displayValue, state: state, isInformational: false)
+                    }
+                    ForEach(unified) { attr in
                         HStack {
                             Text("0x\(String(format: "%02X", attr.id))")
                                 .font(.system(size: 9.5, design: .monospaced))
                                 .frame(width: 40, alignment: .leading)
-                            Text(info.name)
+                            Text(attr.name)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            Text(displayValue)
+                            Text(attr.rawValue)
                                 .frame(width: 120, alignment: .trailing)
-                            Text(stateStr)
+                            Text(attr.state == .normal ? "Normal" : (attr.state == .warning ? "Attention" : (attr.state == .critical ? "Critique" : "—")))
                                 .frame(width: 80, alignment: .leading)
                         }
                         .font(.system(size: 9.5))

@@ -13,7 +13,7 @@ struct InspectorView: View {
             return appManager.disks.first(where: { $0.id == id })
         case .volume(let id):
             let vol = appManager.volumes.first(where: { $0.id == id })
-            if let phys = vol?.physicalDiskBSDName {
+            if let phys = vol?.physicalDiskBSDNames.first {
                 return appManager.disks.first(where: { $0.id == phys })
             }
             return nil
@@ -72,7 +72,7 @@ struct InspectorView: View {
                     }
                 }
                 
-                let diskVolumes = appManager.volumes.filter { $0.physicalDiskBSDName == disk.id }
+                let diskVolumes = appManager.volumes.filter { $0.physicalDiskBSDNames.contains(disk.id) }
                 if !diskVolumes.isEmpty {
                     Section("Volumes") {
                         ForEach(diskVolumes) { vol in

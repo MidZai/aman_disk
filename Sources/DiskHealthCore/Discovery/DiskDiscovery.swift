@@ -26,7 +26,7 @@ public enum DiskDiscovery {
                 let isWhole = descDict[kDADiskDescriptionMediaWholeKey as String] as? Bool ?? false
                 let protocolName = descDict[kDADiskDescriptionDeviceProtocolKey as String] as? String ?? ""
                 
-                if isWhole && protocolName != "Disk Image" && protocolName != "Virtual Interface" && !isSynthetic(service: serviceToProcess) {
+                if isWhole && protocolName != "Disk Image" && !isSynthetic(service: serviceToProcess, protocolName: protocolName) {
                     let bsdName = descDict[kDADiskDescriptionMediaBSDNameKey as String] as? String ?? ""
                     let model = descDict[kDADiskDescriptionDeviceModelKey as String] as? String ?? "Unknown Model"
                     let sizeBytes = descDict[kDADiskDescriptionMediaSizeKey as String] as? UInt64 ?? 0
@@ -71,7 +71,7 @@ public enum DiskDiscovery {
         return disks.sorted { $0.bsdName < $1.bsdName }
     }
     
-    private static func isSynthetic(service: io_object_t) -> Bool {
+    private static func isSynthetic(service: io_object_t, protocolName: String) -> Bool {
         var current = service
         IOObjectRetain(current)
         
@@ -95,7 +95,9 @@ public enum DiskDiscovery {
                 break
             }
         }
-        return isAPFSContainer || !hasBlockStorage
+        if isAPFSContainer { return true }
+        if protocolName == "Virtual Interface" { return false }
+        return !hasBlockStorage
     }
     
     private static func getVolumeNames(for bsdName: String, session: DASession) -> [String] {

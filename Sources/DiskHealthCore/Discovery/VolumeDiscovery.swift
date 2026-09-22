@@ -36,12 +36,12 @@ public enum VolumeDiscovery {
             let format = values.volumeLocalizedFormatDescription ?? "Unknown"
             
             var bsdName = ""
-            var physicalDiskBSDName: String? = nil
+            var physicalDiskBSDNames: [String] = []
             
             if let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL) {
                 if let bsd = DADiskGetBSDName(disk) {
                     bsdName = String(cString: bsd)
-                    physicalDiskBSDName = getPhysicalDiskBSDName(for: bsdName)
+                    physicalDiskBSDNames = getPhysicalDiskBSDNames(for: bsdName)
                 }
             }
             
@@ -54,67 +54,17 @@ public enum VolumeDiscovery {
                 format: format,
                 totalBytes: total,
                 availableBytes: available,
-                physicalDiskBSDName: physicalDiskBSDName
+                physicalDiskBSDNames: physicalDiskBSDNames
             ))
         }
         
         return volumes
     }
     
-    private static func getPhysicalDiskBSDName(for volumeBSDName: String) -> String? {
+    public static func getPhysicalDiskBSDNames(for volumeBSDName: String) -> [String] {
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOBSDNameMatching(kIOMainPortDefault, 0, volumeBSDName))
-        if service == 0 { return nil }
-        
-        var current = service
-        var physicalName: String? = nil
-        
-        while current != 0 {
-            if let whole = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "Whole" as CFString, kCFAllocatorDefault, 0) as? Bool, whole == true {
-                if !isSynthetic(service: current) {
-                    if let bsd = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "BSD Name" as CFString, kCFAllocatorDefault, 0) as? String {
-                        physicalName = bsd
-                        IOObjectRelease(current)
-                        break
-                    }
-                }
-            }
-            
-            var parent: io_object_t = 0
-            let kr = IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent)
-            IOObjectRelease(current)
-            if kr == kIOReturnSuccess && parent != 0 {
-                current = parent
-            } else {
-                break
-            }
-        }
-        return physicalName
-    }
-    
-    private static func isSynthetic(service: io_object_t) -> Bool {
-        var current = service
-        IOObjectRetain(current)
-        
-        var hasBlockStorage = false
-        var isAPFSContainer = false
-        
-        while current != 0 {
-            if IOObjectConformsTo(current, "AppleAPFSContainerScheme") != 0 {
-                isAPFSContainer = true
-            }
-            if IOObjectConformsTo(current, "IOBlockStorageDevice") != 0 {
-                hasBlockStorage = true
-            }
-            
-            var parent: io_object_t = 0
-            let kr = IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent)
-            IOObjectRelease(current)
-            if kr == kIOReturnSuccess && parent != 0 {
-                current = parent
-            } else {
-                break
-            }
-        }
-        return isAPFSContainer || !hasBlockStorage
+        guard service != 0 else { return [] }
+        let node = IOKitRegistryNode(entry: service, shouldRelease: true)
+        return PhysicalDiskResolver.resolvePhysicalDisks(from: node)
     }
 }

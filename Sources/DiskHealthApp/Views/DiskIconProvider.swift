@@ -3,11 +3,15 @@ import SwiftUI
 import DiskHealthCore
 
 public enum DiskIconProvider {
-    public static func icon(for disk: RealDisk) -> some View {
-        let name = disk.physical.isInternal ? "internaldrive" : "externaldrive"
+    public static func icon(for physical: PhysicalDisk) -> some View {
+        let name = physical.isInternal ? "internaldrive" : "externaldrive"
         return Image(systemName: name)
             .foregroundStyle(.secondary)
             .fontWeight(.light)
+    }
+    
+    public static func icon(for disk: RealDisk) -> some View {
+        return icon(for: disk.physical)
     }
     
     public static func icon(for volume: Volume) -> some View {

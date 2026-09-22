@@ -35,7 +35,7 @@ struct ContentView: View {
                                     }
                             }
                             
-                            let childVolumes = appManager.volumes.filter { $0.physicalDiskBSDName == disk.physical.bsdName }
+                            let childVolumes = appManager.volumes.filter { $0.physicalDiskBSDNames.contains(disk.physical.bsdName) }
                             ForEach(childVolumes) { volume in
                                 NavigationLink(value: SidebarItem.volume(volume.id)) {
                                     VolumeRowView(volume: volume)
@@ -46,7 +46,7 @@ struct ContentView: View {
                     }
                     
                     let orphanVolumes = appManager.volumes.filter { vol in
-                        !appManager.disks.contains(where: { $0.physical.bsdName == vol.physicalDiskBSDName })
+                        !appManager.disks.contains(where: { vol.physicalDiskBSDNames.contains($0.physical.bsdName) })
                     }
                     
                     if !orphanVolumes.isEmpty {
@@ -206,6 +206,7 @@ struct ExportSheet: View {
 
 
 struct DiskRowView: View {
+    @EnvironmentObject var appManager: AppManager
     let disk: RealDisk
     
     var body: some View {
@@ -226,6 +227,12 @@ struct DiskRowView: View {
                 Text("\(sizeStr) · \(connStr)")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                
+                if appManager.isFusionDriveMember(disk) {
+                    Text(Strings.fusionDriveMember)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
             
             Spacer()

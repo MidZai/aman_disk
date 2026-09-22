@@ -3,6 +3,7 @@ import Charts
 import DiskHealthCore
 
 struct DiskDetailView: View {
+    @EnvironmentObject var appManager: AppManager
     let disk: RealDisk
     
     @State private var historyRange: HistoryRange = .oneHour
@@ -240,6 +241,9 @@ struct DiskDetailView: View {
         var str = "\(typeStr) \(locStr) · \(protoStr)"
         if disk.physical.mediumType == .rotational, let snap = disk.snapshot, case .ata(let ataSnap) = snap, ataSnap.rotationRate > 1 {
             str += " · \(ataSnap.rotationRate) tr/min"
+        }
+        if appManager.isFusionDriveMember(disk) {
+            str += " · \(Strings.fusionDriveMember)"
         }
         return str
     }
