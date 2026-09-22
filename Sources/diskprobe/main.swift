@@ -76,6 +76,49 @@ if args.count > 1 {
         } catch {
             print("Error reading NVMe data: \(error)")
         }
+    } else if command == "smart" {
+        if args.count < 3 {
+            print("Usage: diskprobe smart <bsdName> [--json]")
+            exit(1)
+        }
+        let bsdName = args[2]
+        
+        do {
+            let smartData = try NVMeReader.readSmartLog(bsdName: bsdName)
+            let identifyData = try NVMeReader.readIdentify(bsdName: bsdName)
+            
+            if let smartLog = NVMeSmartParser.parse(smartData), let identify = NVMeIdentifyParser.parse(identifyData) {
+                let assessment = HealthEngine.evaluate(smart: smartLog, identify: identify)
+                
+                if args.contains("--json") {
+                    let encoder = JSONEncoder()
+                    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                    
+                    struct Output: Codable {
+                        let identify: NVMeIdentify
+                        let smart: NVMeSmartLog
+                        let health: HealthAssessment
+                    }
+                    let out = Output(identify: identify, smart: smartLog, health: assessment)
+                    if let data = try? encoder.encode(out), let json = String(data: data, encoding: .utf8) {
+                        print(json)
+                    }
+                } else {
+                    print("Model: \(identify.modelNumber)")
+                    print("Serial: \(identify.serialNumber)")
+                    print("Health: \(assessment.status.rawValue.uppercased()) (\(assessment.healthPercent.map { "\($0)%" } ?? "Unknown"))")
+                    for reason in assessment.reasons {
+                        print("- \(reason)")
+                    }
+                    print("Temperature: \(smartLog.temperatureCelsius.map { "\($0) °C" } ?? "Unknown")")
+                    print("Data Written: \(Formatters.dataUnitsToBytesText(smartLog.dataUnitsWritten))")
+                }
+            } else {
+                print("Failed to parse NVMe data")
+            }
+        } catch {
+            print("Error reading NVMe data: \(error)")
+        }
     } else {
         print("Unknown command: \(command)")
     }

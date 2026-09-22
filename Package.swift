@@ -33,6 +33,13 @@ let package = Package(
         .executableTarget(
             name: "diskprobe",
             dependencies: ["DiskHealthCore"]
+        ),
+        .testTarget(
+            name: "DiskHealthCoreTests",
+            dependencies: ["DiskHealthCore"],
+            resources: [
+                .copy("Fixtures")
+            ]
         )
     ]
 )
