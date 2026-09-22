@@ -85,7 +85,7 @@ struct ReportPageView: View {
                     infoRow("Modèle", disk.physical.model)
                     let serial = disk.identify?.serialNumber ?? (disk.snapshot != nil ? { if case .ata(let s) = disk.snapshot! { return s.serialNumber } else { return nil } }() : nil)
                     infoRow("Numéro de série", serial ?? "Inconnu")
-                    let fw = disk.identify?.firmwareRevision ?? (disk.snapshot != nil ? { if case .ata(let s) = disk.snapshot! { return s.firmwareRevision } else { return nil } }() : nil)
+                    let fw = disk.identify?.firmwareRevision ?? (disk.snapshot != nil ? { if case .ata(let s) = disk.snapshot! { return s.firmware } else { return nil } }() : nil)
                     infoRow("Firmware", fw ?? "Inconnu")
                 }
                 VStack(alignment: .leading, spacing: 6) {
@@ -107,14 +107,7 @@ struct ReportPageView: View {
                             infoRow("Endurance utilisée", "\(smart.percentageUsed) %")
                             infoRow("Réserve disponible", "\(smart.availableSpare) %")
                         case .ata(let ataSnap):
-                            let profile = ATACatalog.profile(for: ataSnap.model)
-                            var tempStr = "—"
-                            var usedStr = "—"
-                            for attr in ataSnap.attributes {
-                                let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-                                if info.role == .temperature, let t = attr.value(for: .temperature) { tempStr = "\(t) °C" }
-                                if info.role == .lifeRemainingPercentNormalized { usedStr = "\(100 - attr.current) %" }
-                            }
+                            let (tempStr, usedStr) = ataTempAndUsed(ataSnap: ataSnap)
                             infoRow("Température", tempStr)
                             infoRow("Endurance utilisée", usedStr)
                             infoRow("Réserve disponible", "—")
@@ -128,20 +121,7 @@ struct ReportPageView: View {
                             infoRow("Données lues", String(format: "%.1f To", readTB))
                             infoRow("Données écrites", String(format: "%.1f To", writeTB))
                         case .ata(let ataSnap):
-                            let profile = ATACatalog.profile(for: ataSnap.model)
-                            var readStr = "—"
-                            var writeStr = "—"
-                            for attr in ataSnap.attributes {
-                                let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-                                if case .hostReadsBytes(let mult) = info.role {
-                                    let readTB = Double(attr.rawValue * mult) / 1_000_000_000_000.0
-                                    readStr = String(format: "%.1f To", readTB)
-                                }
-                                if case .hostWritesBytes(let mult) = info.role {
-                                    let writeTB = Double(attr.rawValue * mult) / 1_000_000_000_000.0
-                                    writeStr = String(format: "%.1f To", writeTB)
-                                }
-                            }
+                            let (readStr, writeStr) = ataReadWrite(ataSnap: ataSnap)
                             infoRow("Données lues", readStr)
                             infoRow("Données écrites", writeStr)
                         }
@@ -192,7 +172,7 @@ struct ReportPageView: View {
                 switch snap {
                 case .nvme(let smart, let identify):
                     let attrs = NVMeAttributeCatalog.attributes(from: smart, identify: identify)
-                    ForEach(Array(attrs.enumerated()), id: \.element.id) { index, attr in
+                    ForEach(Array(attrs.enumerated()), id: \.offset) { index, attr in
                         HStack {
                             Text("0x\(String(format: "%02X", attr.id))")
                                 .font(.system(size: 9.5, design: .monospaced))
@@ -210,7 +190,7 @@ struct ReportPageView: View {
                     }
                 case .ata(let ataSnap):
                     let profile = ATACatalog.profile(for: ataSnap.model)
-                    ForEach(Array(ataSnap.attributes.enumerated()), id: \.element.id) { index, attr in
+                    ForEach(ataSnap.attributes, id: \.id) { attr in
                         let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
                         var stateStr = "Normal"
                         if attr.threshold > 0 && attr.current <= attr.threshold {
@@ -233,7 +213,7 @@ struct ReportPageView: View {
                         }
                         .font(.system(size: 9.5))
                         .padding(.vertical, 4)
-                        .background(index % 2 == 0 ? Color.white : Color(hex: "#F5F5F7").opacity(0.3))
+                        .background(Color.white)
                     }
                 }
             }
@@ -259,6 +239,36 @@ struct ReportPageView: View {
                 .font(.system(size: 10.5))
                 .foregroundColor(Color(hex: "#1D1D1F"))
         }
+    }
+    
+    private func ataTempAndUsed(ataSnap: ATASmartSnapshot) -> (String, String) {
+        let profile = ATACatalog.profile(for: ataSnap.model)
+        var tempStr = "—"
+        var usedStr = "—"
+        for attr in ataSnap.attributes {
+            let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
+            if info.role == .temperature, let t = attr.value(for: .temperature) { tempStr = "\(t) °C" }
+            if info.role == .lifeRemainingPercentNormalized { usedStr = "\(100 - attr.current) %" }
+        }
+        return (tempStr, usedStr)
+    }
+    
+    private func ataReadWrite(ataSnap: ATASmartSnapshot) -> (String, String) {
+        let profile = ATACatalog.profile(for: ataSnap.model)
+        var readStr = "—"
+        var writeStr = "—"
+        for attr in ataSnap.attributes {
+            let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
+            if case .hostReadsBytes(let mult) = info.role {
+                let readTB = Double(attr.rawValue * mult) / 1_000_000_000_000.0
+                readStr = String(format: "%.1f To", readTB)
+            }
+            if case .hostWritesBytes(let mult) = info.role {
+                let writeTB = Double(attr.rawValue * mult) / 1_000_000_000_000.0
+                writeStr = String(format: "%.1f To", writeTB)
+            }
+        }
+        return (readStr, writeStr)
     }
     
     private var statusColor: Color {
