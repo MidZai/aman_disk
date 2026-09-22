@@ -1,6 +1,6 @@
 import Foundation
 
-public struct NVMeIdentify: Codable, Equatable {
+public struct NVMeIdentify: Codable, Equatable, Hashable {
     public let serialNumber: String
     public let modelNumber: String
     public let firmwareRevision: String

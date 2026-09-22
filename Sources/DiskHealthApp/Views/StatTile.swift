@@ -75,7 +75,7 @@ struct MiniSparkline: View {
 
 struct StatTilesRow: View {
     let physical: PhysicalDisk
-    let smart: NVMeSmartLog?
+    let snapshot: DiskHealthSnapshot?
     
     var body: some View {
         HStack(spacing: 12) {
@@ -98,40 +98,103 @@ struct StatTilesRow: View {
                     label: "Pont USB"
                 )
             } else {
-                let tempStr = smart?.temperatureCelsius.map { Formatters.temperature($0) } ?? "Inconnue"
+                let metrics = extractMetrics(snapshot: snapshot, isRotational: physical.mediumType == .rotational)
                 let isDemo = ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] == "1"
                 
                 StatTile(
-                    value: tempStr,
-                    label: isDemo ? Strings.tileTemperatureHelp : "Température",
-                    customView: isDemo ? AnyView(MiniSparkline(data: [35.0, 36.0, 38.0, 40.0, 44.0, 42.0, 40.0, 39.0, 38.0, 38.0, 39.0, 40.0, 41.0, 39.0, 38.0, 38.0])) : nil
+                    value: metrics.tempStr,
+                    label: isDemo ? Strings.tileTemperatureHelp : (metrics.hasTemp ? "Température" : "Non fourni par ce disque"),
+                    customView: isDemo && metrics.hasTemp ? AnyView(MiniSparkline(data: [35.0, 36.0, 38.0, 40.0, 44.0, 42.0, 40.0, 39.0, 38.0, 38.0, 39.0, 40.0, 41.0, 39.0, 38.0, 38.0])) : nil
                 )
                 
-                let hours = smart?.powerOnHours ?? 0
                 StatTile(
-                    value: Formatters.hours(hours),
-                    label: "Heures d'utilisation"
+                    value: metrics.hoursStr,
+                    label: metrics.hasHours ? "Heures d'utilisation" : "Non fourni par ce disque"
                 )
                 
-                let cycles = smart?.powerCycles ?? 0
                 StatTile(
-                    value: Formatters.cycles(cycles),
-                    label: "Cycles d'alimentation"
+                    value: metrics.cyclesStr,
+                    label: metrics.hasCycles ? "Cycles d'alimentation" : "Non fourni par ce disque"
                 )
                 
-                let unsafe = smart?.unsafeShutdowns ?? 0
                 StatTile(
-                    value: Formatters.integer(unsafe),
-                    label: "Arrêts non propres"
+                    value: metrics.unsafeStr,
+                    label: metrics.hasUnsafe ? "Arrêts non propres" : "Non fourni par ce disque"
                 )
                 
-                let errors = smart?.mediaErrors ?? 0
                 StatTile(
-                    value: Formatters.integer(errors),
-                    label: "Erreurs média"
+                    value: metrics.errorsStr,
+                    label: metrics.hasErrors ? "Secteurs défectueux" : "Non fourni par ce disque"
                 )
             }
         }
     }
+    
+    private struct ExtractedMetrics {
+        let tempStr: String
+        let hoursStr: String
+        let cyclesStr: String
+        let unsafeStr: String
+        let errorsStr: String
+        
+        let hasTemp: Bool
+        let hasHours: Bool
+        let hasCycles: Bool
+        let hasUnsafe: Bool
+        let hasErrors: Bool
+    }
+    
+    private func extractMetrics(snapshot: DiskHealthSnapshot?, isRotational: Bool) -> ExtractedMetrics {
+        guard let snap = snapshot else {
+            return ExtractedMetrics(tempStr: "—", hoursStr: "—", cyclesStr: "—", unsafeStr: "—", errorsStr: "—", hasTemp: false, hasHours: false, hasCycles: false, hasUnsafe: false, hasErrors: false)
+        }
+        
+        var temp: Int? = nil
+        var hours: UInt64? = nil
+        var cycles: UInt64? = nil
+        var unsafe: UInt64? = nil
+        var errors: UInt64? = nil
+        
+        switch snap {
+        case .nvme(let smart, _):
+            temp = smart.temperatureCelsius
+            hours = smart.powerOnHours
+            cycles = smart.powerCycles
+            unsafe = smart.unsafeShutdowns
+            errors = smart.mediaErrors
+        case .ata(let ataSnap):
+            let profile = ATACatalog.profile(for: ataSnap.model)
+            for attr in ataSnap.attributes {
+                let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
+                if info.role == .temperature {
+                    temp = attr.value(for: .temperature).map { Int($0) }
+                }
+                if info.role == .powerOnHours {
+                    hours = attr.value(for: .powerOnHours)
+                }
+                if info.role == .powerCycles {
+                    cycles = attr.value(for: .powerCycles)
+                }
+                if info.role == .unsafeShutdowns {
+                    unsafe = attr.value(for: .unsafeShutdowns)
+                }
+                if info.role == .reallocated || info.role == .pending || info.role == .uncorrectable {
+                    errors = (errors ?? 0) + attr.rawValue
+                }
+            }
+        }
+        
+        return ExtractedMetrics(
+            tempStr: temp != nil ? Formatters.temperature(temp!) : "—",
+            hoursStr: hours != nil ? Formatters.hours(hours!) : "—",
+            cyclesStr: cycles != nil ? Formatters.cycles(cycles!) : "—",
+            unsafeStr: unsafe != nil ? Formatters.integer(unsafe!) : "—",
+            errorsStr: errors != nil ? Formatters.integer(errors!) : "—",
+            hasTemp: temp != nil,
+            hasHours: hours != nil,
+            hasCycles: cycles != nil,
+            hasUnsafe: unsafe != nil,
+            hasErrors: errors != nil
+        )
+    }
 }
-

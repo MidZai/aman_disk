@@ -149,7 +149,7 @@ if args.count > 1 {
             let snapshot: DiskHealthSnapshot
             if protocolType == .nvme {
                 snapshot = try NVMeBackend.read(bsdName: bsdName)
-            } else if protocolType == .ata {
+            } else if protocolType == .ata || protocolType == .pcieAhci {
                 snapshot = try ATABackend.read(bsdName: bsdName)
             } else {
                 print("Error: Unsupported protocol for SMART reading (\(protocolType)).")

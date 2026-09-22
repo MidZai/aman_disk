@@ -1,7 +1,7 @@
 import Foundation
 
 public enum StorageProtocol: String, Codable, Hashable {
-    case nvme, ata, sdCard, virtualDisk, usb, unknown
+    case nvme, ata, pcieAhci, sdCard, virtualDisk, usb, unknown
 }
 
 public enum MediumType: String, Codable, Hashable {

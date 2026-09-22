@@ -1,6 +1,6 @@
 import Foundation
 
-public struct NVMeSmartLog: Codable, Equatable {
+public struct NVMeSmartLog: Codable, Equatable, Hashable {
     public let criticalWarning: UInt8
     public let compositeTemperatureKelvin: UInt16
     public let availableSpare: UInt8

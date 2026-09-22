@@ -14,8 +14,8 @@ struct DiskDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
             header
             
-            if disk.smart != nil {
-                StatTilesRow(physical: disk.physical, smart: disk.smart)
+            if disk.snapshot != nil {
+                StatTilesRow(physical: disk.physical, snapshot: disk.snapshot)
             }
             
             Divider()
@@ -124,7 +124,7 @@ struct DiskDetailView: View {
                 }
             }
             
-            if disk.smart != nil {
+            if disk.snapshot != nil {
                 SmartTableView(disk: disk)
             }
             
@@ -227,10 +227,21 @@ struct DiskDetailView: View {
     }
     
     private var subtext: String {
-        let isApple = disk.physical.model.uppercased().contains("APPLE")
-        let maker = isApple ? "Apple" : "Générique"
-        let loc = disk.physical.isInternal ? "Disque interne" : "Disque externe"
-        return "\(loc) · \(maker)"
+        let typeStr = disk.physical.mediumType == .solidState ? "SSD" : (disk.physical.mediumType == .rotational ? "Disque dur" : "Support")
+        let locStr = disk.physical.isInternal ? "interne" : "externe"
+        var protoStr = ""
+        switch disk.physical.protocolType {
+        case .nvme: protoStr = "NVMe"
+        case .pcieAhci: protoStr = "PCIe AHCI"
+        case .ata: protoStr = "SATA"
+        case .usb: protoStr = "USB"
+        default: protoStr = disk.physical.connection.rawValue
+        }
+        var str = "\(typeStr) \(locStr) · \(protoStr)"
+        if disk.physical.mediumType == .rotational, let snap = disk.snapshot, case .ata(let ataSnap) = snap, ataSnap.rotationRate > 1 {
+            str += " · \(ataSnap.rotationRate) tr/min"
+        }
+        return str
     }
     
     private var sizeStr: String {

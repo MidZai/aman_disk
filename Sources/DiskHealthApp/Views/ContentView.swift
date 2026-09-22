@@ -72,7 +72,7 @@ struct ContentView: View {
                     switch selection {
                     case .physicalDisk(let id):
                         if let disk = appManager.disks.first(where: { $0.id == id }) {
-                            if disk.smart == nil {
+                            if disk.snapshot == nil {
                                 UnsupportedDiskView(physical: disk.physical)
                             } else {
                                 DiskDetailView(disk: disk)

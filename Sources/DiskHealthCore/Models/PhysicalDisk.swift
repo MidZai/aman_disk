@@ -1,5 +1,6 @@
 import Foundation
 
+
 public enum Connection: String, Codable {
     case nvmeInternal, nvmeExternal, usb, sata, other
 }

@@ -7,20 +7,31 @@ struct ReportPageView: View {
     let includeHistory: Bool
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Disk Health")
-                    .font(.system(size: 10))
-                    .foregroundColor(Color(hex: "#6E6E73"))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("DiskHealth")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(Color(hex: "#1D1D1F"))
+                    Text("Rapport d'état de santé")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: "#6E6E73"))
+                }
                 Spacer()
-                Text(formatter.string(from: Date()))
-                    .font(.system(size: 10))
-                    .foregroundColor(Color(hex: "#6E6E73"))
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(formatter.string(from: Date()))
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: "#6E6E73"))
+                    Text("Page \(pageNumber)")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: "#6E6E73"))
+                }
             }
-            .padding(.bottom, 8)
+            .padding(.bottom, 16)
             
-            Divider().background(Color(hex: "#D2D2D7"))
+            Divider()
+                .background(Color(hex: "#E5E5EA"))
                 .padding(.bottom, 20)
             
             if pageNumber == 1 {
@@ -29,30 +40,18 @@ struct ReportPageView: View {
                 page2Content
             }
             
-            Spacer()
-            
-            // Footer
-            HStack {
-                Text("Généré par Disk Health 0.2.0")
-                    .font(.system(size: 8))
-                    .foregroundColor(Color(hex: "#6E6E73"))
-                Spacer()
-                Text("Page \(pageNumber) / \(includeHistory ? 2 : 2)")
-                    .font(.system(size: 8))
-                    .foregroundColor(Color(hex: "#6E6E73"))
-            }
+            Spacer(minLength: 0)
         }
-        .padding(48)
-        .frame(width: 595, height: 842)
+        .padding(40)
+        .frame(width: 595, height: 842) // A4 format
         .background(Color.white)
-        .environment(\.colorScheme, .light)
     }
     
     @ViewBuilder
     private var page1Content: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Rapport de santé du disque")
-                .font(.system(size: 22, weight: .semibold))
+            Text("Résumé")
+                .font(.system(size: 20, weight: .bold))
                 .foregroundColor(Color(hex: "#1D1D1F"))
             
             Text(disk.physical.model)
@@ -84,8 +83,10 @@ struct ReportPageView: View {
             HStack(alignment: .top, spacing: 40) {
                 VStack(alignment: .leading, spacing: 6) {
                     infoRow("Modèle", disk.physical.model)
-                    infoRow("Numéro de série", disk.identify?.serialNumber ?? "Inconnu")
-                    infoRow("Firmware", disk.identify?.firmwareRevision ?? "Inconnu")
+                    let serial = disk.identify?.serialNumber ?? (disk.snapshot != nil ? { if case .ata(let s) = disk.snapshot! { return s.serialNumber } else { return nil } }() : nil)
+                    infoRow("Numéro de série", serial ?? "Inconnu")
+                    let fw = disk.identify?.firmwareRevision ?? (disk.snapshot != nil ? { if case .ata(let s) = disk.snapshot! { return s.firmwareRevision } else { return nil } }() : nil)
+                    infoRow("Firmware", fw ?? "Inconnu")
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     let sizeGB = Double(disk.physical.sizeBytes) / 1_000_000_000.0
@@ -97,18 +98,53 @@ struct ReportPageView: View {
             .padding(.bottom, 12)
             
             sectionHeader("2. Indicateurs clés")
-            if let smart = disk.smart {
+            if let snap = disk.snapshot {
                 HStack(alignment: .top, spacing: 40) {
                     VStack(alignment: .leading, spacing: 6) {
-                        infoRow("Température", "\(smart.temperatureCelsius ?? 0) °C")
-                        infoRow("Endurance utilisée", "\(smart.percentageUsed) %")
-                        infoRow("Réserve disponible", "\(smart.availableSpare) %")
+                        switch snap {
+                        case .nvme(let smart, _):
+                            infoRow("Température", "\(smart.temperatureCelsius ?? 0) °C")
+                            infoRow("Endurance utilisée", "\(smart.percentageUsed) %")
+                            infoRow("Réserve disponible", "\(smart.availableSpare) %")
+                        case .ata(let ataSnap):
+                            let profile = ATACatalog.profile(for: ataSnap.model)
+                            var tempStr = "—"
+                            var usedStr = "—"
+                            for attr in ataSnap.attributes {
+                                let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
+                                if info.role == .temperature, let t = attr.value(for: .temperature) { tempStr = "\(t) °C" }
+                                if info.role == .lifeRemainingPercentNormalized { usedStr = "\(100 - attr.current) %" }
+                            }
+                            infoRow("Température", tempStr)
+                            infoRow("Endurance utilisée", usedStr)
+                            infoRow("Réserve disponible", "—")
+                        }
                     }
                     VStack(alignment: .leading, spacing: 6) {
-                        let readTB = Double(smart.dataUnitsRead) * 512_000.0 / 1_000_000_000_000.0
-                        let writeTB = Double(smart.dataUnitsWritten) * 512_000.0 / 1_000_000_000_000.0
-                        infoRow("Données lues", String(format: "%.1f To", readTB))
-                        infoRow("Données écrites", String(format: "%.1f To", writeTB))
+                        switch snap {
+                        case .nvme(let smart, _):
+                            let readTB = Double(smart.dataUnitsRead) * 512_000.0 / 1_000_000_000_000.0
+                            let writeTB = Double(smart.dataUnitsWritten) * 512_000.0 / 1_000_000_000_000.0
+                            infoRow("Données lues", String(format: "%.1f To", readTB))
+                            infoRow("Données écrites", String(format: "%.1f To", writeTB))
+                        case .ata(let ataSnap):
+                            let profile = ATACatalog.profile(for: ataSnap.model)
+                            var readStr = "—"
+                            var writeStr = "—"
+                            for attr in ataSnap.attributes {
+                                let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
+                                if case .hostReadsBytes(let mult) = info.role {
+                                    let readTB = Double(attr.rawValue * mult) / 1_000_000_000_000.0
+                                    readStr = String(format: "%.1f To", readTB)
+                                }
+                                if case .hostWritesBytes(let mult) = info.role {
+                                    let writeTB = Double(attr.rawValue * mult) / 1_000_000_000_000.0
+                                    writeStr = String(format: "%.1f To", writeTB)
+                                }
+                            }
+                            infoRow("Données lues", readStr)
+                            infoRow("Données écrites", writeStr)
+                        }
                     }
                 }
             }
@@ -131,7 +167,7 @@ struct ReportPageView: View {
             
             Text("Méthode et limites")
                 .font(.system(size: 10, weight: .semibold))
-            Text("L'état de santé est calculé à partir des données déclarées par le contrôleur du disque (journal NVMe SMART / Health Information) au moment de la lecture. Il reflète l'usure et les erreurs connues du disque, mais ne peut pas garantir l'absence de panne future. Sauvegardez régulièrement vos données.")
+            Text("L'état de santé est calculé à partir des données déclarées par le contrôleur du disque au moment de la lecture. Il reflète l'usure et les erreurs connues du disque, mais ne peut pas garantir l'absence de panne future. Sauvegardez régulièrement vos données.")
                 .font(.system(size: 9))
                 .foregroundColor(Color(hex: "#6E6E73"))
         }
@@ -139,7 +175,7 @@ struct ReportPageView: View {
     
     private var smartTable: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Détail NVMe SMART / Health")
+            sectionHeader(disk.physical.protocolType == .nvme ? "Détail NVMe SMART / Health" : "Attributs S.M.A.R.T.")
             
             HStack {
                 Text("ID").frame(width: 40, alignment: .leading)
@@ -152,23 +188,53 @@ struct ReportPageView: View {
             .padding(.vertical, 4)
             .background(Color(hex: "#F5F5F7"))
             
-            if let smart = disk.smart {
-                let attrs = NVMeAttributeCatalog.attributes(from: smart, identify: disk.identify)
-                ForEach(Array(attrs.enumerated()), id: \.element.id) { index, attr in
-                    HStack {
-                        Text("0x\(String(format: "%02X", attr.id))")
-                            .font(.system(size: 9.5, design: .monospaced))
-                            .frame(width: 40, alignment: .leading)
-                        Text(attr.name)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(attr.displayValue)
-                            .frame(width: 120, alignment: .trailing)
-                        Text(attr.state == .normal ? "Normal" : (attr.state == .warning ? "Attention" : (attr.state == .critical ? "Critique" : "—")))
-                            .frame(width: 80, alignment: .leading)
+            if let snap = disk.snapshot {
+                switch snap {
+                case .nvme(let smart, let identify):
+                    let attrs = NVMeAttributeCatalog.attributes(from: smart, identify: identify)
+                    ForEach(Array(attrs.enumerated()), id: \.element.id) { index, attr in
+                        HStack {
+                            Text("0x\(String(format: "%02X", attr.id))")
+                                .font(.system(size: 9.5, design: .monospaced))
+                                .frame(width: 40, alignment: .leading)
+                            Text(attr.name)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(attr.displayValue)
+                                .frame(width: 120, alignment: .trailing)
+                            Text(attr.state == .normal ? "Normal" : (attr.state == .warning ? "Attention" : (attr.state == .critical ? "Critique" : "—")))
+                                .frame(width: 80, alignment: .leading)
+                        }
+                        .font(.system(size: 9.5))
+                        .padding(.vertical, 4)
+                        .background(index % 2 == 0 ? Color.white : Color(hex: "#F5F5F7").opacity(0.3))
                     }
-                    .font(.system(size: 9.5))
-                    .padding(.vertical, 4)
-                    .background(index % 2 == 0 ? Color.white : Color(hex: "#F5F5F7").opacity(0.3))
+                case .ata(let ataSnap):
+                    let profile = ATACatalog.profile(for: ataSnap.model)
+                    ForEach(Array(ataSnap.attributes.enumerated()), id: \.element.id) { index, attr in
+                        let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
+                        var stateStr = "Normal"
+                        if attr.threshold > 0 && attr.current <= attr.threshold {
+                            stateStr = "Critique"
+                        } else if info.role == .reallocated || info.role == .pending || info.role == .uncorrectable {
+                            if attr.rawValue > 0 { stateStr = "Attention" }
+                        }
+                        let displayValue = attr.value(for: info.role).map { Formatters.integer($0) } ?? "\(attr.current)"
+                        
+                        HStack {
+                            Text("0x\(String(format: "%02X", attr.id))")
+                                .font(.system(size: 9.5, design: .monospaced))
+                                .frame(width: 40, alignment: .leading)
+                            Text(info.name)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(displayValue)
+                                .frame(width: 120, alignment: .trailing)
+                            Text(stateStr)
+                                .frame(width: 80, alignment: .leading)
+                        }
+                        .font(.system(size: 9.5))
+                        .padding(.vertical, 4)
+                        .background(index % 2 == 0 ? Color.white : Color(hex: "#F5F5F7").opacity(0.3))
+                    }
                 }
             }
         }

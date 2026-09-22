@@ -78,28 +78,51 @@ public struct ExportService {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         
-        // Let's modify the disk temporarily to hide the serial if needed.
         var exportDisk = disk
-        if !includeSerial, let iden = disk.identify {
-            let modifiedIdentify = NVMeIdentify(
-                serialNumber: "<masqué>",
-                modelNumber: iden.modelNumber,
-                firmwareRevision: iden.firmwareRevision,
-                warningTempKelvin: iden.warningTempKelvin,
-                criticalTempKelvin: iden.criticalTempKelvin,
-                totalCapacityBytes: iden.totalCapacityBytes
-            )
-            exportDisk = RealDisk(physical: disk.physical, smart: disk.smart, identify: modifiedIdentify, health: disk.health, lastRead: disk.lastRead)
+        if !includeSerial, let snap = disk.snapshot {
+            switch snap {
+            case .nvme(let smart, let iden):
+                let modifiedIdentify = NVMeIdentify(
+                    serialNumber: "<masqué>",
+                    modelNumber: iden.modelNumber,
+                    firmwareRevision: iden.firmwareRevision,
+                    warningTempKelvin: iden.warningTempKelvin,
+                    criticalTempKelvin: iden.criticalTempKelvin,
+                    totalCapacityBytes: iden.totalCapacityBytes
+                )
+                exportDisk = RealDisk(physical: disk.physical, snapshot: .nvme(smart, modifiedIdentify), health: disk.health, lastRead: disk.lastRead)
+            case .ata(let a):
+                let modified = ATASmartSnapshot(
+                    attributes: a.attributes,
+                    model: a.model,
+                    firmware: a.firmware,
+                    serialNumber: "<masqué>",
+                    rotationRate: a.rotationRate,
+                    thresholdExceeded: a.thresholdExceeded,
+                    checksumValid: a.checksumValid
+                )
+                exportDisk = RealDisk(physical: disk.physical, snapshot: .ata(modified), health: disk.health, lastRead: disk.lastRead)
+            }
         }
         
-        guard let data = try? encoder.encode(exportDisk) else { return }
+        struct ExportFormat: Codable {
+            let schemaVersion: Int
+            let physical: PhysicalDisk
+            let smart: DiskHealthSnapshot?
+            let health: HealthAssessment
+            let lastRead: Date
+        }
+        
+        let out = ExportFormat(schemaVersion: 2, physical: exportDisk.physical, smart: exportDisk.snapshot, health: exportDisk.health, lastRead: exportDisk.lastRead)
+        
+        guard let data = try? encoder.encode(out) else { return }
         if let url = getSaveURL(disk: disk, extension: "json") {
             do {
                 try data.write(to: url)
                 ToastCenter.shared.show(message: "Rapport exporté", systemImage: "checkmark.circle")
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } catch {
-                ToastCenter.shared.show(message: "L'export a échoué: \(error.localizedDescription)", systemImage: "xmark.octagon")
+                ToastCenter.shared.show(message: "L'export a échoué", systemImage: "xmark.octagon")
             }
         }
     }

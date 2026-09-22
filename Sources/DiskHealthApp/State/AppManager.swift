@@ -9,15 +9,35 @@ enum SidebarItem: Hashable {
 public struct RealDisk: Identifiable, Equatable, Codable {
     public var id: String { physical.bsdName }
     public let physical: PhysicalDisk
-    public let smart: NVMeSmartLog?
-    public let identify: NVMeIdentify?
+    public let snapshot: DiskHealthSnapshot?
     public let health: HealthAssessment
     public let lastRead: Date
     
+    public var smart: NVMeSmartLog? {
+        if case .nvme(let sm, _) = snapshot { return sm }
+        return nil
+    }
+    
+    public var identify: NVMeIdentify? {
+        if case .nvme(_, let id) = snapshot { return id }
+        return nil
+    }
+    
+    public init(physical: PhysicalDisk, snapshot: DiskHealthSnapshot?, health: HealthAssessment, lastRead: Date = Date()) {
+        self.physical = physical
+        self.snapshot = snapshot
+        self.health = health
+        self.lastRead = lastRead
+    }
+    
+    // For backwards compatibility during initialization
     public init(physical: PhysicalDisk, smart: NVMeSmartLog?, identify: NVMeIdentify?, health: HealthAssessment, lastRead: Date = Date()) {
         self.physical = physical
-        self.smart = smart
-        self.identify = identify
+        if let s = smart, let i = identify {
+            self.snapshot = .nvme(s, i)
+        } else {
+            self.snapshot = nil
+        }
         self.health = health
         self.lastRead = lastRead
     }
@@ -82,61 +102,96 @@ class AppManager: ObservableObject {
     func loadDisks(isAutoRefresh: Bool = false) {
         if ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] == "1" {
             self.disks = DemoData.disks.map { 
-                RealDisk(physical: $0.physical, smart: $0.smart, identify: $0.identify, health: $0.health, lastRead: Date()) 
+                RealDisk(physical: $0.physical, snapshot: $0.snapshot, health: $0.health, lastRead: Date()) 
             }
             self.volumes = []
             self.isLoading = false
             return
         }
         
-        if !isAutoRefresh { isLoading = true }
-        // On background queue
-        DispatchQueue.global(qos: .userInitiated).async {
+        if !isAutoRefresh { self.isLoading = true }
+        
+        Task.detached {
             let physicalDisks = DiskDiscovery.listPhysicalDisks()
             var newDisks: [RealDisk] = []
             var privilegesMissing = false
             
             for physical in physicalDisks {
-                if physical.connection == .nvmeInternal || physical.connection == .nvmeExternal {
-                    do {
-                        let smartData = try NVMeReader.readSmartLog(bsdName: physical.bsdName)
-                        let identifyData = try NVMeReader.readIdentify(bsdName: physical.bsdName)
-                        
-                        if let smartLog = NVMeSmartParser.parse(smartData),
-                           let identify = NVMeIdentifyParser.parse(identifyData) {
-                            let health = HealthEngine.evaluate(smart: smartLog, identify: identify)
-                            newDisks.append(RealDisk(physical: physical, smart: smartLog, identify: identify, health: health, lastRead: Date()))
-                            
-                            // Save to history
+                var snapshot: DiskHealthSnapshot? = nil
+                var health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Pas d'information S.M.A.R.T. disponible."])
+                
+                do {
+                    if physical.protocolType == .nvme {
+                        snapshot = try NVMeBackend.read(bsdName: physical.bsdName)
+                    } else if physical.protocolType == .ata || physical.protocolType == .pcieAhci {
+                        snapshot = try ATABackend.read(bsdName: physical.bsdName)
+                    }
+                    
+                    if let snap = snapshot {
+                        switch snap {
+                        case .nvme(let smartLog, let identify):
+                            health = HealthEngine.evaluate(smart: smartLog, identify: identify)
                             let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
                             let sample = HistorySample(
                                 date: Date(),
                                 temperatureC: smartLog.temperatureCelsius,
-                                percentageUsed: smartLog.percentageUsed,
+                                percentageUsed: Int(smartLog.percentageUsed),
                                 dataUnitsWritten: smartLog.dataUnitsWritten,
                                 dataUnitsRead: smartLog.dataUnitsRead,
                                 powerOnHours: smartLog.powerOnHours,
                                 mediaErrors: smartLog.mediaErrors,
-                                availableSpare: smartLog.availableSpare
+                                availableSpare: Int(smartLog.availableSpare)
                             )
                             HistoryStore.shared.append(sample, for: key)
-                        } else {
-                            let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Données SMART illisibles"])
-                            newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health, lastRead: Date()))
+                            
+                        case .ata(let ataSnapshot):
+                            health = ATAHealthEvaluator.evaluate(snapshot: ataSnapshot)
+                            let profile = ATACatalog.profile(for: ataSnapshot.model)
+                            
+                            var temp: Int? = nil
+                            var written: UInt64? = nil
+                            var read: UInt64? = nil
+                            var hours: UInt64? = nil
+                            var used: Int? = nil
+                            var errors: UInt64? = nil
+                            var spare: Int? = nil
+                            
+                            for attr in ataSnapshot.attributes {
+                                let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
+                                switch info.role {
+                                case .temperature: temp = attr.value(for: .temperature).map { Int($0) }
+                                case .hostWritesBytes(let mult): written = (attr.rawValue * mult) / 512000
+                                case .hostReadsBytes(let mult): read = (attr.rawValue * mult) / 512000
+                                case .powerOnHours: hours = attr.value(for: .powerOnHours)
+                                case .lifeRemainingPercentNormalized: used = 100 - Int(attr.current)
+                                case .reallocated, .pending, .uncorrectable: errors = (errors ?? 0) + attr.rawValue
+                                default: break
+                                }
+                            }
+                            
+                            let key = DiskIdentity.key(model: ataSnapshot.model, serial: ataSnapshot.serialNumber)
+                            let sample = HistorySample(
+                                date: Date(),
+                                temperatureC: temp,
+                                percentageUsed: used,
+                                dataUnitsWritten: written,
+                                dataUnitsRead: read,
+                                powerOnHours: hours,
+                                mediaErrors: errors,
+                                availableSpare: spare
+                            )
+                            HistoryStore.shared.append(sample, for: key)
                         }
-                    } catch {
-                        privilegesMissing = true
-                        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Erreur de lecture: \(error.localizedDescription)"])
-                        newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health, lastRead: Date()))
                     }
-                } else {
-                    let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Santé non lisible"])
-                    newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health, lastRead: Date()))
+                } catch {
+                    privilegesMissing = true
                 }
+                
+                newDisks.append(RealDisk(physical: physical, snapshot: snapshot, health: health, lastRead: Date()))
             }
             
-
             let volumes = VolumeDiscovery.listVolumes()
+
             DispatchQueue.main.async {
                 // Hotplug detection for toasts
                 if !self.disks.isEmpty {

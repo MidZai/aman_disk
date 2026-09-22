@@ -30,6 +30,7 @@ public enum ProtocolDetector {
         
         var isNVMeSmartCapable = false
         var isATASmartCapable = false
+        var isPCIeAHCI = false
         var mediumTypeStr: String? = nil
         
         var current = targetService
@@ -47,6 +48,12 @@ public enum ProtocolDetector {
             if let devChars = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "Device Characteristics" as CFString, kCFAllocatorDefault, 0) as? [String: Any] {
                 if mediumTypeStr == nil, let mt = devChars["Medium Type"] as? String {
                     mediumTypeStr = mt
+                }
+            }
+            
+            if let protChars = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "Protocol Characteristics" as CFString, kCFAllocatorDefault, 0) as? [String: Any] {
+                if let interconnect = protChars["Physical Interconnect"] as? String, interconnect == "PCI-Express" {
+                    isPCIeAHCI = true
                 }
             }
             
@@ -83,6 +90,9 @@ public enum ProtocolDetector {
             return (.nvme, mediumType, .supported)
         }
         if isATASmartCapable {
+            if isPCIeAHCI {
+                return (.pcieAhci, mediumType, .supported)
+            }
             return (.ata, mediumType, .supported)
         }
         if daProtocol == "USB" || daProtocol == "USB-C" || daProtocol == "USB (Attached SCSI)" {

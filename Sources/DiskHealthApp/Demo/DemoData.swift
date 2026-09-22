@@ -4,16 +4,18 @@ import DiskHealthCore
 public enum DemoData {
     public struct DemoDisk {
         let physical: PhysicalDisk
-        let smart: NVMeSmartLog?
-        let identify: NVMeIdentify?
+        let snapshot: DiskHealthSnapshot?
+        
         let health: HealthAssessment
     }
     
-    public static let disks: [DemoDisk] = [
+        public static let disks: [DemoDisk] = [
         makeDisk1(),
         makeDisk2(),
         makeDisk3(),
-        makeDisk4()
+        makeDisk4(),
+        makeDisk5(),
+        makeDisk6()
     ]
     
     private static func makeDisk1() -> DemoDisk {
@@ -61,7 +63,7 @@ public enum DemoData {
             current = current.addingTimeInterval(5 * 60)
         }
 
-        return DemoDisk(physical: physical, smart: smart, identify: identify, health: health)
+        return DemoDisk(physical: physical, snapshot: .nvme(smart, identify), health: health)
     }
     
     private static func makeDisk2() -> DemoDisk {
@@ -107,7 +109,7 @@ public enum DemoData {
             current = current.addingTimeInterval(5 * 60)
         }
 
-        return DemoDisk(physical: physical, smart: smart, identify: identify, health: health)
+        return DemoDisk(physical: physical, snapshot: .nvme(smart, identify), health: health)
     }
     
     private static func makeDisk3() -> DemoDisk {
@@ -153,12 +155,121 @@ public enum DemoData {
             current = current.addingTimeInterval(5 * 60)
         }
 
-        return DemoDisk(physical: physical, smart: smart, identify: identify, health: health)
+        return DemoDisk(physical: physical, snapshot: .nvme(smart, identify), health: health)
     }
     
+    
+    private static func makeATASmartData(attributes: [(id: UInt8, flags: UInt16, current: UInt8, worst: UInt8, raw: [UInt8])]) -> Data {
+        var data = [UInt8](repeating: 0, count: 512)
+        for (i, attr) in attributes.enumerated() {
+            if i >= 30 { break }
+            let offset = 2 + (i * 12)
+            data[offset] = attr.id
+            data[offset+1] = UInt8(attr.flags & 0xFF)
+            data[offset+2] = UInt8((attr.flags >> 8) & 0xFF)
+            data[offset+3] = attr.current
+            data[offset+4] = attr.worst
+            for j in 0..<min(6, attr.raw.count) {
+                data[offset+5+j] = attr.raw[j]
+            }
+        }
+        let sum = data.prefix(511).reduce(0) { (UInt16($0) + UInt16($1)) % 256 }
+        let checksum = (256 - sum) % 256
+        data[511] = UInt8(checksum)
+        return Data(data)
+    }
+
+    private static func makeATAThresholds(thresholds: [(id: UInt8, threshold: UInt8)]) -> Data {
+        var data = [UInt8](repeating: 0, count: 512)
+        for (i, t) in thresholds.enumerated() {
+            if i >= 30 { break }
+            let offset = 2 + (i * 12)
+            data[offset] = t.id
+            data[offset+1] = t.threshold
+        }
+        let sum = data.prefix(511).reduce(0) { (UInt16($0) + UInt16($1)) % 256 }
+        let checksum = (256 - sum) % 256
+        data[511] = UInt8(checksum)
+        return Data(data)
+    }
+
+    private static func makeATAIdentify(model: String, rotationRate: Int) -> Data {
+        var data = [UInt8](repeating: 0, count: 512)
+        func writeString(_ str: String, offset: Int, length: Int) {
+            let padded = str.padding(toLength: length, withPad: " ", startingAt: 0)
+            let bytes = Array(padded.utf8)
+            for i in 0..<(length/2) {
+                let b1 = i*2 < bytes.count ? bytes[i*2] : 32
+                let b2 = i*2+1 < bytes.count ? bytes[i*2+1] : 32
+                data[offset + i*2] = b2
+                data[offset + i*2 + 1] = b1
+            }
+        }
+        writeString(model, offset: 54, length: 40)
+        data[434] = UInt8(rotationRate & 0xFF)
+        data[435] = UInt8((rotationRate >> 8) & 0xFF)
+        return Data(data)
+    }
+
+    private static func makeDisk5() -> DemoDisk {
+        let physical = PhysicalDisk(bsdName: "disk4", model: "APPLE SSD SM0512G", sizeBytes: 500_277_790_720, isInternal: true, connection: .sata, volumeNames: ["Macintosh HD"], usbVendorID: nil, usbProductID: nil, protocolType: .pcieAhci, mediumType: .solidState, healthCapability: .supported)
+        
+        let smartData = makeATASmartData(attributes: [
+            (1, 0, 200, 200, [0, 0, 0, 0, 0, 0]),
+            (5, 0, 100, 100, [0, 0, 0, 0, 0, 0]),
+            (9, 0, 93, 93, [59, 123, 0, 0, 0, 0]), // 31483 hours
+            (12, 0, 40, 40, [32, 234, 0, 0, 0, 0]), // 59936 cycles
+            (173, 0, 183, 183, [0, 0, 0, 0, 0, 0]), // Wear leveling count 183 -> 17% used
+            (174, 0, 99, 99, [52, 105, 105, 6, 0, 0]), // Reads
+            (175, 0, 99, 99, [24, 60, 215, 6, 0, 0]), // Writes
+            (192, 0, 99, 99, [10, 2, 0, 0, 0, 0]), // Unsafe shutdowns
+            (194, 0, 60, 35, [40, 0, 0, 0, 0, 0]), // Temp 40C
+            (197, 0, 100, 100, [0, 0, 0, 0, 0, 0])
+        ])
+        
+        let thresholdsData = makeATAThresholds(thresholds: [
+            (1, 0), (5, 0), (9, 0), (12, 0), (173, 100), (194, 0), (197, 0)
+        ])
+        
+        let identifyData = makeATAIdentify(model: "APPLE SSD SM0512G", rotationRate: 1)
+        
+        let parsedSmart = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false)
+        let health = ATAHealthEvaluator.evaluate(snapshot: parsedSmart!)
+        
+        return DemoDisk(physical: physical, snapshot: .ata(parsedSmart!), health: health)
+    }
+
+    private static func makeDisk6() -> DemoDisk {
+        let physical = PhysicalDisk(bsdName: "disk5", model: "WDC WD10EZEX-00BN5A0", sizeBytes: 1_000_204_886_016, isInternal: true, connection: .sata, volumeNames: ["Data"], usbVendorID: nil, usbProductID: nil, protocolType: .ata, mediumType: .rotational, healthCapability: .supported)
+        
+        let smartData = makeATASmartData(attributes: [
+            (1, 0, 200, 200, [0, 0, 0, 0, 0, 0]),
+            (3, 0, 140, 140, [21, 0, 0, 0, 0, 0]),
+            (4, 0, 100, 100, [45, 0, 0, 0, 0, 0]),
+            (5, 0, 200, 200, [0, 0, 0, 0, 0, 0]),
+            (9, 0, 85, 85, [140, 45, 0, 0, 0, 0]), // ~11660 hours
+            (12, 0, 100, 100, [42, 0, 0, 0, 0, 0]),
+            (192, 0, 200, 200, [15, 0, 0, 0, 0, 0]),
+            (194, 0, 110, 95, [38, 0, 0, 0, 0, 0]), // 38C
+            (197, 0, 200, 200, [8, 0, 0, 0, 0, 0]), // 8 pending sectors (caution)
+            (199, 0, 200, 200, [0, 0, 0, 0, 0, 0])
+        ])
+        
+        let thresholdsData = makeATAThresholds(thresholds: [
+            (1, 51), (3, 21), (4, 0), (5, 140), (9, 0), (12, 0), (194, 0), (197, 0)
+        ])
+        
+        let identifyData = makeATAIdentify(model: "WDC WD10EZEX-00BN5A0", rotationRate: 7200)
+        
+        let parsedSmart = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false)
+        let health = ATAHealthEvaluator.evaluate(snapshot: parsedSmart!)
+        
+        return DemoDisk(physical: physical, snapshot: .ata(parsedSmart!), health: health)
+    }
+
     private static func makeDisk4() -> DemoDisk {
         let physical = PhysicalDisk(bsdName: "disk3", model: "External SSD", sizeBytes: 1_000_000_000_000, isInternal: false, connection: .usb, volumeNames: ["Sauvegardes"], usbVendorID: 0x0BDA, usbProductID: 0x9210, protocolType: .usb, mediumType: .solidState, healthCapability: .unsupported(reason: .usbBridge))
         let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Santé non lisible"])
-        return DemoDisk(physical: physical, smart: nil, identify: nil, health: health)
+        return DemoDisk(physical: physical, snapshot: nil, health: health)
     }
 }
