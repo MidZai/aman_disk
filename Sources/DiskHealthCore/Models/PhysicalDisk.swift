@@ -12,7 +12,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
     public let isInternal: Bool
     public let connection: Connection
     public let volumeNames: [String]
-    public let usbVendorID: UInt16?
+    public let usbVendorID: UInt16?     // uniquement si connection == .usb
     public let usbProductID: UInt16?
 
     public init(bsdName: String, model: String, sizeBytes: UInt64, isInternal: Bool, connection: Connection, volumeNames: [String], usbVendorID: UInt16? = nil, usbProductID: UInt16? = nil) {
