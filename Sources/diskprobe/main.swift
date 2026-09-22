@@ -144,26 +144,43 @@ if args.count > 1 {
         let bsdName = args[2]
         
         do {
-            let smartData = try NVMeReader.readSmartLog(bsdName: bsdName)
-            let identifyData = try NVMeReader.readIdentify(bsdName: bsdName)
+            let (protocolType, _, _) = ProtocolDetector.detect(bsdName: bsdName)
             
-            if let smartLog = NVMeSmartParser.parse(smartData), let identify = NVMeIdentifyParser.parse(identifyData) {
-                let assessment = HealthEngine.evaluate(smart: smartLog, identify: identify)
+            let snapshot: DiskHealthSnapshot
+            if protocolType == .nvme {
+                snapshot = try NVMeBackend.read(bsdName: bsdName)
+            } else if protocolType == .ata {
+                snapshot = try ATABackend.read(bsdName: bsdName)
+            } else {
+                print("Error: Unsupported protocol for SMART reading (\(protocolType)).")
+                exit(1)
+            }
+            
+            if args.contains("--json") {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
                 
-                if args.contains("--json") {
-                    let encoder = JSONEncoder()
-                    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                    
-                    struct Output: Codable {
-                        let identify: NVMeIdentify
-                        let smart: NVMeSmartLog
-                        let health: HealthAssessment
-                    }
-                    let out = Output(identify: identify, smart: smartLog, health: assessment)
-                    if let data = try? encoder.encode(out), let json = String(data: data, encoding: .utf8) {
-                        print(json)
-                    }
-                } else {
+                struct Output: Codable {
+                    let snapshot: DiskHealthSnapshot
+                    let health: HealthAssessment
+                }
+                
+                let assessment: HealthAssessment
+                switch snapshot {
+                case .nvme(let smartLog, let identify):
+                    assessment = HealthEngine.evaluate(smart: smartLog, identify: identify)
+                case .ata(let ataSnapshot):
+                    assessment = ATAHealthEvaluator.evaluate(snapshot: ataSnapshot)
+                }
+                
+                let out = Output(snapshot: snapshot, health: assessment)
+                if let data = try? encoder.encode(out), let json = String(data: data, encoding: .utf8) {
+                    print(json)
+                }
+            } else {
+                switch snapshot {
+                case .nvme(let smartLog, let identify):
+                    let assessment = HealthEngine.evaluate(smart: smartLog, identify: identify)
                     print("Model: \(identify.modelNumber)")
                     print("Serial: \(identify.serialNumber)")
                     print("Health: \(assessment.status.rawValue.uppercased()) (\(assessment.healthPercent.map { "\($0)%" } ?? "Unknown"))")
@@ -172,12 +189,28 @@ if args.count > 1 {
                     }
                     print("Temperature: \(smartLog.temperatureCelsius.map { "\($0) °C" } ?? "Unknown")")
                     print("Data Written: \(Formatters.dataUnitsToBytesText(smartLog.dataUnitsWritten))")
+                case .ata(let ataSnapshot):
+                    let assessment = ATAHealthEvaluator.evaluate(snapshot: ataSnapshot)
+                    print("Model: \(ataSnapshot.model)")
+                    print("Serial: \(ataSnapshot.serialNumber)")
+                    print("Health: \(assessment.status.rawValue.uppercased()) (\(assessment.healthPercent.map { "\($0)%" } ?? "Unknown"))")
+                    for reason in assessment.reasons {
+                        print("- \(reason)")
+                    }
+                    let profile = ATACatalog.profile(for: ataSnapshot.model)
+                    if let tempAttr = ataSnapshot.attributes.first(where: { ATACatalog.attributeInfo(id: $0.id, profile: profile).role == .temperature }) {
+                        if let temp = tempAttr.value(for: .temperature) {
+                            print("Temperature: \(temp) °C")
+                        } else {
+                            print("Temperature: Unknown")
+                        }
+                    } else {
+                        print("Temperature: Unknown")
+                    }
                 }
-            } else {
-                print("Failed to parse NVMe data")
             }
         } catch {
-            print("Error reading NVMe data: \(error)")
+            print("Error reading SMART data: \(error)")
         }
     } else if command == "volumes" {
         let volumes = VolumeDiscovery.listVolumes()
