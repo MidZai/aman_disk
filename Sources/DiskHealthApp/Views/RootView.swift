@@ -11,14 +11,39 @@ struct RootView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
+            let selectedDisk = DemoData.disks[selectedDiskIndex]
+            
+            // Halo background
+            HealthHalo(status: selectedDisk.health.status)
+            
             // Main content
-            VStack {
-                Spacer()
-                Text(DemoData.disks[selectedDiskIndex].physical.model)
-                    .font(.largeTitle)
-                Spacer()
+            VStack(spacing: 22) {
+                // Hero Zone
+                HStack(spacing: 32) {
+                    HealthGauge(assessment: selectedDisk.health)
+                    
+                    VStack(alignment: .leading, spacing: 22) {
+                        HeroHeader(physical: selectedDisk.physical, assessment: selectedDisk.health)
+                        StatTilesRow(physical: selectedDisk.physical, smart: selectedDisk.smart)
+                    }
+                    Spacer()
+                }
+                
+                // Bottom Zone
+                HStack(alignment: .top, spacing: 26) {
+                    InfoList(physical: selectedDisk.physical, smart: selectedDisk.smart, identify: selectedDisk.identify)
+                    
+                    if let smart = selectedDisk.smart {
+                        SmartTable(smart: smart)
+                    } else {
+                        UnsupportedDiskView()
+                    }
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.top, 66)
+            .padding(.bottom, 26)
+            .padding(.horizontal, 26)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             
             // Floating chrome
             HStack(alignment: .top) {
@@ -51,9 +76,9 @@ struct RootView: View {
                 
                 // Action buttons (right, 12pt offset)
                 HStack(spacing: 4) {
-                    ActionButton(icon: "arrow.clockwise", help: "Actualiser") {}
-                    ActionButton(icon: "doc.on.doc", help: "Copier le rapport") {}
-                    ActionButton(icon: "clock.arrow.circlepath", help: "Historique") {}
+                    ActionButton(icon: "arrow.clockwise", help: Strings.refresh) {}
+                    ActionButton(icon: "doc.on.doc", help: Strings.copyReport) {}
+                    ActionButton(icon: "clock.arrow.circlepath", help: Strings.history) {}
                         .disabled(true)
                 }
                 .padding(.horizontal, 8)
@@ -68,21 +93,26 @@ struct RootView: View {
             .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chromeVisible)
         }
         .frame(minWidth: 980, minHeight: 640)
-        .windowAccessor { window in
+        .windowAccessor(onWindow: { window in
             self.hoverWindow = window
-        }
-        .onHover { inside in
-            if initialTimer?.isValid == true { return } // Keep visible during initial timer
+            
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.styleMask.insert(.fullSizeContentView)
+            window.isMovableByWindowBackground = true
+            
+            window.standardWindowButton(.closeButton)?.alphaValue = 0
+            window.standardWindowButton(.miniaturizeButton)?.alphaValue = 0
+            window.standardWindowButton(.zoomButton)?.alphaValue = 0
+        }, onHover: { inside in
+            if initialTimer?.isValid == true { return }
             setChromeVisible(inside)
-        }
+        })
         .onAppear {
             setChromeVisible(true)
             initialTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { _ in
-                // If not currently hovering after 2s, hide it. We can't easily read native mouse pos here simply without a tracking area, 
-                // but we can assume if they aren't triggering onHover, we hide.
-                // Actually, SwiftUI's onHover handles state. We just reset the timer lock.
                 self.initialTimer = nil
-                self.setChromeVisible(false) // it will quickly reappear if mouse is actually inside, since onHover triggers continuously or we can just leave it false and wait for movement.
+                self.setChromeVisible(false)
             }
         }
     }
@@ -101,7 +131,7 @@ struct RootView: View {
         }
     }
     
-    private func statusColor(_ status: DiskHealthCore.HealthStatus) -> Color {
+    private func statusColor(_ status: HealthStatus) -> Color {
         switch status {
         case .good: return Color(nsColor: .systemGreen)
         case .caution: return Color(nsColor: .systemOrange)
