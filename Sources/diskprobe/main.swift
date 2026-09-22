@@ -119,6 +119,22 @@ if args.count > 1 {
         } catch {
             print("Error reading NVMe data: \(error)")
         }
+    } else if command == "volumes" {
+        let volumes = VolumeDiscovery.listVolumes()
+        if args.contains("--json") {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            if let data = try? encoder.encode(volumes), let json = String(data: data, encoding: .utf8) {
+                print(json)
+            }
+        } else {
+            print("Found \(volumes.count) volume(s):")
+            for vol in volumes {
+                let sizeGB = Double(vol.totalBytes) / 1_000_000_000.0
+                let phys = vol.physicalDiskBSDName ?? "None"
+                print(String(format: "%-8@ %-20@ %6.1f GB  %-8@ %-30@ (Phys: %@)", vol.bsdName, vol.name, sizeGB, vol.format, vol.mountPoint, phys))
+            }
+        }
     } else {
         print("Unknown command: \(command)")
     }
