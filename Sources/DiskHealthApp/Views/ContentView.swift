@@ -55,11 +55,19 @@ struct ContentView: View {
             .listStyle(.sidebar)
         } detail: {
             Group {
+                if appManager.isLoading {
+                    ProgressView("Analyse des disques…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else 
                 if let selection = selection {
                     switch selection {
                     case .physicalDisk(let id):
                         if let disk = appManager.disks.first(where: { $0.id == id }) {
-                            DiskDetailView(disk: disk)
+                            if disk.smart == nil {
+                                UnsupportedDiskView(physical: disk.physical)
+                            } else {
+                                DiskDetailView(disk: disk)
+                            }
                         } else {
                             Text("Disque introuvable")
                         }
@@ -75,6 +83,7 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+            .animation(.easeInOut, value: selection)
             .inspector(isPresented: $appManager.showDetails) {
                 if let selection = selection {
                     InspectorView(selection: selection)
@@ -88,7 +97,7 @@ struct ContentView: View {
                     Button(action: {
                         appManager.loadDisks()
                     }) {
-                        Label("Actualiser", systemImage: "arrow.clockwise")
+                        Label("Actualiser", systemImage: "arrow.clockwise").help("Actualiser la liste des disques")
                     }
                 }
                 
@@ -100,7 +109,7 @@ struct ContentView: View {
                         Divider()
                         Button("Copier le résumé") { print("Copier le résumé") }
                     } label: {
-                        Label("Exporter", systemImage: "square.and.arrow.up")
+                        Label("Exporter", systemImage: "square.and.arrow.up").help("Exporter les données du disque")
                     }
                 }
                 
@@ -108,7 +117,7 @@ struct ContentView: View {
                     Button(action: {
                         appManager.showDetails.toggle()
                     }) {
-                        Label("Détails", systemImage: "info.circle")
+                        Label("Détails", systemImage: "info.circle").help("Afficher l'inspecteur de détails")
                     }
                 }
             }

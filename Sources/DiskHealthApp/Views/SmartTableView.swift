@@ -52,7 +52,7 @@ struct SmartTableView: View {
                 TableColumn("Valeur brute") { attr in
                     if appManager.showRawValues {
                         Text(attr.rawValue)
-                            .monospaced()
+                            .monospacedDigit()
                             .foregroundColor(.secondary)
                             .textSelection(.enabled)
                             .contextMenu { contextMenu(for: attr) }
