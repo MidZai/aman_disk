@@ -14,7 +14,16 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "CDiskIO",
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedFramework("IOKit"),
+                .linkedFramework("CoreFoundation")
+            ]
+        ),
+        .target(
             name: "DiskHealthCore",
+            dependencies: ["CDiskIO"],
             linkerSettings: [
                 .linkedFramework("IOKit"),
                 .linkedFramework("DiskArbitration"),
