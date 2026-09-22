@@ -7,7 +7,7 @@ struct HeroHeader: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(physical.volumeNames.first ?? physical.model)
+            Text(physical.model)
                 .font(.system(size: 30, weight: .bold))
             
             HStack(spacing: 6) {

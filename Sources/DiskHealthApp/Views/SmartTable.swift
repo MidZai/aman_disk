@@ -12,6 +12,7 @@ struct SmartAttribute: Identifiable {
 
 struct SmartTable: View {
     let smart: NVMeSmartLog
+    let lastRead: Date
     
     var attributes: [SmartAttribute] {
         [
@@ -20,8 +21,8 @@ struct SmartTable: View {
             SmartAttribute(id: 0x03, name: Strings.attr03, rawValue: UInt64(smart.availableSpare), formattedValue: "\(smart.availableSpare) %", isWarning: smart.availableSpare <= smart.availableSpareThreshold, isCritical: false),
             SmartAttribute(id: 0x04, name: Strings.attr04, rawValue: UInt64(smart.availableSpareThreshold), formattedValue: "\(smart.availableSpareThreshold) %", isWarning: false, isCritical: false),
             SmartAttribute(id: 0x05, name: Strings.attr05, rawValue: UInt64(smart.percentageUsed), formattedValue: "\(smart.percentageUsed) %", isWarning: smart.percentageUsed >= 90, isCritical: smart.percentageUsed >= 100),
-            SmartAttribute(id: 0x06, name: Strings.attr06, rawValue: smart.dataUnitsRead, formattedValue: Formatters.integer(smart.dataUnitsRead), isWarning: false, isCritical: false),
-            SmartAttribute(id: 0x07, name: Strings.attr07, rawValue: smart.dataUnitsWritten, formattedValue: Formatters.integer(smart.dataUnitsWritten), isWarning: false, isCritical: false),
+            SmartAttribute(id: 0x06, name: Strings.attr06, rawValue: smart.dataUnitsRead, formattedValue: Formatters.dataUnitsToBytesText(smart.dataUnitsRead), isWarning: false, isCritical: false),
+            SmartAttribute(id: 0x07, name: Strings.attr07, rawValue: smart.dataUnitsWritten, formattedValue: Formatters.dataUnitsToBytesText(smart.dataUnitsWritten), isWarning: false, isCritical: false),
             SmartAttribute(id: 0x08, name: Strings.attr08, rawValue: smart.hostReadCommands, formattedValue: Formatters.integer(smart.hostReadCommands), isWarning: false, isCritical: false),
             SmartAttribute(id: 0x09, name: Strings.attr09, rawValue: smart.hostWriteCommands, formattedValue: Formatters.integer(smart.hostWriteCommands), isWarning: false, isCritical: false),
             SmartAttribute(id: 0x0A, name: Strings.attr0A, rawValue: smart.controllerBusyTimeMinutes, formattedValue: Formatters.integer(smart.controllerBusyTimeMinutes), isWarning: false, isCritical: false),
@@ -39,9 +40,12 @@ struct SmartTable: View {
                 Text(Strings.smartTitle)
                     .font(.headline)
                 Spacer()
-                Text(Strings.smartReadAgo)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    let seconds = Int(Date().timeIntervalSince(lastRead))
+                    Text("Lu il y a \(seconds) s")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(.horizontal, 8)
             
@@ -59,7 +63,7 @@ struct SmartTable: View {
                 }
                 
                 TableColumn(Strings.smartColRaw) { attr in
-                    Text("0x\(String(format: "%016llX", attr.rawValue))")
+                    Text("0x\(String(format: "%02llX", attr.rawValue))")
                         .monospaced()
                         .foregroundColor(.secondary)
                 }

@@ -106,13 +106,13 @@ struct StatTilesRow: View {
             } else {
                 // NVMe
                 let tempStr = smart?.temperatureCelsius.map { Formatters.temperature($0) } ?? "Inconnue"
-                let demoSparkline: [CGFloat] = [35.0, 36.0, 38.0, 40.0, 44.0, 42.0, 40.0, 39.0, 38.0, 38.0, 39.0, 40.0, 41.0, 39.0, 38.0, 38.0]
+                let isDemo = ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] == "1"
                 
                 StatTile(
                     title: Strings.tileTemperature,
                     value: tempStr,
-                    legend: Strings.tileTemperatureHelp,
-                    customView: AnyView(MiniSparkline(data: demoSparkline))
+                    legend: isDemo ? Strings.tileTemperatureHelp : "",
+                    customView: isDemo ? AnyView(MiniSparkline(data: [35.0, 36.0, 38.0, 40.0, 44.0, 42.0, 40.0, 39.0, 38.0, 38.0, 39.0, 40.0, 41.0, 39.0, 38.0, 38.0])) : nil
                 )
                 
                 let written = smart?.dataUnitsWritten ?? 0

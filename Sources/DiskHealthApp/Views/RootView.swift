@@ -44,7 +44,7 @@ struct RootView: View {
                         InfoList(physical: selectedDisk.physical, smart: selectedDisk.smart, identify: selectedDisk.identify)
                         
                         if let smart = selectedDisk.smart {
-                            SmartTable(smart: smart)
+                            SmartTable(smart: smart, lastRead: selectedDisk.lastRead)
                         } else {
                             UnsupportedDiskView(physical: selectedDisk.physical)
                         }
@@ -68,7 +68,7 @@ struct RootView: View {
                                     Circle()
                                         .fill(statusColor(disk.health.status))
                                         .frame(width: 7, height: 7)
-                                    Text(disk.physical.volumeNames.first ?? disk.physical.model)
+                                    Text(disk.physical.model)
                                         .foregroundColor(.primary)
                                 }
                                 .padding(.horizontal, 12)

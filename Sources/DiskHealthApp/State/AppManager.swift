@@ -7,9 +7,18 @@ public struct RealDisk: Identifiable, Equatable {
     public let smart: NVMeSmartLog?
     public let identify: NVMeIdentify?
     public let health: HealthAssessment
+    public let lastRead: Date
+    
+    public init(physical: PhysicalDisk, smart: NVMeSmartLog?, identify: NVMeIdentify?, health: HealthAssessment, lastRead: Date = Date()) {
+        self.physical = physical
+        self.smart = smart
+        self.identify = identify
+        self.health = health
+        self.lastRead = lastRead
+    }
     
     public static func ==(lhs: RealDisk, rhs: RealDisk) -> Bool {
-        return lhs.physical == rhs.physical
+        return lhs.physical == rhs.physical && lhs.lastRead == rhs.lastRead
     }
 }
 
