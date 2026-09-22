@@ -1,17 +1,134 @@
 import SwiftUI
+import Charts
 import DiskHealthCore
 
 struct DiskDetailView: View {
     let disk: RealDisk
     
+    @State private var historyRange: HistoryRange = .oneHour
+    @State private var historySamples: [HistorySample] = []
+    @State private var selectedPoint: AggregatedPoint? = nil
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
             Divider()
+            
+            HStack {
+                Text("Historique de température")
+                    .font(.title3.bold())
+                Spacer()
+                Picker("Plage", selection: $historyRange) {
+                    Text("1 heure").tag(HistoryRange.oneHour)
+                    Text("24 heures").tag(HistoryRange.twentyFourHours)
+                    Text("7 jours").tag(HistoryRange.sevenDays)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 250)
+            }
+            
+            let agg = HistoryAggregation.aggregate(samples: historySamples, range: historyRange)
+            
+            if agg.points.count < 2 {
+                VStack {
+                    Spacer()
+                    Text("Données d'historique insuffisantes.\nLaissez l'application ouverte pour enregistrer la température.")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                let yMin = max(0, (agg.min ?? 0) - 5)
+                let yMax = min(100, (agg.max ?? 0) + 5)
+                
+                Chart {
+                    ForEach(agg.points) { point in
+                        LineMark(
+                            x: .value("Heure", point.date),
+                            y: .value("Temp", point.temperature),
+                            series: .value("Segment", point.segment)
+                        )
+                        .foregroundStyle(Color.blue)
+                        
+                        AreaMark(
+                            x: .value("Heure", point.date),
+                            y: .value("Temp", point.temperature),
+                            series: .value("Segment", point.segment)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.3), Color.blue.opacity(0.0)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .alignsMarkStylesWithPlotArea(true)
+                    }
+                    
+                    if let selected = selectedPoint {
+                        RuleMark(
+                            x: .value("Heure", selected.date)
+                        )
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5]))
+                        .foregroundStyle(Color.gray)
+                        .annotation(position: .top) {
+                            VStack(alignment: .leading) {
+                                Text(selected.date.formatted(date: .omitted, time: .shortened))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text("\(Int(round(selected.temperature))) °C")
+                                    .font(.caption.bold())
+                            }
+                            .padding(6)
+                            .background(Color(NSColor.windowBackgroundColor).opacity(0.9))
+                            .cornerRadius(6)
+                            .shadow(radius: 2)
+                        }
+                    }
+                }
+                .chartYScale(domain: yMin...yMax)
+                .chartXAxis {
+                    AxisMarks(preset: .aligned)
+                }
+                .chartYAxis {
+                    AxisMarks(preset: .aligned)
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geo in
+                        Rectangle()
+                            .fill(Color.clear)
+                            .contentShape(Rectangle())
+                            .onContinuousHover { phase in
+                                switch phase {
+                                case .active(let location):
+                                    if let date: Date = proxy.value(atX: location.x) {
+                                        // Find closest point
+                                        selectedPoint = agg.points.min(by: { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) })
+                                    }
+                                case .ended:
+                                    selectedPoint = nil
+                                }
+                            }
+                    }
+                }
+            }
+            
             Spacer()
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear(perform: loadHistory)
+        .onChange(of: disk.lastRead) { loadHistory() }
+        .onChange(of: historyRange) { loadHistory() }
+    }
+    
+    private func loadHistory() {
+        if let identify = disk.identify {
+            let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
+            let since = Date().addingTimeInterval(-historyRange.timeInterval)
+            historySamples = HistoryStore.shared.samples(for: key, since: since)
+        }
     }
     
     private var header: some View {
@@ -99,7 +216,7 @@ struct DiskDetailView: View {
     
     private var subtext: String {
         let isApple = disk.physical.model.uppercased().contains("APPLE")
-        let maker = isApple ? "Apple" : "Générique" // Could be better but suffices
+        let maker = isApple ? "Apple" : "Générique"
         let loc = disk.physical.isInternal ? "Disque interne" : "Disque externe"
         return "\(loc) · \(maker)"
     }
