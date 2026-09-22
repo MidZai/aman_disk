@@ -65,8 +65,7 @@ struct ContentView: View {
                         }
                     case .volume(let id):
                         if let volume = appManager.volumes.first(where: { $0.id == id }) {
-                            Text("Détail du volume \(volume.name)")
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            VolumeDetailView(selection: $selection, volume: volume)
                         } else {
                             Text("Volume introuvable")
                         }
@@ -77,8 +76,12 @@ struct ContentView: View {
                 }
             }
             .inspector(isPresented: $appManager.showDetails) {
-                Text("Inspector")
-                    .frame(minWidth: 200, idealWidth: 250, maxWidth: 300, maxHeight: .infinity)
+                if let selection = selection {
+                    InspectorView(selection: selection)
+                } else {
+                    Text("Aucune sélection")
+                        .frame(minWidth: 280, idealWidth: 300, maxWidth: 350, maxHeight: .infinity)
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

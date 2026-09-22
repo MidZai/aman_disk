@@ -10,7 +10,8 @@ struct DiskDetailView: View {
     @State private var selectedPoint: AggregatedPoint? = nil
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
             header
             Divider()
             
@@ -114,10 +115,15 @@ struct DiskDetailView: View {
                 }
             }
             
+            if disk.smart != nil {
+                SmartTableView(disk: disk)
+            }
+            
             Spacer()
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
         .onAppear(perform: loadHistory)
         .onChange(of: disk.lastRead) { loadHistory() }
         .onChange(of: historyRange) { loadHistory() }
