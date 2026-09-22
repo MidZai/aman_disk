@@ -122,7 +122,8 @@ struct DiskDetailView: View {
             Spacer()
         }
         .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: 1400, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity)
         }
         .onAppear(perform: loadHistory)
         .onChange(of: disk.lastRead) { loadHistory() }

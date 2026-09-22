@@ -128,6 +128,8 @@ struct VolumeDetailView: View {
                 Spacer()
             }
             .padding(24)
+            .frame(maxWidth: 1400, alignment: .top)
+            .frame(maxWidth: .infinity)
         }
     }
     
