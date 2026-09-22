@@ -25,9 +25,13 @@ public struct RealDisk: Identifiable, Equatable {
 @MainActor
 class AppManager: ObservableObject {
     @Published var disks: [RealDisk] = []
+    @Published var volumes: [Volume] = []
     @Published var needsSudo: Bool = false
     @Published var ignoreSudo: Bool = false
     @Published var isLoading: Bool = true
+    @Published var showDetails: Bool = false
+    @Published var showRawValues: Bool = false
+
     private var refreshTimer: Timer?
     
     public init() {
@@ -89,8 +93,12 @@ class AppManager: ObservableObject {
                 }
             }
             
+
+            let volumes = VolumeDiscovery.listVolumes()
             DispatchQueue.main.async {
                 self.disks = newDisks
+                self.volumes = volumes
+
                 self.needsSudo = privilegesMissing
                 if !isAutoRefresh { self.isLoading = false }
             }
