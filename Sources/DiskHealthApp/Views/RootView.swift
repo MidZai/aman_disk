@@ -89,7 +89,9 @@ struct RootView: View {
                         ActionButton(icon: "arrow.clockwise", help: Strings.refresh) {
                             appManager.loadDisks()
                         }
-                        ActionButton(icon: "doc.on.doc", help: Strings.copyReport) {}
+                        ActionButton(icon: "doc.on.doc", help: Strings.copyReport) {
+                            copyReportToClipboard(disk: selectedDisk)
+                        }
                         ActionButton(icon: "clock.arrow.circlepath", help: Strings.history) {}
                             .disabled(true)
                     }
@@ -148,6 +150,24 @@ struct RootView: View {
                 self.initialTimer = nil
                 self.setChromeVisible(false)
             }
+        }
+    }
+    
+    private func copyReportToClipboard(disk: RealDisk) {
+        struct Report: Codable {
+            let identify: NVMeIdentify?
+            let smart: NVMeSmartLog?
+            let health: HealthAssessment
+        }
+        
+        let report = Report(identify: disk.identify, smart: disk.smart, health: disk.health)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        
+        if let data = try? encoder.encode(report), let string = String(data: data, encoding: .utf8) {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(string, forType: .string)
         }
     }
     
