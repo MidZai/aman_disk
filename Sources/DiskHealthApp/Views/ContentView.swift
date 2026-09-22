@@ -6,13 +6,13 @@ import DiskHealthCore
 
 struct ContentView: View {
     @EnvironmentObject var appManager: AppManager
-    
-    
+    @State private var exportDisk: RealDisk?
+    @State private var exportFormat: ExportFormat = .pdf
     var body: some View {
         NavigationSplitView {
             List(selection: $appManager.selection) {
                 if !appManager.disks.isEmpty {
-                    Section("Disques physiques") {
+                    Section("Stockage") {
                         ForEach(appManager.disks) { disk in
                             NavigationLink(value: SidebarItem.physicalDisk(disk.id)) {
                                 DiskRowView(disk: disk)
@@ -34,15 +34,27 @@ struct ContentView: View {
                                         }
                                     }
                             }
+                            
+                            let childVolumes = appManager.volumes.filter { $0.physicalDiskBSDName == disk.physical.bsdName }
+                            ForEach(childVolumes) { volume in
+                                NavigationLink(value: SidebarItem.volume(volume.id)) {
+                                    VolumeRowView(volume: volume)
+                                        .padding(.leading, 16)
+                                }
+                            }
                         }
                     }
-                }
-                
-                if !appManager.volumes.isEmpty {
-                    Section("Volumes") {
-                        ForEach(appManager.volumes) { volume in
-                            NavigationLink(value: SidebarItem.volume(volume.id)) {
-                                VolumeRowView(volume: volume)
+                    
+                    let orphanVolumes = appManager.volumes.filter { vol in
+                        !appManager.disks.contains(where: { $0.physical.bsdName == vol.physicalDiskBSDName })
+                    }
+                    
+                    if !orphanVolumes.isEmpty {
+                        Section("Autres Volumes") {
+                            ForEach(orphanVolumes) { volume in
+                                NavigationLink(value: SidebarItem.volume(volume.id)) {
+                                    VolumeRowView(volume: volume)
+                                }
                             }
                         }
                     }
@@ -81,6 +93,9 @@ struct ContentView: View {
                 }
             }
             .animation(.easeInOut, value: appManager.selection)
+            .overlay(alignment: .top) {
+                ToastView()
+            }
             .inspector(isPresented: $appManager.showDetails) {
                 if let selection = appManager.selection {
                     InspectorView(selection: selection)
@@ -88,6 +103,9 @@ struct ContentView: View {
                     Text("Aucune sélection")
                         .frame(minWidth: 280, idealWidth: 300, maxWidth: 350, maxHeight: .infinity)
                 }
+            }
+            .sheet(item: $exportDisk) { disk in
+                ExportSheet(disk: disk)
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -101,11 +119,11 @@ struct ContentView: View {
                 ToolbarItem(placement: .primaryAction) {
                     if let sel = appManager.selection, case .physicalDisk(let id) = sel, let disk = appManager.disks.first(where: { $0.id == id }) {
                         Menu {
-                            Button("Exporter en PDF…") { print("Non implémenté") }
-                            Button("Exporter en texte…") { print("Non implémenté") }
-                            Button("Exporter en JSON…") { ExportService.exportJSON(disk: disk) }
+                            Button("Exporter en PDF…") { exportDisk = disk; exportFormat = .pdf }
+                            Button("Exporter en texte…") { exportDisk = disk; exportFormat = .text }
+                            Button("Exporter en JSON…") { exportDisk = disk; exportFormat = .json }
                             Divider()
-                            Button("Copier le résumé") { ExportService.copySummary(disk: disk) }
+                            Button("Copier le résumé") { ExportService.copySummary(disk: disk); ToastCenter.shared.show(message: "Résumé copié", systemImage: "doc.on.doc") }
                         } label: {
                             Label("Exporter", systemImage: "square.and.arrow.up").help("Exporter les données du disque")
                         }
@@ -123,7 +141,7 @@ struct ContentView: View {
                     Button(action: {
                         appManager.showDetails.toggle()
                     }) {
-                        Label("Détails", systemImage: "info.circle").help("Afficher l'inspecteur de détails")
+                        Label("Détails", systemImage: "info.circle").help("Afficher l'inspecteur de détails (⌘I)")
                     }
                 }
             }
@@ -138,25 +156,71 @@ struct ContentView: View {
     }
 }
 
+enum ExportFormat { case pdf, text, json }
+
+struct ExportSheet: View {
+    let disk: RealDisk
+    @Environment(\.dismiss) var dismiss
+    @State private var format: ExportFormat = .pdf
+    @State private var includeSerial: Bool = false
+    @State private var includeHistory: Bool = true
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Exporter le rapport")
+                .font(.headline)
+            
+            Picker("Format", selection: $format) {
+                Text("PDF").tag(ExportFormat.pdf)
+                Text("Texte").tag(ExportFormat.text)
+                Text("JSON").tag(ExportFormat.json)
+            }
+            .pickerStyle(.segmented)
+            
+            Toggle("Inclure le numéro de série", isOn: $includeSerial)
+            Toggle("Inclure l'historique de température (7 jours)", isOn: $includeHistory)
+            
+            HStack {
+                Spacer()
+                Button("Annuler", role: .cancel) {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+                
+                Button("Exporter…") {
+                    dismiss()
+                    switch format {
+                    case .pdf: ExportService.exportPDF(disk: disk, includeSerial: includeSerial, includeHistory: includeHistory)
+                    case .text: ExportService.exportText(disk: disk, includeSerial: includeSerial, includeHistory: includeHistory)
+                    case .json: ExportService.exportJSON(disk: disk, includeSerial: includeSerial, includeHistory: includeHistory)
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding()
+        .frame(width: 420)
+    }
+}
+
+
 struct DiskRowView: View {
     let disk: RealDisk
     
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             DiskIconProvider.icon(for: disk)
-                .resizable()
-                .scaledToFit()
+                .font(.system(size: 24))
                 .frame(width: 28, height: 28)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(disk.physical.model)
-                    .font(.body)
+                    .font(.subheadline)
                     .fontWeight(.medium)
                     .lineLimit(1)
                 
-                                // Formatters doesn't have a formatBytes... Oh wait, in Phase 1 I might have done it. Let's just use a basic division.
-                let sizeGB = Double(disk.physical.sizeBytes) / 1_000_000_000.0
-                let sizeStr = String(format: "%.1f Go", sizeGB)
+                let sizeStr = Formatters.bytes(disk.physical.sizeBytes)
                 let connStr = disk.physical.isInternal ? "Interne" : (disk.physical.connection == .usb ? "USB" : "Externe")
                 
                 Text("\(sizeStr) · \(connStr)")
@@ -171,7 +235,7 @@ struct DiskRowView: View {
                 .frame(width: 8, height: 8)
                 .help(disk.health.status.rawValue.capitalized)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
     
     private var healthColor: Color {
@@ -188,20 +252,17 @@ struct VolumeRowView: View {
     let volume: Volume
     
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             DiskIconProvider.icon(for: volume)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 24, height: 24)
+                .frame(width: 20, height: 20)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(volume.name)
-                    .font(.body)
-                    .fontWeight(.medium)
+                    .font(.subheadline)
+                    .fontWeight(.regular)
                     .lineLimit(1)
                 
-                let sizeGB = Double(volume.totalBytes) / 1_000_000_000.0
-                let sizeStr = String(format: "%.1f Go", sizeGB)
+                let sizeStr = Formatters.bytes(volume.totalBytes)
                 Text("\(volume.format) · \(sizeStr)")
                     .font(.caption)
                     .foregroundColor(.secondary)

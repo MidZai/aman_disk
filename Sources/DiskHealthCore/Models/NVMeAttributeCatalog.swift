@@ -59,7 +59,7 @@ public enum NVMeAttributeCatalog {
         let resState: AttributeState
         if log.availableSpare < log.availableSpareThreshold {
             resState = .critical
-        } else if log.availableSpare < log.availableSpareThreshold + 10 {
+        } else if log.availableSpare <= log.availableSpareThreshold + 10 && log.availableSpare < 100 && log.availableSpareThreshold < 90 {
             resState = .warning
         } else {
             resState = .normal

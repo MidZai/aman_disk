@@ -29,62 +29,69 @@ struct SmartTableView: View {
             Table(attrs) {
                 TableColumn("ID") { attr in
                     Text("0x" + String(format: "%02X", attr.id))
-                        .monospaced()
+                        .font(.system(.subheadline, design: .monospaced))
                         .foregroundColor(.secondary)
+                        .padding(.vertical, 6)
                         .contextMenu { contextMenu(for: attr) }
                 }
-                .width(56)
+                .width(40)
                 
                 TableColumn("Attribut") { attr in
                     AttributeCell(attr: attr)
+                        .padding(.vertical, 6)
                         .contextMenu { contextMenu(for: attr) }
                 }
                 
                 TableColumn("Valeur") { attr in
                     Text(attr.displayValue)
-                        .monospacedDigit()
+                        .font(.system(.body, design: .monospaced))
                         .fontWeight(weight(for: attr.state))
                         .foregroundColor(color(for: attr.state, isValue: true))
+                        .padding(.vertical, 6)
                         .contextMenu { contextMenu(for: attr) }
                 }
-                .width(140)
+                .width(180)
                 
                 TableColumn("Valeur brute") { attr in
                     if appManager.showRawValues {
                         Text(attr.rawValue)
-                            .monospacedDigit()
+                            .font(.system(.body, design: .monospaced))
                             .foregroundColor(.secondary)
                             .textSelection(.enabled)
+                            .padding(.vertical, 6)
                             .contextMenu { contextMenu(for: attr) }
                     }
                 }
-                .width(appManager.showRawValues ? 170 : 0)
+                .width(appManager.showRawValues ? 150 : 0)
                 
                 TableColumn("État") { attr in
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         if attr.state == .informational {
                             Text("—").foregroundColor(.secondary)
                         } else {
                             Circle()
-                                .fill(color(for: attr.state, isValue: true))
+                                .fill(color(for: attr.state, isValue: false))
                                 .frame(width: 8, height: 8)
                             
                             Text(stateLabel(attr.state))
-                                .foregroundColor(color(for: attr.state, isValue: true))
+                                .foregroundColor(.primary)
                         }
                     }
+                    .padding(.vertical, 6)
                     .contextMenu { contextMenu(for: attr) }
                 }
-                .width(110)
+                .width(100)
             }
-            .frame(height: 38 + (15 * 28))
+            .environment(\.defaultMinListRowHeight, 32)
+            .tableStyle(.bordered)
+            .frame(height: 38 + (15 * 32))
         }
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(10)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
         )
     }
     

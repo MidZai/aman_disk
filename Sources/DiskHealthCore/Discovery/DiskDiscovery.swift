@@ -48,6 +48,7 @@ public enum DiskDiscovery {
                     }
                     
                     let volumeNames = getVolumeNames(for: bsdName, session: session)
+                    let (protocolType, mediumType, healthCapability) = ProtocolDetector.detect(bsdName: bsdName)
                     
                     disks.append(PhysicalDisk(
                         bsdName: bsdName,
@@ -57,7 +58,10 @@ public enum DiskDiscovery {
                         connection: connection,
                         volumeNames: volumeNames,
                         usbVendorID: usbVendorID,
-                        usbProductID: usbProductID
+                        usbProductID: usbProductID,
+                        protocolType: protocolType,
+                        mediumType: mediumType,
+                        healthCapability: healthCapability
                     ))
                 }
             }

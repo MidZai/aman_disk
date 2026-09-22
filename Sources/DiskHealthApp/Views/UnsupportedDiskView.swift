@@ -17,11 +17,6 @@ struct UnsupportedDiskView: View {
             Text("Disque non supporté")
                 .font(.headline)
             
-            Text("Disk Health a besoin d'un accès NVMe direct pour lire la santé du disque.")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 400)
             
             HStack(spacing: 12) {
                 Button("Pourquoi ?") {

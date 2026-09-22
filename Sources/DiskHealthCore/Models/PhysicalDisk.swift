@@ -14,8 +14,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
     public let volumeNames: [String]
     public let usbVendorID: UInt16?     // uniquement si connection == .usb
     public let usbProductID: UInt16?
+    public let protocolType: StorageProtocol
+    public let mediumType: MediumType
+    public let healthCapability: HealthCapability
 
-    public init(bsdName: String, model: String, sizeBytes: UInt64, isInternal: Bool, connection: Connection, volumeNames: [String], usbVendorID: UInt16? = nil, usbProductID: UInt16? = nil) {
+    public init(bsdName: String, model: String, sizeBytes: UInt64, isInternal: Bool, connection: Connection, volumeNames: [String], usbVendorID: UInt16? = nil, usbProductID: UInt16? = nil, protocolType: StorageProtocol, mediumType: MediumType, healthCapability: HealthCapability) {
         self.bsdName = bsdName
         self.model = model
         self.sizeBytes = sizeBytes
@@ -24,5 +27,8 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         self.volumeNames = volumeNames
         self.usbVendorID = usbVendorID
         self.usbProductID = usbProductID
+        self.protocolType = protocolType
+        self.mediumType = mediumType
+        self.healthCapability = healthCapability
     }
 }

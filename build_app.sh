@@ -2,7 +2,7 @@
 set -e
 
 echo "Compiling DiskHealthApp in release mode..."
-swift build -c release
+swift build -c release --arch arm64 --arch x86_64
 
 APP_NAME="DiskHealth.app"
 CONTENTS_DIR="$APP_NAME/Contents"
@@ -15,7 +15,7 @@ mkdir -p "$MACOS_DIR"
 mkdir -p "$RESOURCES_DIR"
 
 # Determine swift architecture path
-SWIFT_BIN_PATH=$(swift build -c release --show-bin-path)
+SWIFT_BIN_PATH=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
 
 echo "Copying executable..."
 cp "$SWIFT_BIN_PATH/DiskHealthApp" "$MACOS_DIR/DiskHealth"

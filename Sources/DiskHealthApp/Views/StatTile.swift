@@ -2,27 +2,22 @@ import SwiftUI
 import DiskHealthCore
 
 struct StatTile: View {
-    let title: String
     let value: String
-    let legend: String
+    let label: String
     let customView: AnyView?
     
-    init(title: String, value: String, legend: String, customView: AnyView? = nil) {
-        self.title = title
+    init(value: String, label: String, customView: AnyView? = nil) {
         self.value = value
-        self.legend = legend
+        self.label = label
         self.customView = customView
     }
     
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(title)
-                .foregroundColor(.secondary)
-            Spacer()
-            
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .bottom) {
                 Text(value)
                     .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(.primary)
                 
                 if let custom = customView {
                     Spacer()
@@ -30,18 +25,20 @@ struct StatTile: View {
                 }
             }
             
-            Spacer()
-            Text(legend)
-                .font(.caption)
+            Text(label)
+                .font(.subheadline)
                 .foregroundColor(.secondary)
+            
+            Spacer(minLength: 0)
         }
         .padding(16)
-        .frame(height: 100, alignment: .leading)
+        .frame(height: 90, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color(NSColor.controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
         )
     }
 }
@@ -84,53 +81,57 @@ struct StatTilesRow: View {
         HStack(spacing: 12) {
             if physical.connection == .usb {
                 StatTile(
-                    title: Strings.tileTemperature,
                     value: "Non transmise",
-                    legend: ""
+                    label: "Température"
                 )
                 
                 StatTile(
-                    title: "Connexion",
                     value: "USB",
-                    legend: ""
+                    label: "Connexion"
                 )
                 
                 let vidStr = physical.usbVendorID.map { String(format: "%04X", $0) } ?? "----"
                 let pidStr = physical.usbProductID.map { String(format: "%04X", $0) } ?? "----"
                 
                 StatTile(
-                    title: "Pont USB",
                     value: "\(vidStr):\(pidStr)",
-                    legend: ""
+                    label: "Pont USB"
                 )
             } else {
-                // NVMe
                 let tempStr = smart?.temperatureCelsius.map { Formatters.temperature($0) } ?? "Inconnue"
                 let isDemo = ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] == "1"
                 
                 StatTile(
-                    title: Strings.tileTemperature,
                     value: tempStr,
-                    legend: isDemo ? Strings.tileTemperatureHelp : "",
+                    label: isDemo ? Strings.tileTemperatureHelp : "Température",
                     customView: isDemo ? AnyView(MiniSparkline(data: [35.0, 36.0, 38.0, 40.0, 44.0, 42.0, 40.0, 39.0, 38.0, 38.0, 39.0, 40.0, 41.0, 39.0, 38.0, 38.0])) : nil
                 )
                 
-                let written = smart?.dataUnitsWritten ?? 0
-                let writtenStr = Formatters.dataUnitsToBytesText(written)
-                let readStr = Formatters.dataUnitsToBytesText(smart?.dataUnitsRead ?? 0)
-                
+                let hours = smart?.powerOnHours ?? 0
                 StatTile(
-                    title: Strings.tileDataWritten,
-                    value: writtenStr,
-                    legend: "\(readStr) lus depuis la mise en service"
+                    value: Formatters.hours(hours),
+                    label: "Heures d'utilisation"
                 )
                 
+                let cycles = smart?.powerCycles ?? 0
                 StatTile(
-                    title: Strings.tileLifeLeft,
-                    value: "—", // In phase 5 it displays text in legend
-                    legend: Strings.tileLifeLeftHelp
+                    value: Formatters.cycles(cycles),
+                    label: "Cycles d'alimentation"
+                )
+                
+                let unsafe = smart?.unsafeShutdowns ?? 0
+                StatTile(
+                    value: Formatters.integer(unsafe),
+                    label: "Arrêts non propres"
+                )
+                
+                let errors = smart?.mediaErrors ?? 0
+                StatTile(
+                    value: Formatters.integer(errors),
+                    label: "Erreurs média"
                 )
             }
         }
     }
 }
+

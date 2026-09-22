@@ -30,7 +30,6 @@ enum Strings {
     static let actionHide = "Masquer"
     
     static let smartTitle = "Journal SMART / Health"
-    static let smartReadAgo = "Lu il y a 12 s" // Hardcoded for Phase 5 demo
     static let smartColId = "ID"
     static let smartColAttr = "Attribut"
     static let smartColRaw = "Brut"

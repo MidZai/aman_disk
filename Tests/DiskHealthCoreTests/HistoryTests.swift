@@ -31,8 +31,8 @@ final class HistoryTests: XCTestCase {
         let s3 = HistorySample(date: baseDate.addingTimeInterval(2.5 * 60), temperatureC: 33, percentageUsed: 0, dataUnitsWritten: 0, dataUnitsRead: 0, powerOnHours: 0, mediaErrors: 0, availableSpare: 100)
         store.append(s3, for: testKey)
         
-        // Sample 5 mins later -> Accepted (diff time > 4)
-        let s4 = HistorySample(date: baseDate.addingTimeInterval(5 * 60), temperatureC: 34, percentageUsed: 0, dataUnitsWritten: 0, dataUnitsRead: 0, powerOnHours: 0, mediaErrors: 0, availableSpare: 100)
+        // Sample 7 mins later -> Accepted (diff time > 4 from s3)
+        let s4 = HistorySample(date: baseDate.addingTimeInterval(7 * 60), temperatureC: 34, percentageUsed: 0, dataUnitsWritten: 0, dataUnitsRead: 0, powerOnHours: 0, mediaErrors: 0, availableSpare: 100)
         store.append(s4, for: testKey)
         
         let samples = store.samples(for: testKey, since: Date.distantPast)
@@ -64,8 +64,8 @@ final class HistoryTests: XCTestCase {
             samples.append(HistorySample(date: baseDate.addingTimeInterval(Double(i) * 300), temperatureC: 30 + i, percentageUsed: 0, dataUnitsWritten: 0, dataUnitsRead: 0, powerOnHours: 0, mediaErrors: 0, availableSpare: 100))
         }
         
-        // Break of 2 hours
-        let baseDate2 = baseDate.addingTimeInterval(3 * 3600)
+        // Break of 3 hours (4 hours from baseDate)
+        let baseDate2 = baseDate.addingTimeInterval(4 * 3600)
         
         // 2nd hour: 12 samples, temps = 20 to 31
         for i in 0..<12 {
@@ -85,6 +85,6 @@ final class HistoryTests: XCTestCase {
         
         XCTAssertEqual(result7d.min, 20)
         XCTAssertEqual(result7d.max, 41)
-        XCTAssertEqual(result7d.average, 30) // Avg of 20...41 is about 30.5 -> 30
+        XCTAssertEqual(result7d.average, 31) // Avg of 20...41 is about 30.5 -> 31
     }
 }

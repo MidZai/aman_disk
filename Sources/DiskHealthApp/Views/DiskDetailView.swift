@@ -13,29 +13,38 @@ struct DiskDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
             header
+            
+            if disk.smart != nil {
+                StatTilesRow(physical: disk.physical, smart: disk.smart)
+            }
+            
             Divider()
             
             HStack {
                 Text("Historique de température")
                     .font(.title3.bold())
                 Spacer()
-                Picker("Plage", selection: $historyRange) {
+                Picker("", selection: $historyRange) {
                     Text("1 heure").tag(HistoryRange.oneHour)
                     Text("24 heures").tag(HistoryRange.twentyFourHours)
                     Text("7 jours").tag(HistoryRange.sevenDays)
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .frame(width: 250)
             }
             
             let agg = HistoryAggregation.aggregate(samples: historySamples, range: historyRange)
             
             if agg.points.count < 2 {
-                VStack {
+                VStack(spacing: 8) {
                     Spacer()
-                    Text("Données d'historique insuffisantes.\nLaissez l'application ouverte pour enregistrer la température.")
-                        .multilineTextAlignment(.center)
+                    Text("Aucune donnée historique disponible")
+                        .font(.headline)
+                    Text("L'application commencera à enregistrer la température\ndès que le disque sera surveillé.")
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -141,8 +150,7 @@ struct DiskDetailView: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 20) {
             DiskIconProvider.icon(for: disk)
-                .resizable()
-                .scaledToFit()
+                .font(.system(size: 64))
                 .frame(width: 72, height: 72)
             
             VStack(alignment: .leading, spacing: 4) {
@@ -155,7 +163,7 @@ struct DiskDetailView: View {
                         .fill(healthColor)
                         .frame(width: 12, height: 12)
                     Text(healthLabel)
-                        .font(.title3)
+                        .font(.headline)
                 }
                 
                 Text(subtext)
@@ -165,33 +173,30 @@ struct DiskDetailView: View {
             
             Spacer()
             
-            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 4) {
-                GridRow {
-                    Text("Capacité").foregroundColor(.secondary)
-                    Text(sizeStr)
-                    
-                    Text("Firmware").foregroundColor(.secondary)
-                    Text(disk.identify?.firmwareRevision ?? "—")
+            HStack(spacing: 32) {
+                VStack(alignment: .leading, spacing: 16) {
+                    InfoPair(label: "Capacité", value: sizeStr)
+                    InfoPair(label: "Interface", value: interfaceStr)
+                    InfoPair(label: "Emplacement", value: locationStr)
                 }
-                GridRow {
-                    Text("Interface").foregroundColor(.secondary)
-                    Text(interfaceStr)
+                
+                VStack(alignment: .leading, spacing: 16) {
+                    InfoPair(label: "Firmware", value: disk.identify?.firmwareRevision ?? "—")
+                    InfoPair(label: "N° de série", value: serialStr)
                     
-                    Text("N° de série").foregroundColor(.secondary)
-                    Text(serialStr)
-                }
-                GridRow {
-                    Text("Emplacement").foregroundColor(.secondary)
-                    Text(locationStr)
-                    
-                    Text("Dernière lecture").foregroundColor(.secondary)
-                    TimelineView(.periodic(from: .now, by: 1.0)) { timeline in
-                        let diff = Int(timeline.date.timeIntervalSince(disk.lastRead))
-                        Text("il y a \(diff) s")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dernière lecture")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        TimelineView(.periodic(from: .now, by: 1.0)) { timeline in
+                            let diff = Int(timeline.date.timeIntervalSince(disk.lastRead))
+                            Text("il y a \(diff) s")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             }
-            .font(.body)
         }
     }
     
@@ -252,5 +257,21 @@ struct DiskDetailView: View {
         }
         let suffix = s.suffix(4)
         return "••••\(suffix)"
+    }
+}
+
+struct InfoPair: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.body)
+                .fontWeight(.medium)
+        }
     }
 }

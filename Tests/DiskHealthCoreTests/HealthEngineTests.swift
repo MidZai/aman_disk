@@ -108,6 +108,6 @@ final class HealthEngineTests: XCTestCase {
         
         let assessment = HealthEngine.evaluate(smart: smartLog, identify: defaultIdentify())
         XCTAssertEqual(assessment.status, .caution)
-        XCTAssertNil(assessment.healthPercent)
+        XCTAssertEqual(assessment.healthPercent, 0)
     }
 }

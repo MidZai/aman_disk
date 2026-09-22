@@ -3,22 +3,17 @@ import SwiftUI
 import DiskHealthCore
 
 public enum DiskIconProvider {
-    public static func icon(for disk: RealDisk) -> Image {
-        if !disk.physical.volumeNames.isEmpty {
-            // Find volume mount point
-            let volumes = VolumeDiscovery.listVolumes()
-            if let vol = volumes.first(where: { $0.physicalDiskBSDName == disk.physical.bsdName }) {
-                let nsIcon = NSWorkspace.shared.icon(forFile: vol.mountPoint)
-                return Image(nsImage: nsIcon)
-            }
-        }
-        
-        let name = disk.physical.isInternal ? "internaldrive.fill" : "externaldrive.fill"
+    public static func icon(for disk: RealDisk) -> some View {
+        let name = disk.physical.isInternal ? "internaldrive" : "externaldrive"
         return Image(systemName: name)
+            .foregroundStyle(.secondary)
+            .fontWeight(.light)
     }
     
-    public static func icon(for volume: Volume) -> Image {
+    public static func icon(for volume: Volume) -> some View {
         let nsIcon = NSWorkspace.shared.icon(forFile: volume.mountPoint)
         return Image(nsImage: nsIcon)
+            .resizable()
+            .scaledToFit()
     }
 }

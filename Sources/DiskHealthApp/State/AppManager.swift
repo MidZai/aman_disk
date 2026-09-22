@@ -39,9 +39,38 @@ class AppManager: ObservableObject {
     @Published var selection: SidebarItem? = nil
 
     private var refreshTimer: Timer?
+    private var daSession: DASession?
     
     public init() {
         startTimer()
+        setupHotplug()
+        Task { @MainActor in loadDisks() }
+    }
+    
+    private func setupHotplug() {
+        guard let session = DASessionCreate(kCFAllocatorDefault) else { return }
+        self.daSession = session
+        
+        let match = [kDADiskDescriptionVolumeNetworkKey: false] as CFDictionary
+        
+        let appearCallback: DADiskAppearedCallback = { disk, context in
+            if let ctx = context {
+                let manager = Unmanaged<AppManager>.fromOpaque(ctx).takeUnretainedValue()
+                Task { @MainActor in manager.loadDisks() }
+            }
+        }
+        
+        let disappearCallback: DADiskDisappearedCallback = { disk, context in
+            if let ctx = context {
+                let manager = Unmanaged<AppManager>.fromOpaque(ctx).takeUnretainedValue()
+                Task { @MainActor in manager.loadDisks() }
+            }
+        }
+        
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        DARegisterDiskAppearedCallback(session, match, appearCallback, context)
+        DARegisterDiskDisappearedCallback(session, match, disappearCallback, context)
+        DASessionScheduleWithRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
     }
     
     private func startTimer() {
@@ -51,6 +80,15 @@ class AppManager: ObservableObject {
     }
     
     func loadDisks(isAutoRefresh: Bool = false) {
+        if ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] == "1" {
+            self.disks = DemoData.disks.map { 
+                RealDisk(physical: $0.physical, smart: $0.smart, identify: $0.identify, health: $0.health, lastRead: Date()) 
+            }
+            self.volumes = []
+            self.isLoading = false
+            return
+        }
+        
         if !isAutoRefresh { isLoading = true }
         // On background queue
         DispatchQueue.global(qos: .userInitiated).async {
@@ -70,20 +108,18 @@ class AppManager: ObservableObject {
                             newDisks.append(RealDisk(physical: physical, smart: smartLog, identify: identify, health: health, lastRead: Date()))
                             
                             // Save to history
-                            if ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] != "1" {
-                                let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
-                                let sample = HistorySample(
-                                    date: Date(),
-                                    temperatureC: smartLog.temperatureCelsius,
-                                    percentageUsed: smartLog.percentageUsed,
-                                    dataUnitsWritten: smartLog.dataUnitsWritten,
-                                    dataUnitsRead: smartLog.dataUnitsRead,
-                                    powerOnHours: smartLog.powerOnHours,
-                                    mediaErrors: smartLog.mediaErrors,
-                                    availableSpare: smartLog.availableSpare
-                                )
-                                HistoryStore.shared.append(sample, for: key)
-                            }
+                            let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
+                            let sample = HistorySample(
+                                date: Date(),
+                                temperatureC: smartLog.temperatureCelsius,
+                                percentageUsed: smartLog.percentageUsed,
+                                dataUnitsWritten: smartLog.dataUnitsWritten,
+                                dataUnitsRead: smartLog.dataUnitsRead,
+                                powerOnHours: smartLog.powerOnHours,
+                                mediaErrors: smartLog.mediaErrors,
+                                availableSpare: smartLog.availableSpare
+                            )
+                            HistoryStore.shared.append(sample, for: key)
                         } else {
                             let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Données SMART illisibles"])
                             newDisks.append(RealDisk(physical: physical, smart: nil, identify: nil, health: health, lastRead: Date()))
@@ -102,6 +138,46 @@ class AppManager: ObservableObject {
 
             let volumes = VolumeDiscovery.listVolumes()
             DispatchQueue.main.async {
+                // Hotplug detection for toasts
+                if !self.disks.isEmpty {
+                    let oldIds = Set(self.disks.map { $0.id })
+                    let newIds = Set(newDisks.map { $0.id })
+                    
+                    let added = newIds.subtracting(oldIds)
+                    let removed = oldIds.subtracting(newIds)
+                    
+                    for id in added {
+                        if let disk = newDisks.first(where: { $0.id == id }) {
+                            ToastCenter.shared.show(message: "\(disk.physical.model) connecté", systemImage: "externaldrive.badge.plus")
+                        }
+                    }
+                    for id in removed {
+                        if let disk = self.disks.first(where: { $0.id == id }) {
+                            ToastCenter.shared.show(message: "\(disk.physical.model) déconnecté", systemImage: "externaldrive.badge.minus")
+                            
+                            if case .physicalDisk(let selId) = self.selection, selId == id {
+                                if let internalDisk = newDisks.first(where: { $0.physical.isInternal }) {
+                                    self.selection = .physicalDisk(internalDisk.id)
+                                } else {
+                                    self.selection = nil
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Health change detection
+                    if isAutoRefresh {
+                        for newDisk in newDisks {
+                            if let oldDisk = self.disks.first(where: { $0.id == newDisk.id }) {
+                                if oldDisk.health.status != newDisk.health.status {
+                                    let statusStr = newDisk.health.status == .good ? "En bonne santé" : (newDisk.health.status == .caution ? "À surveiller" : "Défaillance probable")
+                                    ToastCenter.shared.show(message: "L'état de \(newDisk.physical.model) est passé à : \(statusStr)", systemImage: "exclamationmark.triangle")
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 self.disks = newDisks
                 self.volumes = volumes
 

@@ -122,9 +122,13 @@ cleanup:
 
 
 int cdiskio_read_nvme_smart(const char *bsd_name, unsigned char *out_buffer, int buffer_size) {
+    if (bsd_name == NULL || out_buffer == NULL) return -1;
+    if (buffer_size < 512) return -5;
     return _cdiskio_do_nvme_operation(bsd_name, out_buffer, buffer_size, 1);
 }
 
 int cdiskio_read_nvme_identify(const char *bsd_name, unsigned char *out_buffer, int buffer_size) {
+    if (bsd_name == NULL || out_buffer == NULL) return -1;
+    if (buffer_size < 4096) return -5;
     return _cdiskio_do_nvme_operation(bsd_name, out_buffer, buffer_size, 2);
 }

@@ -3,16 +3,6 @@ import Foundation
 public enum Formatters {
     private static let frLocale = Locale(identifier: "fr_FR")
     
-    private static let byteFormatter: ByteCountFormatter = {
-        let f = ByteCountFormatter()
-        f.allowedUnits = [.useBytes, .useKB, .useMB, .useGB, .useTB]
-        f.countStyle = .decimal
-        f.isAdaptive = true
-        // The ByteCountFormatter doesn't easily let us hide the fractional part ONLY when 0.
-        // We will do a custom formatting for bytes to exactly match the requirement.
-        return f
-    }()
-    
     public static func bytes(_ bytes: UInt64) -> String {
         let kb = Double(bytes) / 1_000.0
         let mb = Double(bytes) / 1_000_000.0
@@ -43,7 +33,7 @@ public enum Formatters {
         nf.locale = frLocale
         nf.numberStyle = .decimal
         nf.maximumFractionDigits = 1
-        nf.minimumFractionDigits = 0 // hides if integer
+        nf.minimumFractionDigits = 0
         
         let formattedNumber = nf.string(from: NSNumber(value: val)) ?? "\(val)"
         return "\(formattedNumber) \(unit)"
@@ -58,12 +48,37 @@ public enum Formatters {
         let nf = NumberFormatter()
         nf.locale = frLocale
         nf.numberStyle = .decimal
-        nf.groupingSeparator = " " // explicitly set space
+        nf.groupingSeparator = " "
         return nf.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+    
+    public static func largeNumber(_ value: UInt64) -> String {
+        let million = Double(value) / 1_000_000.0
+        let billion = Double(value) / 1_000_000_000.0
+        
+        let nf = NumberFormatter()
+        nf.locale = frLocale
+        nf.numberStyle = .decimal
+        nf.maximumFractionDigits = 1
+        nf.minimumFractionDigits = 0
+        
+        if billion >= 1.0 {
+            let numStr = nf.string(from: NSNumber(value: billion)) ?? "\(billion)"
+            return "environ \(numStr) Md"
+        } else if million >= 1.0 {
+            let numStr = nf.string(from: NSNumber(value: million)) ?? "\(million)"
+            return "environ \(numStr) M"
+        } else {
+            return integer(value)
+        }
     }
     
     public static func hours(_ value: UInt64) -> String {
         return "\(integer(value)) h"
+    }
+    
+    public static func cycles(_ value: UInt64) -> String {
+        return "\(integer(value)) cycles"
     }
     
     public static func temperature(_ celsius: Int) -> String {

@@ -12,16 +12,13 @@ struct VolumeDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 16) {
                     DiskIconProvider.icon(for: volume)
-                        .resizable()
-                        .scaledToFit()
                         .frame(width: 64, height: 64)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(volume.name)
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.system(size: 24, weight: .semibold))
                         
-                        let sizeGB = Double(volume.totalBytes) / 1_000_000_000.0
-                        let sizeStr = String(format: "%.1f Go", sizeGB)
+                        let sizeStr = Formatters.bytes(volume.totalBytes)
                         Text("\(volume.format) · \(sizeStr)")
                             .font(.body)
                             .foregroundColor(.secondary)
@@ -35,14 +32,14 @@ struct VolumeDetailView: View {
                     Text("Espace").font(.headline)
                     
                     let usedBytes = volume.totalBytes - volume.availableBytes
-                    let usedGB = Double(usedBytes) / 1_000_000_000.0
-                    let totalGB = Double(volume.totalBytes) / 1_000_000_000.0
-                    let availGB = Double(volume.availableBytes) / 1_000_000_000.0
+                    let usedStr = Formatters.bytes(usedBytes)
+                    let totalStr = Formatters.bytes(volume.totalBytes)
+                    let availStr = Formatters.bytes(volume.availableBytes)
                     let ratio = volume.totalBytes > 0 ? Double(usedBytes) / Double(volume.totalBytes) : 0
                     
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(Color.secondary.opacity(0.2))
+                            Capsule().fill(Color.secondary.opacity(0.15))
                             Capsule()
                                 .fill(Color.accentColor)
                                 .frame(width: max(0, geo.size.width * ratio))
@@ -51,16 +48,20 @@ struct VolumeDetailView: View {
                     .frame(height: 10)
                     
                     HStack {
-                        Text(String(format: "%.1f Go utilisés sur %.1f Go", usedGB, totalGB))
+                        Text("\(usedStr) utilisés sur \(totalStr)")
                         Spacer()
-                        Text(String(format: "%.1f Go disponibles", availGB))
+                        Text("\(availStr) disponibles")
                             .foregroundColor(.secondary)
                     }
                     .font(.subheadline)
                 }
                 .padding()
                 .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+                )
                 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Informations").font(.headline)
@@ -83,7 +84,11 @@ struct VolumeDetailView: View {
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+                )
                 
                 if let physID = volume.physicalDiskBSDName, let physDisk = appManager.disks.first(where: { $0.id == physID }) {
                     VStack(alignment: .leading, spacing: 12) {
@@ -91,8 +96,7 @@ struct VolumeDetailView: View {
                         
                         HStack(spacing: 12) {
                             DiskIconProvider.icon(for: physDisk)
-                                .resizable()
-                                .scaledToFit()
+                                .font(.system(size: 28))
                                 .frame(width: 32, height: 32)
                             
                             VStack(alignment: .leading) {
@@ -117,7 +121,11 @@ struct VolumeDetailView: View {
                     }
                     .padding()
                     .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+                    )
                 }
                 
                 Text("La santé se mesure au niveau du disque physique.")

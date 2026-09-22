@@ -20,8 +20,8 @@ final class ParsingTests: XCTestCase {
         if let log = smartLog {
             XCTAssertEqual(log.temperatureCelsius, 28)
             XCTAssertEqual(log.percentageUsed, 0)
-            XCTAssertEqual(log.dataUnitsRead, 27753070)
-            XCTAssertEqual(log.dataUnitsWritten, 14743979)
+            XCTAssertEqual(log.dataUnitsRead, 27756904)
+            XCTAssertEqual(log.dataUnitsWritten, 14747252)
             XCTAssertEqual(log.powerCycles, 151)
             XCTAssertEqual(log.powerOnHours, 268)
         }

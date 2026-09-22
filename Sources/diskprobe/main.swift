@@ -40,6 +40,18 @@ if args.count > 1 {
                 }
             }
         }
+    } else if command == "detect" {
+        let disks = DiskDiscovery.listPhysicalDisks()
+        for disk in disks {
+            var capabilityStr = ""
+            switch disk.healthCapability {
+            case .supported:
+                capabilityStr = "supported"
+            case .unsupported(let reason):
+                capabilityStr = "unsupported(\(reason.rawValue))"
+            }
+            print("\(disk.bsdName) : \(disk.protocolType.rawValue), \(disk.mediumType.rawValue), \(capabilityStr)")
+        }
     } else if command == "raw" {
         if args.count < 3 {
             print("Usage: diskprobe raw <bsdName> [--save <folder>]")
