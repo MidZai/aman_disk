@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ATASmartAttribute: Codable, Equatable, Hashable {
+public struct ATASmartAttribute: Codable, Equatable, Hashable, Identifiable {
     public let id: UInt8
     public let flags: UInt16
     public let current: UInt8
