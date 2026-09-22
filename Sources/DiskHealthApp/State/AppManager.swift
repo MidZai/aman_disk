@@ -1,7 +1,12 @@
 import Foundation
 import DiskHealthCore
 
-public struct RealDisk: Identifiable, Equatable {
+enum SidebarItem: Hashable {
+    case physicalDisk(String)
+    case volume(String)
+}
+
+public struct RealDisk: Identifiable, Equatable, Codable {
     public var id: String { physical.bsdName }
     public let physical: PhysicalDisk
     public let smart: NVMeSmartLog?
@@ -31,6 +36,7 @@ class AppManager: ObservableObject {
     @Published var isLoading: Bool = true
     @Published var showDetails: Bool = false
     @Published var showRawValues: Bool = false
+    @Published var selection: SidebarItem? = nil
 
     private var refreshTimer: Timer?
     

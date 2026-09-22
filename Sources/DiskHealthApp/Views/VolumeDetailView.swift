@@ -3,7 +3,7 @@ import DiskHealthCore
 
 struct VolumeDetailView: View {
     @EnvironmentObject var appManager: AppManager
-    @Binding var selection: SidebarItem?
+    
     
     let volume: Volume
     
@@ -111,7 +111,7 @@ struct VolumeDetailView: View {
                             Spacer()
                             
                             Button("Afficher le disque") {
-                                selection = .physicalDisk(physID)
+                                appManager.selection = .physicalDisk(physID)
                             }
                         }
                     }

@@ -15,12 +15,16 @@ struct DiskCommands: Commands {
             .keyboardShortcut("r", modifiers: .command)
             
             Button("Copier le résumé") {
-                print("Copier le résumé")
+                if case .physicalDisk(let id) = appManager.selection, let disk = appManager.disks.first(where: { $0.id == id }) {
+                    ExportService.copySummary(disk: disk)
+                }
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
             
-            Button("Exporter en PDF…") {
-                print("Exporter en PDF…")
+            Button("Exporter le rapport (JSON)…") {
+                if case .physicalDisk(let id) = appManager.selection, let disk = appManager.disks.first(where: { $0.id == id }) {
+                    ExportService.exportJSON(disk: disk)
+                }
             }
             .keyboardShortcut("e", modifiers: .command)
             

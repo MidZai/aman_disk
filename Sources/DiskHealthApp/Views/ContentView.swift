@@ -2,18 +2,15 @@ import SwiftUI
 import AppKit
 import DiskHealthCore
 
-enum SidebarItem: Hashable {
-    case physicalDisk(String)
-    case volume(String)
-}
+
 
 struct ContentView: View {
     @EnvironmentObject var appManager: AppManager
-    @State private var selection: SidebarItem?
+    
     
     var body: some View {
         NavigationSplitView {
-            List(selection: $selection) {
+            List(selection: $appManager.selection) {
                 if !appManager.disks.isEmpty {
                     Section("Disques physiques") {
                         ForEach(appManager.disks) { disk in
@@ -24,10 +21,10 @@ struct ContentView: View {
                                             appManager.loadDisks()
                                         }
                                         Button("Copier le résumé") {
-                                            print("Copier le résumé")
+                                            ExportService.copySummary(disk: disk)
                                         }
                                         Button("Exporter le rapport…") {
-                                            print("Exporter le rapport…")
+                                            ExportService.exportJSON(disk: disk)
                                         }
                                         Divider()
                                         Button("Afficher dans Utilitaire de disque") {
@@ -59,7 +56,7 @@ struct ContentView: View {
                     ProgressView("Analyse des disques…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else 
-                if let selection = selection {
+                if let selection = appManager.selection {
                     switch selection {
                     case .physicalDisk(let id):
                         if let disk = appManager.disks.first(where: { $0.id == id }) {
@@ -73,7 +70,7 @@ struct ContentView: View {
                         }
                     case .volume(let id):
                         if let volume = appManager.volumes.first(where: { $0.id == id }) {
-                            VolumeDetailView(selection: $selection, volume: volume)
+                            VolumeDetailView(volume: volume)
                         } else {
                             Text("Volume introuvable")
                         }
@@ -83,9 +80,9 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .animation(.easeInOut, value: selection)
+            .animation(.easeInOut, value: appManager.selection)
             .inspector(isPresented: $appManager.showDetails) {
-                if let selection = selection {
+                if let selection = appManager.selection {
                     InspectorView(selection: selection)
                 } else {
                     Text("Aucune sélection")
@@ -102,14 +99,23 @@ struct ContentView: View {
                 }
                 
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button("Exporter en PDF…") { print("Exporter en PDF…") }
-                        Button("Exporter en texte…") { print("Exporter en texte…") }
-                        Button("Exporter en JSON…") { print("Exporter en JSON…") }
-                        Divider()
-                        Button("Copier le résumé") { print("Copier le résumé") }
-                    } label: {
-                        Label("Exporter", systemImage: "square.and.arrow.up").help("Exporter les données du disque")
+                    if let sel = appManager.selection, case .physicalDisk(let id) = sel, let disk = appManager.disks.first(where: { $0.id == id }) {
+                        Menu {
+                            Button("Exporter en PDF…") { print("Non implémenté") }
+                            Button("Exporter en texte…") { print("Non implémenté") }
+                            Button("Exporter en JSON…") { ExportService.exportJSON(disk: disk) }
+                            Divider()
+                            Button("Copier le résumé") { ExportService.copySummary(disk: disk) }
+                        } label: {
+                            Label("Exporter", systemImage: "square.and.arrow.up").help("Exporter les données du disque")
+                        }
+                    } else {
+                        Menu {
+                            Text("Sélectionnez un disque").foregroundColor(.secondary)
+                        } label: {
+                            Label("Exporter", systemImage: "square.and.arrow.up").help("Exporter les données du disque")
+                        }
+                        .disabled(true)
                     }
                 }
                 
@@ -125,8 +131,8 @@ struct ContentView: View {
             .navigationSubtitle("Santé et informations des disques")
         }
         .onReceive(appManager.$disks) { disks in
-            if selection == nil, let internalDisk = disks.first(where: { $0.physical.isInternal }) {
-                selection = .physicalDisk(internalDisk.id)
+            if appManager.selection == nil, let internalDisk = disks.first(where: { $0.physical.isInternal }) {
+                appManager.selection = .physicalDisk(internalDisk.id)
             }
         }
     }
