@@ -254,6 +254,9 @@ struct DiskDetailView: View {
     }
     
     private var interfaceStr: String {
+        if disk.physical.protocolType == .pcieAhci {
+            return "PCIe AHCI"
+        }
         switch disk.physical.connection {
         case .nvmeInternal, .nvmeExternal: return "NVMe"
         case .sata: return "SATA"

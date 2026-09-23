@@ -32,6 +32,9 @@ public enum DiskDiscovery {
                     let sizeBytes = descDict[kDADiskDescriptionMediaSizeKey as String] as? UInt64 ?? 0
                     let isInternal = descDict[kDADiskDescriptionDeviceInternalKey as String] as? Bool ?? false
                     
+                    let volumeNames = getVolumeNames(for: bsdName, session: session)
+                    let (protocolType, mediumType, healthCapability) = ProtocolDetector.detect(bsdName: bsdName)
+                    
                     var connection: Connection = .other
                     var usbVendorID: UInt16? = nil
                     var usbProductID: UInt16? = nil
@@ -41,14 +44,13 @@ public enum DiskDiscovery {
                         let ids = getUSBIDs(service: serviceToProcess)
                         usbVendorID = ids.vid
                         usbProductID = ids.pid
+                    } else if protocolType == .pcieAhci {
+                        connection = .other
                     } else if protocolName.contains("NVMe") || protocolName.contains("Apple Fabric") || protocolName.contains("PCI") {
                         connection = isInternal ? .nvmeInternal : .nvmeExternal
                     } else if protocolName.contains("SATA") {
                         connection = .sata
                     }
-                    
-                    let volumeNames = getVolumeNames(for: bsdName, session: session)
-                    let (protocolType, mediumType, healthCapability) = ProtocolDetector.detect(bsdName: bsdName)
                     
                     disks.append(PhysicalDisk(
                         bsdName: bsdName,

@@ -7,6 +7,22 @@
 #include <string.h>
 #include <stdio.h>
 
+static int is_smart_disabled(IOATASMARTInterface **smart_interface) {
+    if (!smart_interface) return 0;
+    unsigned char identify[512] = {0};
+    UInt32 outSize = 0;
+    IOReturn ikr = (*smart_interface)->GetATAIdentifyData(smart_interface, identify, 512, &outSize);
+    if (ikr == kIOReturnSuccess && outSize >= 512) {
+        unsigned short *words = (unsigned short *)identify;
+        // Word 82 bit 0 = SMART feature set supported
+        // Word 85 bit 0 = SMART feature set enabled
+        if ((words[82] & 0x0001) != 0 && (words[85] & 0x0001) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int get_ata_smart_interface(const char *bsd_name, IOCFPlugInInterface ***out_plugin, IOATASMARTInterface ***out_smart_interface) {
     if (!bsd_name || !out_plugin || !out_smart_interface) return -1;
     
@@ -31,18 +47,34 @@ static int get_ata_smart_interface(const char *bsd_name, IOCFPlugInInterface ***
     io_object_t current = media;
     IOObjectRetain(current);
     
-    io_object_t smart_service = 0;
+    IOCFPlugInInterface **plugin = NULL;
+    IOATASMARTInterface **smart_interface = NULL;
     
     while (current != 0) {
-        CFTypeRef smart_cap = IORegistryEntrySearchCFProperty(current, kIOServicePlane, CFSTR("SMART Capable"), kCFAllocatorDefault, 0);
-        if (smart_cap) {
-            if (CFGetTypeID(smart_cap) == CFBooleanGetTypeID() && CFBooleanGetValue((CFBooleanRef)smart_cap)) {
-                smart_service = current;
-                IOObjectRetain(smart_service);
-                CFRelease(smart_cap);
+        SInt32 score = 0;
+        IOCFPlugInInterface **test_plugin = NULL;
+        kr = IOCreatePlugInInterfaceForService(
+            current,
+            kIOATASMARTUserClientTypeID,
+            kIOCFPlugInInterfaceID,
+            &test_plugin,
+            &score
+        );
+        
+        if (kr == kIOReturnSuccess && test_plugin != NULL) {
+            IOATASMARTInterface **test_smart = NULL;
+            HRESULT res = (*test_plugin)->QueryInterface(
+                test_plugin,
+                CFUUIDGetUUIDBytes(kIOATASMARTInterfaceID),
+                (LPVOID *)&test_smart
+            );
+            if (res == S_OK && test_smart != NULL) {
+                plugin = test_plugin;
+                smart_interface = test_smart;
+                IOObjectRelease(current);
                 break;
             }
-            CFRelease(smart_cap);
+            IODestroyPlugInInterface(test_plugin);
         }
         
         io_object_t parent = 0;
@@ -57,23 +89,7 @@ static int get_ata_smart_interface(const char *bsd_name, IOCFPlugInInterface ***
     
     IOObjectRelease(media);
     
-    if (smart_service == 0) {
-        return -4;
-    }
-    
-    IOCFPlugInInterface **plugin = NULL;
-    SInt32 score = 0;
-    kr = IOCreatePlugInInterfaceForService(smart_service, kIOATASMARTUserClientTypeID, kIOCFPlugInInterfaceID, &plugin, &score);
-    IOObjectRelease(smart_service);
-    
-    if (kr != kIOReturnSuccess || !plugin) {
-        return -5;
-    }
-    
-    IOATASMARTInterface **smart_interface = NULL;
-    HRESULT res = (*plugin)->QueryInterface(plugin, CFUUIDGetUUIDBytes(kIOATASMARTInterfaceID), (LPVOID *)&smart_interface);
-    if (res != S_OK || !smart_interface) {
-        IODestroyPlugInInterface(plugin);
+    if (!plugin || !smart_interface) {
         return -5;
     }
     
@@ -93,7 +109,7 @@ int cdiskio_read_ata_smart_data(const char *bsd_name, unsigned char *out, int si
     
     IOReturn kr = (*smart_interface)->SMARTReadData(smart_interface, (ATASMARTData *)out);
     if (kr != kIOReturnSuccess) {
-        if (kr == kIOReturnNotPermitted || kr == kIOReturnNoDevice) { // Or other error for disabled SMART
+        if (kr == kIOReturnNotPermitted || kr == kIOReturnNoDevice || is_smart_disabled(smart_interface)) {
             IODestroyPlugInInterface(plugin);
             return -6;
         }
@@ -103,7 +119,7 @@ int cdiskio_read_ata_smart_data(const char *bsd_name, unsigned char *out, int si
     
     kr = (*smart_interface)->SMARTValidateReadData(smart_interface, (const ATASMARTData *)out);
     if (kr != kIOReturnSuccess) {
-        fprintf(stderr, "Warning: SMARTValidateReadData failed\n");
+        // Warning: checksum validation warning
     }
     
     IODestroyPlugInInterface(plugin);
@@ -121,8 +137,12 @@ int cdiskio_read_ata_smart_thresholds(const char *bsd_name, unsigned char *out, 
     
     IOReturn kr = (*smart_interface)->SMARTReadDataThresholds(smart_interface, (ATASMARTDataThresholds *)out);
     if (kr != kIOReturnSuccess) {
+        if (kr == kIOReturnNotPermitted || kr == kIOReturnNoDevice || is_smart_disabled(smart_interface)) {
+            IODestroyPlugInInterface(plugin);
+            return -6;
+        }
         IODestroyPlugInInterface(plugin);
-        return -6; // or -5, returning -6 just in case SMART is disabled
+        return -5;
     }
     
     IODestroyPlugInInterface(plugin);
@@ -159,8 +179,12 @@ int cdiskio_read_ata_smart_status(const char *bsd_name, int *threshold_exceeded)
     Boolean exceeded = false;
     IOReturn kr = (*smart_interface)->SMARTReturnStatus(smart_interface, &exceeded);
     if (kr != kIOReturnSuccess) {
+        if (kr == kIOReturnNotPermitted || kr == kIOReturnNoDevice || is_smart_disabled(smart_interface)) {
+            IODestroyPlugInInterface(plugin);
+            return -6;
+        }
         IODestroyPlugInInterface(plugin);
-        return -6;
+        return -5;
     }
     
     if (threshold_exceeded) {

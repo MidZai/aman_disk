@@ -52,7 +52,7 @@ public enum ProtocolDetector {
             }
             
             if let protChars = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "Protocol Characteristics" as CFString, kCFAllocatorDefault, 0) as? [String: Any] {
-                if let interconnect = protChars["Physical Interconnect"] as? String, interconnect == "PCI-Express" {
+                if let interconnect = protChars["Physical Interconnect"] as? String, interconnect.contains("PCI") {
                     isPCIeAHCI = true
                 }
             }

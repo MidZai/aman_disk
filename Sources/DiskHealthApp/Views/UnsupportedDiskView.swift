@@ -80,11 +80,12 @@ struct UnsupportedDiskView: View {
                         let sizeStr = Formatters.bytes(physical.sizeBytes)
                         let locStr = physical.isInternal ? "Interne" : "Externe"
                         let connStr: String = {
+                            if physical.protocolType == .pcieAhci { return "PCIe AHCI" }
                             switch physical.connection {
                             case .nvmeInternal, .nvmeExternal: return "NVMe"
                             case .sata: return "SATA"
                             case .usb: return "USB"
-                            case .other: return physical.protocolType.rawValue
+                            case .other: return physical.protocolType == .unknown ? "Autre" : physical.protocolType.rawValue
                             }
                         }()
                         
@@ -113,6 +114,31 @@ struct UnsupportedDiskView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        
+                        if reason == .smartDisabled {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Commande pour activer S.M.A.R.T. (Terminal) :")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                HStack {
+                                    Text("smartctl -s on /dev/\(physical.bsdName)")
+                                        .font(.system(.body, design: .monospaced))
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color.secondary.opacity(0.1))
+                                        .cornerRadius(6)
+                                    Button {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString("smartctl -s on /dev/\(physical.bsdName)", forType: .string)
+                                    } label: {
+                                        Image(systemName: "doc.on.doc")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help("Copier la commande")
+                                }
+                            }
+                            .padding(.top, 4)
+                        }
                         
                         if showExportButton {
                             Button(Strings.exportDiagnostic) {
