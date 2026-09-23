@@ -7,12 +7,14 @@ public enum ProtocolDetector {
         guard let session = DASessionCreate(kCFAllocatorDefault) else {
             return (.unknown, .unknown, .unsupported(reason: .noSmartInterface))
         }
-        
+
+        // I4: Always release the IOKit iterator.
         var iterator: io_iterator_t = 0
         guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOMedia"), &iterator) == kIOReturnSuccess else {
             return (.unknown, .unknown, .unsupported(reason: .noSmartInterface))
         }
-        
+        defer { IOObjectRelease(iterator) }
+
         var targetService: io_object_t = 0
         var service = IOIteratorNext(iterator)
         while service != 0 {
@@ -23,40 +25,40 @@ public enum ProtocolDetector {
             IOObjectRelease(service)
             service = IOIteratorNext(iterator)
         }
-        
+
         guard targetService != 0 else {
             return (.unknown, .unknown, .unsupported(reason: .noSmartInterface))
         }
-        
+
         var isNVMeSmartCapable = false
         var isATASmartCapable = false
         var isPCIeAHCI = false
         var mediumTypeStr: String? = nil
-        
+
         var current = targetService
         IOObjectRetain(current)
-        
+
         while current != 0 {
             if let capable = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "NVMe SMART Capable" as CFString, kCFAllocatorDefault, 0) as? Bool, capable {
                 isNVMeSmartCapable = true
             }
-            
+
             if let capable = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "SMART Capable" as CFString, kCFAllocatorDefault, 0) as? Bool, capable {
                 isATASmartCapable = true
             }
-            
+
             if let devChars = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "Device Characteristics" as CFString, kCFAllocatorDefault, 0) as? [String: Any] {
                 if mediumTypeStr == nil, let mt = devChars["Medium Type"] as? String {
                     mediumTypeStr = mt
                 }
             }
-            
+
             if let protChars = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "Protocol Characteristics" as CFString, kCFAllocatorDefault, 0) as? [String: Any] {
                 if let interconnect = protChars["Physical Interconnect"] as? String, interconnect.contains("PCI") {
                     isPCIeAHCI = true
                 }
             }
-            
+
             var parent: io_object_t = 0
             let kr = IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent)
             IOObjectRelease(current)
@@ -66,7 +68,7 @@ public enum ProtocolDetector {
                 break
             }
         }
-        
+
         var daProtocol = ""
         var daModel = ""
         if let disk = DADiskCreateFromIOMedia(kCFAllocatorDefault, session, targetService),
@@ -74,9 +76,9 @@ public enum ProtocolDetector {
             daProtocol = desc[kDADiskDescriptionDeviceProtocolKey as String] as? String ?? ""
             daModel = desc[kDADiskDescriptionDeviceModelKey as String] as? String ?? ""
         }
-        
+
         IOObjectRelease(targetService)
-        
+
         let mediumType: MediumType
         if mediumTypeStr == "Solid State" {
             mediumType = .solidState
@@ -85,7 +87,7 @@ public enum ProtocolDetector {
         } else {
             mediumType = .unknown
         }
-        
+
         if isNVMeSmartCapable {
             return (.nvme, mediumType, .supported)
         }
@@ -104,7 +106,7 @@ public enum ProtocolDetector {
         if daProtocol == "Virtual Interface" || daProtocol == "Disk Image" || daModel.contains("VMware") || daModel.contains("VBOX") || daModel.contains("Parallels") || daModel.contains("Virtual") {
             return (.virtualDisk, mediumType, .unsupported(reason: .virtualDisk))
         }
-        
+
         return (.unknown, mediumType, .unsupported(reason: .noSmartInterface))
     }
 }

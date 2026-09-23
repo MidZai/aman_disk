@@ -5,14 +5,6 @@ import AppKit
 struct DiskHealthApp: App {
     @StateObject private var appManager = AppManager()
     
-    init() {
-        if ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] == "1" {
-            // Mode démo activé
-        }
-        NSApplication.shared.setActivationPolicy(.regular)
-        NSApplication.shared.activate(ignoringOtherApps: true)
-    }
-    
     var body: some Scene {
         WindowGroup {
             ContentView()

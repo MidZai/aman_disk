@@ -93,12 +93,13 @@ public enum ATACatalog {
     )
     
     public static let samsungProfile = ATAProfile(
-        name: "GenericATA", // Used internally as GenericATA with override
+        name: "Samsung",
         matches: { model in model.starts(with: "Samsung") },
         attributes: [
             0xB1: AttributeOverride(name: "Nivellement de l'usure", explanation: "Sur de nombreux SSD, la valeur normalisée indique la durée de vie restante estimée.", role: .lifeRemainingPercentNormalized)
         ]
     )
+
 
     public static let profiles = [appleSMFamilyProfile, samsungProfile] // Ordered by priority
 

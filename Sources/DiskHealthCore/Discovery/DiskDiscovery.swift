@@ -14,6 +14,7 @@ public enum DiskDiscovery {
         guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOMedia"), &iterator) == kIOReturnSuccess else {
             return []
         }
+        defer { IOObjectRelease(iterator) }
         
         var diskService: io_object_t = IOIteratorNext(iterator)
         while diskService != 0 {
@@ -106,6 +107,8 @@ public enum DiskDiscovery {
         var names: Set<String> = []
         var iterator: io_iterator_t = 0
         guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOMedia"), &iterator) == kIOReturnSuccess else { return [] }
+        defer { IOObjectRelease(iterator) }
+
         
         var service = IOIteratorNext(iterator)
         while service != 0 {

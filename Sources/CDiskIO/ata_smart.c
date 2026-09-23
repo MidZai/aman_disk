@@ -93,10 +93,22 @@ static int get_ata_smart_interface(const char *bsd_name, IOCFPlugInInterface ***
         return -5;
     }
     
+    // B2: Check if SMART is disabled once, right after obtaining a valid interface,
+    // before any read command is issued by the callers.
+    if (is_smart_disabled(smart_interface)) {
+        // Auto-enable SMART as requested by the user
+        IOReturn enable_kr = (*smart_interface)->SMARTEnableDisableOperations(smart_interface, true);
+        if (enable_kr != kIOReturnSuccess || is_smart_disabled(smart_interface)) {
+            IODestroyPlugInInterface(plugin);
+            return -6;
+        }
+    }
+    
     *out_plugin = plugin;
     *out_smart_interface = smart_interface;
     return 0;
 }
+
 
 int cdiskio_read_ata_smart_data(const char *bsd_name, unsigned char *out, int size) {
     if (size < 512) return -1;
@@ -109,22 +121,20 @@ int cdiskio_read_ata_smart_data(const char *bsd_name, unsigned char *out, int si
     
     IOReturn kr = (*smart_interface)->SMARTReadData(smart_interface, (ATASMARTData *)out);
     if (kr != kIOReturnSuccess) {
-        if (kr == kIOReturnNotPermitted || kr == kIOReturnNoDevice || is_smart_disabled(smart_interface)) {
-            IODestroyPlugInInterface(plugin);
-            return -6;
-        }
         IODestroyPlugInInterface(plugin);
-        return -5;
+        return kr;
     }
     
     kr = (*smart_interface)->SMARTValidateReadData(smart_interface, (const ATASMARTData *)out);
     if (kr != kIOReturnSuccess) {
-        // Warning: checksum validation warning
+        // Checksum invalid: return data anyway but the caller will detect it.
+        fprintf(stderr, "cdiskio: SMART data checksum invalid for %s\n", bsd_name);
     }
     
     IODestroyPlugInInterface(plugin);
     return 0;
 }
+
 
 int cdiskio_read_ata_smart_thresholds(const char *bsd_name, unsigned char *out, int size) {
     if (size < 512) return -1;
@@ -137,17 +147,14 @@ int cdiskio_read_ata_smart_thresholds(const char *bsd_name, unsigned char *out, 
     
     IOReturn kr = (*smart_interface)->SMARTReadDataThresholds(smart_interface, (ATASMARTDataThresholds *)out);
     if (kr != kIOReturnSuccess) {
-        if (kr == kIOReturnNotPermitted || kr == kIOReturnNoDevice || is_smart_disabled(smart_interface)) {
-            IODestroyPlugInInterface(plugin);
-            return -6;
-        }
         IODestroyPlugInInterface(plugin);
-        return -5;
+        return kr;
     }
     
     IODestroyPlugInInterface(plugin);
     return 0;
 }
+
 
 int cdiskio_read_ata_identify(const char *bsd_name, unsigned char *out, int size) {
     if (size < 512) return -1;
@@ -162,7 +169,7 @@ int cdiskio_read_ata_identify(const char *bsd_name, unsigned char *out, int size
     IOReturn kr = (*smart_interface)->GetATAIdentifyData(smart_interface, out, (UInt32)size, &outSize);
     if (kr != kIOReturnSuccess) {
         IODestroyPlugInInterface(plugin);
-        return -5;
+        return kr;
     }
     
     IODestroyPlugInInterface(plugin);
@@ -179,12 +186,8 @@ int cdiskio_read_ata_smart_status(const char *bsd_name, int *threshold_exceeded)
     Boolean exceeded = false;
     IOReturn kr = (*smart_interface)->SMARTReturnStatus(smart_interface, &exceeded);
     if (kr != kIOReturnSuccess) {
-        if (kr == kIOReturnNotPermitted || kr == kIOReturnNoDevice || is_smart_disabled(smart_interface)) {
-            IODestroyPlugInInterface(plugin);
-            return -6;
-        }
         IODestroyPlugInInterface(plugin);
-        return -5;
+        return kr;
     }
     
     if (threshold_exceeded) {
@@ -194,3 +197,5 @@ int cdiskio_read_ata_smart_status(const char *bsd_name, int *threshold_exceeded)
     IODestroyPlugInInterface(plugin);
     return 0;
 }
+
+

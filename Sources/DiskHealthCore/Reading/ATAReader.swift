@@ -8,6 +8,7 @@ public enum ATAReadError: Error, Equatable {
     case smartServiceNotFound
     case pluginCreationFailed
     case smartDisabled
+    case ioError(Int32)
     case unknown(Int32)
 }
 
@@ -20,7 +21,8 @@ public enum ATAReader {
         case -4: return .smartServiceNotFound
         case -5: return .pluginCreationFailed
         case -6: return .smartDisabled
-        default: return .unknown(code)
+        case -7: return .ioError(code)
+        default: return .ioError(code)
         }
     }
     

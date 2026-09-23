@@ -141,12 +141,22 @@ struct DiskDetailView: View {
     }
     
     private func loadHistory() {
-        if let identify = disk.identify {
-            let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
-            let since = Date().addingTimeInterval(-historyRange.timeInterval)
-            historySamples = HistoryStore.shared.samples(for: key, since: since)
+        // I6: disk.identify returns NVMeIdentify? and is nil for ATA disks.
+        // Derive the history key from the snapshot type instead.
+        let key: String?
+        switch disk.snapshot {
+        case .nvme(_, let id):
+            key = DiskIdentity.key(model: id.modelNumber, serial: id.serialNumber)
+        case .ata(let ataSnap):
+            key = DiskIdentity.key(model: ataSnap.model, serial: ataSnap.serialNumber)
+        case nil:
+            key = nil
         }
+        guard let key else { return }
+        let since = Date().addingTimeInterval(-historyRange.timeInterval)
+        historySamples = HistoryStore.shared.samples(for: key, since: since)
     }
+
     
     private var header: some View {
         HStack(alignment: .top, spacing: 20) {
@@ -201,31 +211,22 @@ struct DiskDetailView: View {
         }
     }
     
-    private var healthColor: Color {
-        switch disk.health.status {
-        case .good: return .green
-        case .caution: return .orange
-        case .bad: return .red
-        case .unknown: return .gray
-        }
-    }
-    
+    // P6: Use HealthStatus extension instead of a duplicated switch.
+    private var healthColor: Color { disk.health.status.color }
+
+    // I7: Use Strings constants for localised labels, matching Strings.swift.
     private var healthLabel: String {
-        let statusText: String
-        switch disk.health.status {
-        case .good: statusText = "En bonne santé"
-        case .caution: statusText = "Attention"
-        case .bad: statusText = "Critique"
-        case .unknown: statusText = "Inconnu"
+        let label = disk.health.status.localizedLabel
+        if disk.health.status == .good || disk.health.status == .unknown {
+            return label
         }
-        
-        if disk.health.status == .good {
-            return statusText
-        } else {
-            let reason = disk.health.reasons.first ?? ""
-            return "\(statusText) (\(reason))"
+        // Show first reason in parentheses only when it's short enough (< 60 chars).
+        if let reason = disk.health.reasons.first, reason.count < 60 {
+            return "\(label) (\(reason))"
         }
+        return label
     }
+
     
     private var subtext: String {
         let typeStr = disk.physical.mediumType == .solidState ? "SSD" : (disk.physical.mediumType == .rotational ? "Disque dur" : "Support")

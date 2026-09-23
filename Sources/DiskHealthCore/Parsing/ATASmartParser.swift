@@ -11,13 +11,21 @@ public enum ATASmartParser {
         return String(bytes: chars, encoding: .ascii)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
+    // B4: Compute a checksum using UInt to avoid any intermediate overflow.
+    private static func verifyChecksum(_ data: Data) -> Bool {
+        let sum = data.prefix(512).reduce(UInt(0)) { $0 + UInt($1) }
+        return sum % 256 == 0
+    }
+
     public static func parse(smartData: Data, thresholdsData: Data, identifyData: Data, statusExceeded: Bool) -> ATASmartSnapshot? {
         guard smartData.count >= 512, thresholdsData.count >= 512, identifyData.count >= 512 else {
             return nil
         }
-        
-        let checksumValid = smartData.prefix(512).reduce(0) { (UInt16($0) + UInt16($1)) % 256 } == 0
-        
+
+        // B3+B4: Verify checksums for both SMART data and thresholds.
+        let checksumValid = verifyChecksum(smartData)
+        let thresholdsChecksumValid = verifyChecksum(thresholdsData)
+
         var thresholdsMap = [UInt8: UInt8]()
         for i in 0..<30 {
             let offset = 2 + (i * 12)
@@ -26,7 +34,7 @@ public enum ATASmartParser {
                 thresholdsMap[id] = thresholdsData[offset + 1]
             }
         }
-        
+
         var attributes = [ATASmartAttribute]()
         for i in 0..<30 {
             let offset = 2 + (i * 12)
@@ -36,14 +44,14 @@ public enum ATASmartParser {
                 let current = smartData[offset+3]
                 let worst = smartData[offset+4]
                 let raw = Array(smartData[offset+5...offset+10])
-                
+
                 var rawValue: UInt64 = 0
                 for j in 0..<6 {
                     rawValue |= (UInt64(raw[j]) << (j * 8))
                 }
-                
+
                 let threshold = thresholdsMap[id] ?? 0
-                
+
                 attributes.append(ATASmartAttribute(
                     id: id,
                     flags: flags,
@@ -55,11 +63,11 @@ public enum ATASmartParser {
                 ))
             }
         }
-        
+
         let serialNumber = parseString(data: identifyData, range: 20..<40)
         let firmware = parseString(data: identifyData, range: 46..<54)
         let model = parseString(data: identifyData, range: 54..<94)
-        
+
         let word217 = UInt16(identifyData[434]) | (UInt16(identifyData[435]) << 8)
         let rotationRate: Int
         if word217 == 1 {
@@ -69,7 +77,7 @@ public enum ATASmartParser {
         } else {
             rotationRate = 0
         }
-        
+
         return ATASmartSnapshot(
             attributes: attributes.sorted { $0.id < $1.id },
             model: model,
@@ -77,7 +85,8 @@ public enum ATASmartParser {
             serialNumber: serialNumber,
             rotationRate: rotationRate,
             thresholdExceeded: statusExceeded,
-            checksumValid: checksumValid
+            checksumValid: checksumValid,
+            thresholdsChecksumValid: thresholdsChecksumValid
         )
     }
 }

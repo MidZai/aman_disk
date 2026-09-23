@@ -129,6 +129,12 @@ final class ATATests: XCTestCase {
         badChecksumSmart[511] = 0 // Break checksum
         let snapChecksum = ATASmartParser.parse(smartData: badChecksumSmart, thresholdsData: threshGood, identifyData: identifyData, statusExceeded: false)!
         XCTAssertFalse(snapChecksum.checksumValid)
+
+        var badChecksumThresh = threshGood
+        badChecksumThresh[511] = 0 // Break checksum
+        let snapThreshChecksum = ATASmartParser.parse(smartData: smartGood, thresholdsData: badChecksumThresh, identifyData: identifyData, statusExceeded: false)!
+        XCTAssertFalse(snapThreshChecksum.thresholdsChecksumValid)
+        XCTAssertTrue(snapThreshChecksum.checksumValid)
     }
 
     func testProfiles() {
@@ -139,9 +145,39 @@ final class ATATests: XCTestCase {
         XCTAssertEqual(attrAEInfo.role, .hostReadsBytes(multiplier: 1048576))
         
         let samsungProfile = ATACatalog.profile(for: "Samsung SSD 870 EVO 1TB")
-        XCTAssertEqual(samsungProfile.name, "GenericATA")
+        XCTAssertEqual(samsungProfile.name, "Samsung")   // I2: was wrongly "GenericATA" before fix
         
         let attrB1Info = ATACatalog.attributeInfo(id: 0xB1, profile: samsungProfile)
         XCTAssertEqual(attrB1Info.role, .lifeRemainingPercentNormalized)
     }
+
+    func testDiskHealthSnapshotCodable() throws {
+        let snap = ATASmartSnapshot(attributes: [], model: "TestModel", firmware: "FW", serialNumber: "SN", rotationRate: 0, thresholdExceeded: false, checksumValid: true, thresholdsChecksumValid: true)
+        let diskSnap = DiskHealthSnapshot.ata(snap)
+        let encoded = try JSONEncoder().encode(diskSnap)
+        let decoded = try JSONDecoder().decode(DiskHealthSnapshot.self, from: encoded)
+        XCTAssertEqual(diskSnap, decoded)
+
+        let legacyJSON = """
+        {
+            "protocol": "ata",
+            "attributes": [],
+            "model": "LegacyModel",
+            "firmware": "FW",
+            "serialNumber": "SN",
+            "rotationRate": 0,
+            "thresholdExceeded": false,
+            "checksumValid": true
+        }
+        """.data(using: .utf8)!
+        let legacyDecoded = try JSONDecoder().decode(DiskHealthSnapshot.self, from: legacyJSON)
+        if case .ata(let ata) = legacyDecoded {
+            XCTAssertEqual(ata.model, "LegacyModel")
+            XCTAssertTrue(ata.checksumValid)
+            XCTAssertTrue(ata.thresholdsChecksumValid)
+        } else {
+            XCTFail("Expected .ata snapshot")
+        }
+    }
 }
+

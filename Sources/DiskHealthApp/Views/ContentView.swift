@@ -253,14 +253,9 @@ struct DiskRowView: View {
         .padding(.vertical, 4)
     }
     
-    private var healthColor: Color {
-        switch disk.health.status {
-        case .good: return .green
-        case .caution: return .orange
-        case .bad: return .red
-        case .unknown: return .gray
-        }
-    }
+    // P6: Use HealthStatus extension instead of a duplicated switch.
+    private var healthColor: Color { disk.health.status.color }
+
 }
 
 struct VolumeRowView: View {

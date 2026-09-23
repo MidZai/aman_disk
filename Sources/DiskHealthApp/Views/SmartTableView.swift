@@ -79,9 +79,15 @@ struct SmartTableView: View {
                                 .font(.caption)
                                 .foregroundColor(.orange)
                         }
+                        if !ata.thresholdsChecksumValid {
+                            Text("Seuils non vérifiés (somme de contrôle incorrecte)")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
                     }
                 }
             }
+
             Spacer()
             
             Toggle("Valeurs brutes", isOn: $appManager.showRawValues.animation(.easeInOut(duration: 0.2)))
@@ -116,7 +122,7 @@ struct SmartTableView: View {
         }
         .environment(\.defaultMinListRowHeight, 32)
         .tableStyle(.bordered)
-        .frame(height: CGFloat(38 + (attrs.count * 32)))
+        .frame(minHeight: CGFloat(38 + (attrs.count * 32)))
     }
     
     private func ataTable(_ attrs: [UnifiedAttribute]) -> some View {
@@ -157,8 +163,9 @@ struct SmartTableView: View {
         }
         .environment(\.defaultMinListRowHeight, 32)
         .tableStyle(.bordered)
-        .frame(height: CGFloat(38 + (attrs.count * 32)))
+        .frame(minHeight: CGFloat(38 + (attrs.count * 32)))
     }
+
     
     @ViewBuilder private func idCell(_ attr: UnifiedAttribute) -> some View {
         let hex = "0x" + String(format: "%02X", attr.id)
@@ -218,27 +225,20 @@ struct SmartTableView: View {
         }
     }
     
+    // P6: Replaced by AttributeState extension below.
     private func color(for state: AttributeState, isValue: Bool) -> Color {
-        switch state {
-        case .normal, .informational: return isValue ? .primary : .primary
-        case .warning: return .orange
-        case .critical: return .red
-        }
+        state.tableColor
     }
     
     private func stateLabel(_ state: AttributeState) -> String {
-        switch state {
-        case .normal: return "Normal"
-        case .warning: return "Attention"
-        case .critical: return "Critique"
-        case .informational: return "—"
-        }
+        state.localizedLabel
     }
     
     private func weight(for state: AttributeState) -> Font.Weight {
-        return (state == .warning || state == .critical) ? .semibold : .regular
+        state.fontWeight
     }
 }
+
 
 struct PopoverView: View {
     let attr: UnifiedAttribute
@@ -278,15 +278,8 @@ struct AttributeCell: View {
         }
     }
     
-    private func color(for state: AttributeState, isValue: Bool) -> Color {
-        switch state {
-        case .normal, .informational: return isValue ? .primary : .primary
-        case .warning: return .orange
-        case .critical: return .red
-        }
-    }
-    
-    private func weight(for state: AttributeState) -> Font.Weight {
-        return (state == .warning || state == .critical) ? .semibold : .regular
-    }
+    // P6: Delegate to AttributeState extension for consistency.
+    private func color(for state: AttributeState, isValue: Bool) -> Color { state.tableColor }
+    private func weight(for state: AttributeState) -> Font.Weight { state.fontWeight }
 }
+
