@@ -15,4 +15,4 @@ Une application macOS native (SwiftUI) permettant d'analyser la santé des disqu
 
 Disk Health est gratuit et open source. Si l'application vous est utile, vous pouvez soutenir son développement :
 
-[![Soutenir sur Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/KOFI_USERNAME)
+[![Soutenir sur Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/midzai)
