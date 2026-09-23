@@ -192,7 +192,7 @@ public class BenchmarkRunner: TemperatureSamplerDelegate {
             let result = BenchmarkResult(
                 id: UUID(),
                 date: Date(),
-                appVersion: "0.3.0",
+                appVersion: "0.9.0",
                 diskKey: DiskIdentity.key(model: physicalDisk.model, serial: ""),
                 profile: profile,
                 fileSize: fileSize,

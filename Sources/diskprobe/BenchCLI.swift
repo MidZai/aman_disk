@@ -149,7 +149,7 @@ class BenchHandler: BenchmarkRunnerDelegate {
                 print(s)
             }
         } else {
-            print("Aman Disk 0.3.0 — Test de performances")
+            print("Aman Disk 0.9.0 — Test de performances")
             let profName = profile == .quick ? "Rapide (3 passes)" : (profile == .readOnly ? "Lecture seule (5 passes)" : "Standard (5 passes)")
             print("Volume : \(result.conditions.volumeName) (\(result.conditions.fileSystem)) · Fichier : \(sizeStr) · Profil : \(profName)")
             print("")

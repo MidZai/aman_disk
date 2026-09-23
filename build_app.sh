@@ -1,13 +1,24 @@
 #!/bin/bash
 set -e
 
-echo "Compiling DiskHealthApp in release mode..."
-# Binaire universel si possible ; sinon (Command Line Tools sans xcbuild), architecture de la machine.
-ARCH_FLAGS="--arch arm64 --arch x86_64"
-if ! swift build -c release $ARCH_FLAGS; then
-    echo "⚠️  Compilation universelle impossible (Xcode requis) : binaire pour $(uname -m) uniquement."
-    ARCH_FLAGS=""
-    swift build -c release
+VERSION="${VERSION:-0.9.0}"
+UNIVERSAL="${UNIVERSAL:-0}"
+BUILT_BINARY=".build/AmanDisk-bundle-binary"
+
+if [ "$UNIVERSAL" == "1" ]; then
+    # Une compilation par architecture (--triple ne demande pas xcbuild, contrairement à
+    # « --arch arm64 --arch x86_64 »), puis assemblage avec lipo.
+    echo "Compiling DiskHealthApp (release, universal)..."
+    SLICES=()
+    for ARCH in arm64 x86_64; do
+        swift build -c release --product DiskHealthApp --triple "$ARCH-apple-macosx14.0"
+        SLICES+=("$(swift build -c release --product DiskHealthApp --triple "$ARCH-apple-macosx14.0" --show-bin-path)/DiskHealthApp")
+    done
+    lipo -create "${SLICES[@]}" -output "$BUILT_BINARY"
+else
+    echo "Compiling DiskHealthApp (release, $(uname -m))..."
+    swift build -c release --product DiskHealthApp
+    cp "$(swift build -c release --show-bin-path)/DiskHealthApp" "$BUILT_BINARY"
 fi
 
 APP_NAME="Aman Disk.app"
@@ -20,11 +31,8 @@ rm -rf "$APP_NAME"
 mkdir -p "$MACOS_DIR"
 mkdir -p "$RESOURCES_DIR"
 
-# Determine swift architecture path
-SWIFT_BIN_PATH=$(swift build -c release $ARCH_FLAGS --show-bin-path)
-
 echo "Copying executable..."
-cp "$SWIFT_BIN_PATH/DiskHealthApp" "$MACOS_DIR/AmanDisk"
+cp "$BUILT_BINARY" "$MACOS_DIR/AmanDisk"
 
 echo "Copying resources..."
 cp "Branding/Aman-Disk-brand/icone-app/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
@@ -50,7 +58,7 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.3.0</string>
+    <string>$VERSION</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSApplicationCategoryType</key>
@@ -84,6 +92,8 @@ cat > "AmanDisk-entitlement.plist" << PLIST
 PLIST
 
 echo "Signing application..."
-codesign --force --sign - --entitlements AmanDisk-entitlement.plist "$APP_NAME"
+# Signature ad hoc (pas de compte développeur : l'app n'est pas notariée).
+codesign --force --deep --sign - --entitlements AmanDisk-entitlement.plist "$APP_NAME"
+codesign --verify --deep --strict "$APP_NAME"
 
 echo "Done! $APP_NAME has been created successfully."
