@@ -1,8 +1,8 @@
 import Foundation
 
 public enum AppInfo {
-    public static let name = "DiskHealth"
-    public static let version = "0.2.1"
+    public static let name = "Aman Disk"
+    public static let version = "0.3.0"
     // O4: Replace with your real bundle identifier before App Store submission.
     public static let bundleIdentifier = "io.diskhealth.app"
     // P7: Replace with the real GitHub repository URL before publishing.

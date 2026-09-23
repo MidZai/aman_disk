@@ -23,6 +23,18 @@ public struct RealDisk: Identifiable, Equatable, Codable {
         return nil
     }
     
+    public var firmware: String? {
+        if case .nvme(_, let id) = snapshot { return id.firmwareRevision }
+        if case .ata(let ata) = snapshot { return ata.firmware }
+        return nil
+    }
+    
+    public var serialNumber: String? {
+        if case .nvme(_, let id) = snapshot { return id.serialNumber }
+        if case .ata(let ata) = snapshot { return ata.serialNumber }
+        return nil
+    }
+    
     public init(physical: PhysicalDisk, snapshot: DiskHealthSnapshot?, health: HealthAssessment, lastRead: Date = Date()) {
         self.physical = physical
         self.snapshot = snapshot
@@ -49,6 +61,9 @@ public struct RealDisk: Identifiable, Equatable, Codable {
 
 @MainActor
 class AppManager: ObservableObject {
+    static weak var sharedInstance: AppManager?
+    @Published var runningBenchmarkDiskId: String?
+    var cancelRunningBenchmark: () -> Void = {}
     @Published var disks: [RealDisk] = []
     @Published var volumes: [Volume] = []
     @Published var needsSudo: Bool = false
@@ -56,7 +71,9 @@ class AppManager: ObservableObject {
     @Published var isLoading: Bool = true
     @Published var showDetails: Bool = false
     @Published var showRawValues: Bool = false
-    @Published var selection: SidebarItem? = nil
+        @Published var selection: SidebarItem? = nil
+    @Published var activeTab: Int = 1
+    @Published var requestedVolumeToTest: String? = nil
 
     private var refreshTimer: Timer?
     private var daSession: DASession?
@@ -64,7 +81,8 @@ class AppManager: ObservableObject {
     // Balanced by the release in deinit.
     private var daContext: UnsafeMutableRawPointer?
     
-    public init() {
+        public init() {
+        AppManager.sharedInstance = self
         startTimer()
         setupHotplug()
         Task { @MainActor in loadDisks() }
@@ -116,6 +134,8 @@ class AppManager: ObservableObject {
     }
 
     
+    private var loadTask: Task<Void, Never>?
+
     func loadDisks(isAutoRefresh: Bool = false) {
         if ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] == "1" {
             self.disks = DemoData.disks.map { 
@@ -126,12 +146,25 @@ class AppManager: ObservableObject {
             return
         }
         
-        if !isAutoRefresh { self.isLoading = true }
+        if isAutoRefresh {
+            let fileManager = FileManager.default
+            let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let bundleId = Bundle.main.bundleIdentifier ?? AppInfo.bundleIdentifier
+            let fileURL = appSupport.appendingPathComponent(bundleId).appendingPathComponent("bench-inflight.json")
+            if let data = try? Data(contentsOf: fileURL), let arr = try? JSONDecoder().decode([String].self, from: data), !arr.isEmpty {
+                return
+            }
+        }
         
-        // B7: Use Task (inherits @MainActor context) + detached background work,
-        // then await back on MainActor — no DispatchQueue.main.async needed.
-        Task { [weak self] in
-            guard let self else { return }
+        loadTask?.cancel()
+        
+        loadTask = Task { [weak self] in
+            // Debounce to prevent multiple concurrent IOKit reads when DA triggers multiple events
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled else { return }
+            guard let self = self else { return }
+            
+            if !isAutoRefresh { self.isLoading = true }
             
             let (finalDisks, finalVolumes) = await Task.detached(priority: .userInitiated) {
                 let physicalDisks = DiskDiscovery.listPhysicalDisks()
@@ -148,6 +181,7 @@ class AppManager: ObservableObject {
                                 snapshot = try NVMeBackend.read(bsdName: currentPhysical.bsdName)
                             } else if currentPhysical.protocolType == .ata || currentPhysical.protocolType == .pcieAhci {
                                 snapshot = try ATABackend.read(bsdName: currentPhysical.bsdName)
+                                NSLog("Successfully read SMART for \(currentPhysical.bsdName)")
                             }
                             
                             if let snap = snapshot {
@@ -220,8 +254,10 @@ class AppManager: ObservableObject {
                                 }
                             }
                         } catch let error as ATAReadError where error == .smartDisabled {
+                            NSLog("SMART disabled error for \(currentPhysical.bsdName): \(error)")
                             currentPhysical = currentPhysical.withCapability(.unsupported(reason: .smartDisabled))
                         } catch {
+                            NSLog("Read failed error for \(currentPhysical.bsdName): \(error)")
                             currentPhysical = currentPhysical.withCapability(.unsupported(reason: .readFailed(code: "\(error)")))
                         }
                     }
@@ -229,9 +265,11 @@ class AppManager: ObservableObject {
                     newDisks.append(RealDisk(physical: currentPhysical, snapshot: snapshot, health: health, lastRead: Date()))
                 }
                 
-                let volumes = VolumeDiscovery.listVolumes()
-                return (newDisks, volumes)
+                let allVols = VolumeDiscovery.listVolumes()
+                return DiskFilter.filter(disks: newDisks, volumes: allVols)
             }.value
+            
+            guard !Task.isCancelled else { return }
             
             // B7: Back on MainActor — no DispatchQueue needed.
             // Hotplug detection for toasts

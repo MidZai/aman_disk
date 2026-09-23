@@ -29,7 +29,7 @@ struct InspectorView: View {
                     LabeledContent("N° de série") {
                         HStack {
                             if showSerial {
-                                let rawSerial = disk.identify?.serialNumber ?? "—"
+                                let rawSerial = disk.serialNumber ?? "—"
                                 Text(rawSerial)
                             } else {
                                 Text(serialObfuscated)
@@ -43,7 +43,7 @@ struct InspectorView: View {
                         }
                     }
                     
-                    let fw = disk.identify?.firmwareRevision ?? "—"
+                    let fw = disk.firmware ?? "—"
                     LabeledContent("Firmware", value: fw)
                     LabeledContent("Nom BSD", value: disk.physical.bsdName)
                 }
@@ -83,7 +83,7 @@ struct InspectorView: View {
                 
                 Section {
                     Button("Copier toutes les informations") {
-                        let serialStr = disk.identify?.serialNumber ?? "—"
+                        let serialStr = disk.serialNumber ?? "—"
                         let text = "Modèle: \(disk.physical.model)\nSérie: \(serialStr)\n"
                         let pasteboard = NSPasteboard.general
                         pasteboard.clearContents()
@@ -100,16 +100,15 @@ struct InspectorView: View {
     }
     
     private var serialObfuscated: String {
-        guard let s = disk?.identify?.serialNumber, s.count > 4 else {
-            return disk?.identify?.serialNumber ?? "—"
+        guard let s = disk?.serialNumber, s.count > 4 else {
+            return disk?.serialNumber ?? "—"
         }
         let suffix = s.suffix(4)
         return "••••\(suffix)"
     }
     
     private func formatGB(_ bytes: UInt64) -> String {
-        let sizeGB = Double(bytes) / 1_000_000_000.0
-        return String(format: "%.1f Go", sizeGB)
+        return Formatters.bytes(bytes)
     }
     
     private func interfaceStr(_ phys: PhysicalDisk) -> String {

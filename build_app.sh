@@ -4,7 +4,7 @@ set -e
 echo "Compiling DiskHealthApp in release mode..."
 swift build -c release --arch arm64 --arch x86_64
 
-APP_NAME="DiskHealth.app"
+APP_NAME="Aman Disk.app"
 CONTENTS_DIR="$APP_NAME/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
@@ -18,26 +18,39 @@ mkdir -p "$RESOURCES_DIR"
 SWIFT_BIN_PATH=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
 
 echo "Copying executable..."
-cp "$SWIFT_BIN_PATH/DiskHealthApp" "$MACOS_DIR/DiskHealth"
+cp "$SWIFT_BIN_PATH/DiskHealthApp" "$MACOS_DIR/AmanDisk"
+
+echo "Copying resources..."
+cp "Branding/Aman-Disk-brand/icone-app/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "Branding/Aman-Disk-brand/logo/aman-disk-logo-clair@2x.png" "$RESOURCES_DIR/"
+cp "Branding/Aman-Disk-brand/logo/aman-disk-logo-sombre@2x.png" "$RESOURCES_DIR/"
 
 echo "Creating Info.plist..."
-cat > "$CONTENTS_DIR/Info.plist" << EOF
+cat > "$CONTENTS_DIR/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>DiskHealth</string>
+    <string>AmanDisk</string>
     <key>CFBundleIdentifier</key>
-    <string>com.example.diskhealth</string>
+    <string>io.github.aman-disk.AmanDisk</string>
     <key>CFBundleName</key>
-    <string>DiskHealth</string>
+    <string>Aman</string>
+    <key>CFBundleDisplayName</key>
+    <string>Aman Disk</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2.1</string>
+    <string>0.3.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 Aman Disk contributors · Licence MIT</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSPrincipalClass</key>
@@ -50,10 +63,10 @@ cat > "$CONTENTS_DIR/Info.plist" << EOF
     <true/>
 </dict>
 </plist>
-EOF
+PLIST
 
 echo "Creating entitlements..."
-cat > "DiskHealthApp-entitlement.plist" << EOF
+cat > "AmanDisk-entitlement.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -62,9 +75,9 @@ cat > "DiskHealthApp-entitlement.plist" << EOF
     <false/>
 </dict>
 </plist>
-EOF
+PLIST
 
 echo "Signing application..."
-codesign --force --sign - --entitlements DiskHealthApp-entitlement.plist "$APP_NAME"
+codesign --force --sign - --entitlements AmanDisk-entitlement.plist "$APP_NAME"
 
 echo "Done! $APP_NAME has been created successfully."

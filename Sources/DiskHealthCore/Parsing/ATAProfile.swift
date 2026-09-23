@@ -76,19 +76,19 @@ public enum ATACatalog {
             model.range(of: "^APPLE SSD (SD|SM|TS)\\d{4}[EFG]$", options: .regularExpression) != nil
         },
         attributes: [
-            0x01: AttributeOverride(name: "Raw_Read_Error_Rate", explanation: genericAttributes[0x01]!.explanation, role: .none),
-            0x05: AttributeOverride(name: "Reallocated_Sector_Ct", explanation: genericAttributes[0x05]!.explanation, role: .reallocated),
-            0x09: AttributeOverride(name: "Power_On_Hours", explanation: genericAttributes[0x09]!.explanation, role: .powerOnHours),
-            0x0C: AttributeOverride(name: "Power_Cycle_Count", explanation: genericAttributes[0x0C]!.explanation, role: .powerCycles),
-            0xA9: AttributeOverride(name: "Unknown_Apple_Attrib", explanation: "Attribut propre au fabricant.", role: .none),
-            0xAD: AttributeOverride(name: "Wear_Leveling_Count", explanation: genericAttributes[0xAD]!.explanation, role: .none), // User will confirm later
-            0xAE: AttributeOverride(name: "Host_Reads_MiB", explanation: "Total des données lues par l'ordinateur (en MiB).", role: .hostReadsBytes(multiplier: 1048576)), // 1 MiB = 1048576 bytes
-            0xAF: AttributeOverride(name: "Host_Writes_MiB", explanation: "Total des données écrites par l'ordinateur (en MiB).", role: .hostWritesBytes(multiplier: 1048576)),
-            0xC0: AttributeOverride(name: "Power-Off_Retract_Count", explanation: genericAttributes[0xC0]!.explanation, role: .unsafeShutdowns),
-            0xC2: AttributeOverride(name: "Temperature_Celsius", explanation: genericAttributes[0xC2]!.explanation, role: .temperature),
-            0xC5: AttributeOverride(name: "Current_Pending_Sector", explanation: genericAttributes[0xC5]!.explanation, role: .pending),
-            0xC7: AttributeOverride(name: "UDMA_CRC_Error_Count", explanation: genericAttributes[0xC7]!.explanation, role: .none),
-            0xF0: AttributeOverride(name: "Unknown_SSD_Attribute", explanation: "Attribut propre au fabricant.", role: .none)
+            0x01: AttributeOverride(name: genericAttributes[0x01]!.name, explanation: genericAttributes[0x01]!.explanation + "\n\nNom technique : Raw_Read_Error_Rate", role: .none),
+            0x05: AttributeOverride(name: genericAttributes[0x05]!.name, explanation: genericAttributes[0x05]!.explanation + "\n\nNom technique : Reallocated_Sector_Ct", role: .reallocated),
+            0x09: AttributeOverride(name: genericAttributes[0x09]!.name, explanation: genericAttributes[0x09]!.explanation + "\n\nNom technique : Power_On_Hours", role: .powerOnHours),
+            0x0C: AttributeOverride(name: genericAttributes[0x0C]!.name, explanation: genericAttributes[0x0C]!.explanation + "\n\nNom technique : Power_Cycle_Count", role: .powerCycles),
+            0xA9: AttributeOverride(name: "Attribut propre au fabricant", explanation: "Attribut spécifique à ce modèle. Sa signification n'est pas documentée publiquement.\n\nNom technique : Unknown_Apple_Attrib", role: .none),
+            0xAD: AttributeOverride(name: "Nivellement de l'usure", explanation: "Indicateur d'usure du support.\n\nNom technique : Wear_Leveling_Count", role: .none),
+            0xAE: AttributeOverride(name: "Total des données lues", explanation: "Total des données lues par l'ordinateur.\n\nNom technique : Host_Reads_MiB", role: .hostReadsBytes(multiplier: 1048576)),
+            0xAF: AttributeOverride(name: "Total des données écrites", explanation: "Total des données écrites par l'ordinateur.\n\nNom technique : Host_Writes_MiB", role: .hostWritesBytes(multiplier: 1048576)),
+            0xC0: AttributeOverride(name: genericAttributes[0xC0]!.name, explanation: genericAttributes[0xC0]!.explanation + "\n\nNom technique : Power-Off_Retract_Count", role: .unsafeShutdowns),
+            0xC2: AttributeOverride(name: genericAttributes[0xC2]!.name, explanation: genericAttributes[0xC2]!.explanation + "\n\nNom technique : Temperature_Celsius", role: .temperature),
+            0xC5: AttributeOverride(name: genericAttributes[0xC5]!.name, explanation: genericAttributes[0xC5]!.explanation + "\n\nNom technique : Current_Pending_Sector", role: .pending),
+            0xC7: AttributeOverride(name: genericAttributes[0xC7]!.name, explanation: genericAttributes[0xC7]!.explanation + "\n\nNom technique : UDMA_CRC_Error_Count", role: .none),
+            0xF0: AttributeOverride(name: "Attribut propre au fabricant", explanation: "Attribut spécifique à ce modèle. Sa signification n'est pas documentée publiquement.\n\nNom technique : Unknown_SSD_Attribute", role: .none)
         ]
     )
     

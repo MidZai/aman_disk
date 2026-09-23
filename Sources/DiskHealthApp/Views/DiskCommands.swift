@@ -16,7 +16,7 @@ struct DiskCommands: Commands {
         }
         
         CommandGroup(after: .help) {
-            Button("Soutenir Disk Health sur Ko-fi…") {
+            Button("Soutenir Aman Disk sur Ko-fi…") {
                 NSWorkspace.shared.open(AppInfo.supportURL)
             }
         }
@@ -92,6 +92,24 @@ struct DiskCommands: Commands {
         )
         
         let line4 = NSAttributedString(
+            string: "Aman signifie « eau » en kabyle. L'anneau est aussi la lettre ⴰ de l'alphabet tifinagh.\n",
+            attributes: [
+                .font: font,
+                .foregroundColor: NSColor.secondaryLabelColor,
+                .paragraphStyle: paragraphStyle
+            ]
+        )
+
+        let line5 = NSAttributedString(
+            string: "Aman Disk ne se connecte jamais à Internet.\n",
+            attributes: [
+                .font: font,
+                .foregroundColor: NSColor.secondaryLabelColor,
+                .paragraphStyle: paragraphStyle
+            ]
+        )
+
+        let line6 = NSAttributedString(
             string: "Logiciel libre, sous licence MIT.",
             attributes: [
                 .font: font,
@@ -104,9 +122,19 @@ struct DiskCommands: Commands {
         credits.append(line2)
         credits.append(line3)
         credits.append(line4)
+        credits.append(line5)
+        credits.append(line6)
         
-        NSApp.orderFrontStandardAboutPanel(options: [
-            .credits: credits
-        ])
+        var options: [NSApplication.AboutPanelOptionKey: Any] = [.credits: credits]
+        
+        let appearance = NSApp.effectiveAppearance
+        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let logoName = isDark ? "aman-disk-logo-sombre@2x" : "aman-disk-logo-clair@2x"
+        
+        if let url = Bundle.main.url(forResource: logoName, withExtension: "png"), let img = NSImage(contentsOf: url) {
+            options[.applicationIcon] = img
+        }
+        
+        NSApp.orderFrontStandardAboutPanel(options: options)
     }
 }

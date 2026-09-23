@@ -1,7 +1,15 @@
 import Foundation
 
 public enum Formatters {
-    private static let frLocale = Locale(identifier: "fr_FR")
+            public static var locale: Locale = .autoupdatingCurrent
+    
+    public static func date(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.locale = locale
+        df.dateStyle = .medium
+        df.timeStyle = .short
+        return df.string(from: date)
+    }
     
     public static func bytes(_ bytes: UInt64) -> String {
         let kb = Double(bytes) / 1_000.0
@@ -30,7 +38,7 @@ public enum Formatters {
         }
         
         let nf = NumberFormatter()
-        nf.locale = frLocale
+        nf.locale = locale
         nf.numberStyle = .decimal
         nf.maximumFractionDigits = 1
         nf.minimumFractionDigits = 0
@@ -46,7 +54,7 @@ public enum Formatters {
     
     public static func integer(_ value: UInt64) -> String {
         let nf = NumberFormatter()
-        nf.locale = frLocale
+        nf.locale = locale
         nf.numberStyle = .decimal
         nf.groupingSeparator = " "
         return nf.string(from: NSNumber(value: value)) ?? "\(value)"
@@ -57,7 +65,7 @@ public enum Formatters {
         let billion = Double(value) / 1_000_000_000.0
         
         let nf = NumberFormatter()
-        nf.locale = frLocale
+        nf.locale = locale
         nf.numberStyle = .decimal
         nf.maximumFractionDigits = 1
         nf.minimumFractionDigits = 0
@@ -83,5 +91,36 @@ public enum Formatters {
     
     public static func temperature(_ celsius: Int) -> String {
         return "\(celsius) °C"
+    }
+}
+
+extension Formatters {
+    public static func speed(_ megabytesPerSecond: Double) -> String {
+        let nf = NumberFormatter()
+        nf.locale = locale
+        nf.numberStyle = .decimal
+        nf.maximumFractionDigits = 1
+        nf.minimumFractionDigits = 0
+        let formatted = nf.string(from: NSNumber(value: megabytesPerSecond)) ?? "\(megabytesPerSecond)"
+        return "\(formatted) Mo/s"
+    }
+    
+    public static func speedIOPS(_ iops: Double) -> String {
+        let nf = NumberFormatter()
+        nf.locale = locale
+        nf.numberStyle = .decimal
+        nf.maximumFractionDigits = 0
+        nf.minimumFractionDigits = 0
+        nf.groupingSeparator = " "
+        let formatted = nf.string(from: NSNumber(value: iops)) ?? "\(iops)"
+        return "\(formatted) IOPS"
+    }
+    
+    public static func percentage(_ value: Double) -> String {
+        let nf = NumberFormatter()
+        nf.locale = locale
+        nf.numberStyle = .percent
+        nf.maximumFractionDigits = 1
+        return nf.string(from: NSNumber(value: value / 100.0)) ?? "\(value) %"
     }
 }

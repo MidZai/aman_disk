@@ -27,7 +27,7 @@ public enum DiskDiscovery {
                 let isWhole = descDict[kDADiskDescriptionMediaWholeKey as String] as? Bool ?? false
                 let protocolName = descDict[kDADiskDescriptionDeviceProtocolKey as String] as? String ?? ""
                 
-                if isWhole && protocolName != "Disk Image" && !isSynthetic(service: serviceToProcess, protocolName: protocolName) {
+                if isWhole && !isSynthetic(service: serviceToProcess, protocolName: protocolName) {
                     let bsdName = descDict[kDADiskDescriptionMediaBSDNameKey as String] as? String ?? ""
                     let model = descDict[kDADiskDescriptionDeviceModelKey as String] as? String ?? "Unknown Model"
                     let sizeBytes = descDict[kDADiskDescriptionMediaSizeKey as String] as? UInt64 ?? 0
@@ -64,7 +64,9 @@ public enum DiskDiscovery {
                         usbProductID: usbProductID,
                         protocolType: protocolType,
                         mediumType: mediumType,
-                        healthCapability: healthCapability
+                        healthCapability: healthCapability,
+                        isVirtual: protocolName == "Virtual Interface",
+                        isDiskImage: protocolName == "Disk Image"
                     ))
                 }
             }
@@ -99,7 +101,7 @@ public enum DiskDiscovery {
             }
         }
         if isAPFSContainer { return true }
-        if protocolName == "Virtual Interface" { return false }
+        if protocolName == "Virtual Interface" || protocolName == "Disk Image" { return false }
         return !hasBlockStorage
     }
     

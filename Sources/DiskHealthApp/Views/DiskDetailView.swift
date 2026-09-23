@@ -9,6 +9,7 @@ struct DiskDetailView: View {
     @State private var historyRange: HistoryRange = .oneHour
     @State private var historySamples: [HistorySample] = []
     @State private var selectedPoint: AggregatedPoint? = nil
+    @State private var showSerial = false
     
     var body: some View {
         ScrollView {
@@ -160,9 +161,8 @@ struct DiskDetailView: View {
     
     private var header: some View {
         HStack(alignment: .top, spacing: 20) {
-            DiskIconProvider.icon(for: disk)
-                .font(.system(size: 64))
-                .frame(width: 72, height: 72)
+            HealthRingView(health: disk.health, capability: disk.physical.healthCapability)
+                .frame(width: 96, height: 96)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(disk.physical.model)
@@ -192,8 +192,29 @@ struct DiskDetailView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 16) {
-                    InfoPair(label: "Firmware", value: disk.identify?.firmwareRevision ?? "—")
-                    InfoPair(label: "N° de série", value: serialStr)
+                    InfoPair(label: "Firmware", value: disk.firmware ?? "—")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("N° de série")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        HStack {
+                            if showSerial {
+                                Text(disk.serialNumber ?? "—")
+                                    .font(.body)
+                            } else {
+                                Text(disk.serialNumber != nil ? "Masqué" : "—")
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                            }
+                            if disk.serialNumber != nil {
+                                Button(action: { showSerial.toggle() }) {
+                                    Image(systemName: showSerial ? "eye.slash" : "eye")
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Dernière lecture")
@@ -250,8 +271,7 @@ struct DiskDetailView: View {
     }
     
     private var sizeStr: String {
-        let sizeGB = Double(disk.physical.sizeBytes) / 1_000_000_000.0
-        return String(format: "%.1f Go", sizeGB)
+        return Formatters.bytes(disk.physical.sizeBytes)
     }
     
     private var interfaceStr: String {
@@ -270,13 +290,6 @@ struct DiskDetailView: View {
         disk.physical.isInternal ? "Interne" : "Externe"
     }
     
-    private var serialStr: String {
-        guard let s = disk.identify?.serialNumber, s.count > 4 else {
-            return disk.identify?.serialNumber ?? "—"
-        }
-        let suffix = s.suffix(4)
-        return "••••\(suffix)"
-    }
 }
 
 struct InfoPair: View {

@@ -3,6 +3,9 @@ import XCTest
 
 final class FormattingTests: XCTestCase {
     func testBytes() {
+        Formatters.locale = Locale(identifier: "fr_FR")
+        XCTAssertEqual(Formatters.bytes(500_300_000_000), "500,3 Go")
+        
         XCTAssertEqual(Formatters.bytes(48_300_000_000_000), "48,3 To")
         XCTAssertEqual(Formatters.bytes(2_000_000_000_000), "2 To")
         XCTAssertEqual(Formatters.bytes(512_000_000_000), "512 Go")

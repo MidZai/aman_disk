@@ -181,3 +181,13 @@ final class ATATests: XCTestCase {
     }
 }
 
+
+extension ATATests {
+    func testNoUnderscoresInAttributeNames() {
+        for profile in ATACatalog.profiles {
+            for (id, attr) in profile.attributes {
+                XCTAssertFalse(attr.name.contains("_"), "Attribute name '\\(attr.name)' for ID \\(id) in profile '\\(profile.name)' contains an underscore.")
+            }
+        }
+    }
+}

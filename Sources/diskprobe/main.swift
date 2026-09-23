@@ -1,5 +1,6 @@
 import Foundation
 import DiskHealthCore
+import BenchmarkCore
 
 let args = CommandLine.arguments
 
@@ -228,8 +229,9 @@ if args.count > 1 {
                 print(String(format: "%-8@ %-20@ %6.1f GB  %-8@ %-30@ (Phys: %@)", vol.bsdName, vol.name, sizeGB, vol.format, vol.mountPoint, phys))
             }
         }
-    } else {
-        print("Unknown command: \(command)")
+        } else if command == "bench" {
+        BenchCLI.run(args: Array(args.dropFirst(2)))
+    } else {        print("Unknown command: \(command)")
     }
 } else {
     print("diskprobe OK")

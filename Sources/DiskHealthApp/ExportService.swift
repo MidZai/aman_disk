@@ -1,11 +1,46 @@
 import Foundation
 import AppKit
 import DiskHealthCore
+import BenchmarkCore
 import SwiftUI
 import UniformTypeIdentifiers
 
 public struct ExportService {
     
+        public static func generateBenchmarkSummary(result: BenchmarkResult) -> String {
+        var lines = [String]()
+        lines.append("Aman Disk \(result.appVersion)")
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "fr_FR")
+        df.dateStyle = .medium
+        df.timeStyle = .short
+        lines.append("Date : \(df.string(from: result.date))")
+        
+        var fsInfo = result.conditions.fileSystem
+        if result.conditions.encrypted == true {
+            fsInfo += ", chiffré"
+        }
+        lines.append("Volume : \(result.conditions.volumeName) (\(fsInfo))")
+        
+        let sizeGb = result.fileSize / 1073741824
+        lines.append("Profil : \(result.profile.label), \(sizeGb) Gio")
+        lines.append("")
+        
+        for t in result.tests {
+            if let best = BenchMath.best(t.passes) {
+                let mbps = BenchMath.megabytesPerSecond(bytes: best.bytes, seconds: best.seconds)
+                let mbpsStr = String(format: "%8.1f", mbps)
+                
+                let dirLabel = t.direction == .read ? " Lecture" : "Écriture"
+                // e.g. SEQ1M Q8T1    Lecture (Mo/s) :   2850.1
+                let labelStr = t.spec.label.padding(toLength: 10, withPad: " ", startingAt: 0)
+                let paddedDir = dirLabel.padding(toLength: 9, withPad: " ", startingAt: 0)
+                lines.append("\(labelStr) \(paddedDir) (Mo/s) : \(mbpsStr)")
+            }
+        }
+        
+        return lines.joined(separator: "\n")
+    }
     public static func generateSummary(disk: RealDisk) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "fr_FR")
@@ -13,10 +48,9 @@ public struct ExportService {
         formatter.timeStyle = .short
         
         var lines = [String]()
-        lines.append("Disk Health — Résumé")
+        lines.append("Aman Disk — Résumé")
         
-        let sizeGB = Double(disk.physical.sizeBytes) / 1_000_000_000.0
-        let sizeStr = String(format: "%.1f Go", sizeGB).replacingOccurrences(of: ".", with: ",")
+        let sizeStr = Formatters.bytes(disk.physical.sizeBytes)
         let loc = disk.physical.isInternal ? "interne" : "externe"
         lines.append("\(disk.physical.model) (\(sizeStr), \(disk.physical.connection.rawValue), \(loc))")
         
@@ -34,17 +68,22 @@ public struct ExportService {
         if let smart = disk.smart {
             lines.append("Température : \(smart.temperatureCelsius ?? 0) °C · Endurance utilisée : \(smart.percentageUsed) % · Réserve : \(smart.availableSpare) %")
             
-            let writeTB = Double(smart.dataUnitsWritten) * 512_000.0 / 1_000_000_000_000.0
-            let writeStr = String(format: "%.1f To", writeTB).replacingOccurrences(of: ".", with: ",")
-            lines.append("Données écrites : \(writeStr) · Heures : \(smart.powerOnHours) h · Cycles : \(smart.powerCycles)")
+            let writeStr = Formatters.dataUnitsToBytesText(smart.dataUnitsWritten)
+            lines.append("Données écrites : \(writeStr) · Heures : \(Formatters.hours(smart.powerOnHours)) · Cycles : \(Formatters.integer(smart.powerCycles))")
             
-            lines.append("Arrêts non propres : \(smart.unsafeShutdowns) · Erreurs média : \(smart.mediaErrors)")
+            lines.append("Arrêts non propres : \(Formatters.integer(smart.unsafeShutdowns)) · Erreurs média : \(Formatters.integer(smart.mediaErrors))")
         }
         
         lines.append("Relevé le \(formatter.string(from: disk.lastRead))")
         return lines.joined(separator: "\n")
     }
     
+        public static func copyBenchmarkSummary(result: BenchmarkResult) {
+        let str = generateBenchmarkSummary(result: result)
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(str, forType: .string)
+    }
     public static func copySummary(disk: RealDisk) {
         let text = generateSummary(disk: disk)
         let pasteboard = NSPasteboard.general
@@ -54,7 +93,7 @@ public struct ExportService {
     
     private static func getSaveURL(disk: RealDisk, extension ext: String) -> URL? {
         let panel = NSSavePanel()
-        panel.title = "Exporter le rapport Disk Health"
+        panel.title = "Exporter le rapport Aman Disk"
         let safeModel = disk.physical.model.replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
         
         let formatter = DateFormatter()
@@ -105,15 +144,9 @@ public struct ExportService {
             }
         }
         
-        struct ExportFormat: Codable {
-            let schemaVersion: Int
-            let physical: PhysicalDisk
-            let smart: DiskHealthSnapshot?
-            let health: HealthAssessment
-            let lastRead: Date
-        }
-        
-        let out = ExportFormat(schemaVersion: 2, physical: exportDisk.physical, smart: exportDisk.snapshot, health: exportDisk.health, lastRead: exportDisk.lastRead)
+
+        let benchRes = BenchmarkHistoryManager.shared.loadResultsSync(forDiskKey: disk.physical.bsdName).first
+        let out = BenchmarkCore.ExportFormat(schemaVersion: 3, physical: exportDisk.physical, smart: exportDisk.snapshot, health: exportDisk.health, lastRead: exportDisk.lastRead, benchmark: benchRes)
         
         guard let data = try? encoder.encode(out) else { return }
         if let url = getSaveURL(disk: disk, extension: "json") {
@@ -146,7 +179,7 @@ public struct ExportService {
         
         let safeModel = disk.physical.model.replacingOccurrences(of: " ", with: "-")
         let title = "Rapport de santé du disque – \(safeModel)" as CFString
-        let creator = "Disk Health 0.2.0" as CFString
+        let creator = "Aman Disk \(AppInfo.version)" as CFString
         let auxInfo = [
             kCGPDFContextTitle: title,
             kCGPDFContextCreator: creator
@@ -157,8 +190,9 @@ public struct ExportService {
             return
         }
         
-        let renderer1 = ImageRenderer(content: ReportPageView(disk: exportDisk, pageNumber: 1, includeHistory: includeHistory))
-        let renderer2 = ImageRenderer(content: ReportPageView(disk: exportDisk, pageNumber: 2, includeHistory: includeHistory))
+        let res = BenchmarkHistoryManager.shared.loadResultsSync(forDiskKey: disk.physical.bsdName).first
+        let renderer1 = ImageRenderer(content: ReportPageView(disk: exportDisk, pageNumber: 1, includeHistory: includeHistory, benchmarkResult: res))
+        let renderer2 = ImageRenderer(content: ReportPageView(disk: exportDisk, pageNumber: 2, includeHistory: includeHistory, benchmarkResult: res))
         
         var mediaBox = CGRect(x: 0, y: 0, width: 595, height: 842)
         pdfContext.beginPage(mediaBox: &mediaBox)
@@ -193,7 +227,7 @@ public struct ExportService {
         var lines = [String]()
         lines.append("========================================================================")
         lines.append("  RAPPORT DE SANTÉ DU DISQUE")
-        lines.append("  Disk Health 0.2.0")
+        lines.append("  Aman Disk \(AppInfo.version)")
         lines.append("========================================================================")
         
         let idStr = String(format: "DH-%04X", arc4random_uniform(0xFFFF))
@@ -237,11 +271,10 @@ public struct ExportService {
         lines.append("------------------------------------------------------------------------")
         lines.append(padRight("  Modèle", 22) + disk.physical.model)
         
-        let serial = includeSerial ? (disk.identify?.serialNumber ?? "Inconnu") : "Masqué"
+        let serial = includeSerial ? (disk.serialNumber ?? "Inconnu") : "Masqué"
         lines.append(padRight("  Numéro de série", 22) + serial)
-        lines.append(padRight("  Firmware", 22) + (disk.identify?.firmwareRevision ?? "Inconnu"))
-        let sizeGB = Double(disk.physical.sizeBytes) / 1_000_000_000.0
-        let sizeStr = String(format: "%.1f Go", sizeGB).replacingOccurrences(of: ".", with: ",")
+        lines.append(padRight("  Firmware", 22) + (disk.firmware ?? "Inconnu"))
+        let sizeStr = Formatters.bytes(disk.physical.sizeBytes)
         lines.append(padRight("  Capacité", 22) + sizeStr)
         lines.append(padRight("  Interface", 22) + disk.physical.connection.rawValue)
         let loc = disk.physical.isInternal ? "Interne" : "Externe"
@@ -298,6 +331,14 @@ public struct ExportService {
         lines.append("  du disque, mais ne peut pas garantir l'absence de panne future.")
         lines.append("  Sauvegardez régulièrement vos données.")
         lines.append("========================================================================")
+        
+        if let benchRes = BenchmarkHistoryManager.shared.loadResultsSync(forDiskKey: disk.physical.bsdName).first {
+            lines.append("========================================================================")
+            lines.append("  TEST DE PERFORMANCES")
+            lines.append("========================================================================")
+            lines.append(generateBenchmarkSummary(result: benchRes).components(separatedBy: .newlines).map { "  \($0)" }.joined(separator: "\n"))
+            lines.append("========================================================================")
+        }
         
         let text = lines.joined(separator: "\n")
         do {

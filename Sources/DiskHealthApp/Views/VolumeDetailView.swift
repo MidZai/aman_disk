@@ -143,6 +143,23 @@ struct VolumeDetailView: View {
                     .foregroundColor(.secondary)
                     .padding(.top, 8)
                 
+                HStack {
+                    Spacer()
+                    let canTest = backingDisks.count == 1
+                    Button(action: {
+                        if canTest, let physDisk = backingDisks.first {
+                            appManager.selection = .physicalDisk(physDisk.id)
+                            appManager.requestedVolumeToTest = volume.bsdName
+                            appManager.activeTab = 2
+                        }
+                    }) {
+                        Text("Tester les performances")
+                    }
+                    .disabled(!canTest)
+                    .help(canTest ? "" : "Impossible de tester un volume réparti sur plusieurs disques.")
+                    .padding(.top, 8)
+                }
+                
                 Spacer()
             }
             .padding(24)

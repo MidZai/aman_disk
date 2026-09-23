@@ -7,13 +7,15 @@ import DiskHealthCore
 struct ContentView: View {
     @EnvironmentObject var appManager: AppManager
     @State private var exportDisk: RealDisk?
-    @State private var exportFormat: ExportFormat = .pdf
+        @State private var exportFormat: ExportFormat = .pdf
+     // 1: Health, 2: Performance
     var body: some View {
         NavigationSplitView {
             List(selection: $appManager.selection) {
-                if !appManager.disks.isEmpty {
+                let realDisks = appManager.disks.filter { $0.physical.protocolType != .virtualDisk }
+                if !realDisks.isEmpty {
                     Section("Stockage") {
-                        ForEach(appManager.disks) { disk in
+                        ForEach(realDisks) { disk in
                             NavigationLink(value: SidebarItem.physicalDisk(disk.id)) {
                                 DiskRowView(disk: disk)
                                     .contextMenu {
@@ -58,6 +60,25 @@ struct ContentView: View {
                             }
                         }
                     }
+                    
+                    let diskImages = appManager.disks.filter { $0.physical.protocolType == .virtualDisk }
+                    if !diskImages.isEmpty {
+                        Section("Images disque", isExpanded: .constant(false)) {
+                            ForEach(diskImages) { disk in
+                                NavigationLink(value: SidebarItem.physicalDisk(disk.id)) {
+                                    DiskRowView(disk: disk)
+                                }
+                                
+                                let childVolumes = appManager.volumes.filter { $0.physicalDiskBSDNames.contains(disk.physical.bsdName) }
+                                ForEach(childVolumes) { volume in
+                                    NavigationLink(value: SidebarItem.volume(volume.id)) {
+                                        VolumeRowView(volume: volume)
+                                            .padding(.leading, 16)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 320)
@@ -80,10 +101,14 @@ struct ContentView: View {
                     switch selection {
                     case .physicalDisk(let id):
                         if let disk = appManager.disks.first(where: { $0.id == id }) {
-                            if disk.snapshot == nil {
-                                UnsupportedDiskView(physical: disk.physical)
+                            if appManager.activeTab == 2 {
+                                PerformanceTabView(disk: disk)
                             } else {
-                                DiskDetailView(disk: disk)
+                                if disk.snapshot == nil {
+                                    UnsupportedDiskView(physical: disk.physical)
+                                } else {
+                                    DiskDetailView(disk: disk)
+                                }
                             }
                         } else {
                             Text("Disque introuvable")
@@ -111,11 +136,30 @@ struct ContentView: View {
                     Text("Aucune sélection")
                         .frame(minWidth: 280, idealWidth: 300, maxWidth: 350, maxHeight: .infinity)
                 }
-            }
+                        }
+            .background(
+                Group {
+                    Button("") { appManager.activeTab = 1 }.keyboardShortcut("1", modifiers: .command).opacity(0)
+                    Button("") { appManager.activeTab = 2 }.keyboardShortcut("2", modifiers: .command).opacity(0)
+                }
+            )
             .sheet(item: $exportDisk) { disk in
                 ExportSheet(disk: disk)
             }
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Group {
+                        if appManager.selection != nil {
+                            Picker("", selection: $appManager.activeTab) {
+                                Text("Santé").tag(1)
+                                Text("Performances").tag(2)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 250)
+                        }
+                    }
+                }
+                
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: {
                         appManager.loadDisks()
@@ -132,6 +176,14 @@ struct ContentView: View {
                             Button("Exporter en JSON…") { exportDisk = disk; exportFormat = .json }
                             Divider()
                             Button("Copier le résumé") { ExportService.copySummary(disk: disk); ToastCenter.shared.show(message: "Résumé copié", systemImage: "doc.on.doc") }
+                            if appManager.activeTab == 2 {
+                                Button("Copier le résultat du test") {
+                                    if let res = BenchmarkHistoryManager.shared.loadResultsSync(forDiskKey: disk.physical.bsdName).first {
+                                        ExportService.copyBenchmarkSummary(result: res)
+                                        ToastCenter.shared.show(message: "Résultat copié", systemImage: "doc.on.doc")
+                                    }
+                                }
+                            }
                         } label: {
                             Label("Exporter", systemImage: "square.and.arrow.up").help("Exporter les données du disque")
                         }
@@ -153,7 +205,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .navigationTitle("Disk Health")
+            .navigationTitle("Aman Disk")
             .navigationSubtitle("Santé et informations des disques")
         }
         .onReceive(appManager.$disks) { disks in
@@ -230,7 +282,7 @@ struct DiskRowView: View {
                     .lineLimit(1)
                 
                 let sizeStr = Formatters.bytes(disk.physical.sizeBytes)
-                let connStr = disk.physical.isInternal ? "Interne" : (disk.physical.connection == .usb ? "USB" : "Externe")
+                let connStr = disk.physical.protocolType == .virtualDisk ? "Image disque" : (disk.physical.isInternal ? "Interne" : (disk.physical.connection == .usb ? "USB" : "Externe"))
                 
                 Text("\(sizeStr) · \(connStr)")
                     .font(.caption)
@@ -245,10 +297,12 @@ struct DiskRowView: View {
             
             Spacer()
             
-            Circle()
-                .fill(healthColor)
-                .frame(width: 8, height: 8)
-                .help(disk.health.status.rawValue.capitalized)
+            if disk.physical.protocolType != .virtualDisk {
+                Circle()
+                    .fill(healthColor)
+                    .frame(width: 8, height: 8)
+                    .help(disk.health.status.rawValue.capitalized)
+            }
         }
         .padding(.vertical, 4)
     }

@@ -1,17 +1,20 @@
 import SwiftUI
 import DiskHealthCore
 
+import BenchmarkCore
+
 struct ReportPageView: View {
     let disk: RealDisk
     let pageNumber: Int
     let includeHistory: Bool
+    var benchmarkResult: BenchmarkResult? = nil
     
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("DiskHealth")
+                    Text("Aman Disk")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(Color(hex: "#1D1D1F"))
                     Text("Rapport d'état de santé")
@@ -83,14 +86,13 @@ struct ReportPageView: View {
             HStack(alignment: .top, spacing: 40) {
                 VStack(alignment: .leading, spacing: 6) {
                     infoRow("Modèle", disk.physical.model)
-                    let serial = disk.identify?.serialNumber ?? (disk.snapshot != nil ? { if case .ata(let s) = disk.snapshot! { return s.serialNumber } else { return nil } }() : nil)
+                    let serial = disk.serialNumber
                     infoRow("Numéro de série", serial ?? "Inconnu")
-                    let fw = disk.identify?.firmwareRevision ?? (disk.snapshot != nil ? { if case .ata(let s) = disk.snapshot! { return s.firmware } else { return nil } }() : nil)
+                    let fw = disk.firmware
                     infoRow("Firmware", fw ?? "Inconnu")
                 }
                 VStack(alignment: .leading, spacing: 6) {
-                    let sizeGB = Double(disk.physical.sizeBytes) / 1_000_000_000.0
-                    infoRow("Capacité", String(format: "%.1f Go", sizeGB))
+                    infoRow("Capacité", Formatters.bytes(disk.physical.sizeBytes))
                     infoRow("Interface", disk.physical.connection.rawValue)
                     infoRow("Emplacement", disk.physical.isInternal ? "Interne" : "Externe")
                 }
@@ -139,6 +141,11 @@ struct ReportPageView: View {
     @ViewBuilder
     private var page2Content: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if let res = benchmarkResult {
+                benchmarkSection(res)
+                Spacer().frame(height: 20)
+            }
+            
             if includeHistory {
                 smartTable
             }
@@ -150,6 +157,62 @@ struct ReportPageView: View {
             Text("L'état de santé est calculé à partir des données déclarées par le contrôleur du disque au moment de la lecture. Il reflète l'usure et les erreurs connues du disque, mais ne peut pas garantir l'absence de panne future. Sauvegardez régulièrement vos données.")
                 .font(.system(size: 9))
                 .foregroundColor(Color(hex: "#6E6E73"))
+        }
+    }
+    
+    @ViewBuilder
+    private func benchmarkSection(_ res: BenchmarkResult) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Performances")
+            
+            HStack(spacing: 20) {
+                infoRow("Date", formatter.string(from: res.date))
+                infoRow("Profil", res.profile.label)
+                infoRow("Taille", Formatters.bytes(res.fileSize))
+            }
+            
+            let tempStr = res.conditions.temperatureMaxC != nil ? "\(res.conditions.temperatureMaxC!) °C" : "N/A"
+            let batStr = res.conditions.onBattery == true ? "Sur batterie" : "Sur secteur"
+            HStack(spacing: 20) {
+                infoRow("Volume", res.conditions.volumeName)
+                infoRow("Conditions", "\(batStr) · Temp max \(tempStr)")
+                if res.conditions.encrypted == true {
+                    infoRow("Chiffrement", "Oui (FileVault)")
+                }
+            }
+            
+            Spacer().frame(height: 8)
+            
+            // Minimal grid
+            HStack(spacing: 0) {
+                Text("Test").frame(width: 100, alignment: .leading).font(.system(size: 9.5, weight: .bold))
+                Text("Lecture (Mo/s)").frame(width: 100, alignment: .trailing).font(.system(size: 9.5, weight: .bold))
+                Text("Écriture (Mo/s)").frame(width: 100, alignment: .trailing).font(.system(size: 9.5, weight: .bold))
+            }
+            .padding(.bottom, 4)
+            
+            let order = ["SEQ1M_QD8", "SEQ1M_QD1", "RND4K_QD64", "RND4K_QD1"]
+            ForEach(order, id: \.self) { specId in
+                if let readTest = res.tests.first(where: { $0.spec.id == specId && $0.direction == .read }),
+                   let writeTest = res.tests.first(where: { $0.spec.id == specId && $0.direction == .write }) {
+                    
+                    let rLabel = BenchMath.best(readTest.passes).map { String(format: "%.1f", BenchMath.megabytesPerSecond(bytes: $0.bytes, seconds: $0.seconds)) } ?? "—"
+                    let wLabel = BenchMath.best(writeTest.passes).map { String(format: "%.1f", BenchMath.megabytesPerSecond(bytes: $0.bytes, seconds: $0.seconds)) } ?? "—"
+                    
+                    HStack(spacing: 0) {
+                        Text(readTest.spec.label).frame(width: 100, alignment: .leading).font(.system(size: 9.5))
+                        Text(rLabel).frame(width: 100, alignment: .trailing).font(.system(size: 9.5))
+                        Text(wLabel).frame(width: 100, alignment: .trailing).font(.system(size: 9.5))
+                    }
+                    .padding(.vertical, 2)
+                    Divider()
+                }
+            }
+            
+            Text("Valeur affichée : la meilleure passe. La médiane de toutes les passes figure dans le rapport complet.")
+                .font(.system(size: 8))
+                .foregroundColor(Color(hex: "#6E6E73"))
+                .padding(.top, 4)
         }
     }
     
@@ -199,7 +262,7 @@ struct ReportPageView: View {
                             if attr.rawValue > 0 { state = .warning }
                         }
                         let displayValue = attr.value(for: info.role).map { Formatters.integer($0) } ?? "\(attr.current)"
-                        return UnifiedAttribute(id: attr.id, name: info.name, explanation: info.explanation, current: "\(attr.current)", worst: "\(attr.worst)", threshold: "\(attr.threshold)", rawValue: displayValue, state: state, isInformational: false)
+                        return UnifiedAttribute(id: attr.id, name: info.name, technicalName: "", explanation: info.explanation, valueCurrent: "\(attr.current)", worst: "\(attr.worst)", threshold: "\(attr.threshold)", donnee: displayValue, rawHex: "\(attr.rawValue)", state: state, isInformational: false)
                     }
                     ForEach(unified) { attr in
                         HStack {
@@ -208,7 +271,7 @@ struct ReportPageView: View {
                                 .frame(width: 40, alignment: .leading)
                             Text(attr.name)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            Text(attr.rawValue)
+                            Text(attr.donnee)
                                 .frame(width: 120, alignment: .trailing)
                             Text(attr.state == .normal ? "Normal" : (attr.state == .warning ? "Attention" : (attr.state == .critical ? "Critique" : "—")))
                                 .frame(width: 80, alignment: .leading)
