@@ -76,6 +76,7 @@ class AppManager: ObservableObject {
     @Published var requestedVolumeToTest: String? = nil
 
     private var refreshTimer: Timer?
+    private var sampleScheduler: SampleScheduler?
     private var daSession: DASession?
     // P3: Retained opaque pointer used in DiskArbitration callbacks.
     // Balanced by the release in deinit.
@@ -85,6 +86,8 @@ class AppManager: ObservableObject {
         AppManager.sharedInstance = self
         startTimer()
         setupHotplug()
+        sampleScheduler = SampleScheduler(appManager: self)
+        sampleScheduler?.start()
         Task { @MainActor in loadDisks() }
     }
     
@@ -185,73 +188,8 @@ class AppManager: ObservableObject {
                             }
                             
                             if let snap = snapshot {
-                                switch snap {
-                                case .nvme(let smartLog, let identify):
-                                    health = HealthEngine.evaluate(smart: smartLog, identify: identify)
-                                    let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
-                                    let sample = HistorySample(
-                                        date: Date(),
-                                        temperatureC: smartLog.temperatureCelsius,
-                                        percentageUsed: Int(smartLog.percentageUsed),
-                                        dataUnitsWritten: smartLog.dataUnitsWritten,
-                                        dataUnitsRead: smartLog.dataUnitsRead,
-                                        powerOnHours: smartLog.powerOnHours,
-                                        mediaErrors: smartLog.mediaErrors,
-                                        availableSpare: Int(smartLog.availableSpare)
-                                    )
-                                    HistoryStore.shared.append(sample, for: key)
-                                    
-                                case .ata(let ataSnapshot):
-                                    health = ATAHealthEvaluator.evaluate(snapshot: ataSnapshot)
-                                    let profile = ATACatalog.profile(for: ataSnapshot.model)
-                                    
-                                    var temp: Int? = nil
-                                    // B6: Store raw byte counts. The /512000 divisor was arbitrary
-                                    // and incompatible with the display in StatTile. Formatters handle
-                                    // human-readable conversion at display time.
-                                    var written: UInt64? = nil
-                                    var read: UInt64? = nil
-                                    var hours: UInt64? = nil
-                                    var used: Int? = nil
-                                    var errors: UInt64? = nil
-                                    let spare: Int? = nil   // ATA does not expose available-spare
-
-                                    
-                                    for attr in ataSnapshot.attributes {
-                                        let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-                                        switch info.role {
-                                        case .temperature:
-                                            temp = attr.value(for: .temperature).map { Int($0) }
-                                        case .hostWritesBytes(let mult):
-                                            // B6: Store value in bytes (rawValue × multiplier).
-                                            written = attr.rawValue * mult
-                                        case .hostReadsBytes(let mult):
-                                            // B6: Store value in bytes (rawValue × multiplier).
-                                            read = attr.rawValue * mult
-                                        case .powerOnHours:
-                                            hours = attr.value(for: .powerOnHours)
-                                        case .lifeRemainingPercentNormalized:
-                                            used = 100 - Int(attr.current)
-                                        case .reallocated, .pending, .uncorrectable:
-                                            errors = (errors ?? 0) + attr.rawValue
-                                        default:
-                                            break
-                                        }
-                                    }
-                                    
-                                    let key = DiskIdentity.key(model: ataSnapshot.model, serial: ataSnapshot.serialNumber)
-                                    let sample = HistorySample(
-                                        date: Date(),
-                                        temperatureC: temp,
-                                        percentageUsed: used,
-                                        dataUnitsWritten: written,
-                                        dataUnitsRead: read,
-                                        powerOnHours: hours,
-                                        mediaErrors: errors,
-                                        availableSpare: spare
-                                    )
-                                    HistoryStore.shared.append(sample, for: key)
-                                }
+                                health = Self.evaluate(snap)
+                                HistoryStore.shared.record(HistorySample.from(snapshot: snap), for: DiskIdentity.key(for: snap))
                             }
                         } catch let error as ATAReadError where error == .smartDisabled {
                             NSLog("SMART disabled error for \(currentPhysical.bsdName): \(error)")
@@ -318,6 +256,69 @@ class AppManager: ObservableObject {
         }
     }
 
+    
+    nonisolated static func evaluate(_ snapshot: DiskHealthSnapshot) -> HealthAssessment {
+        switch snapshot {
+        case .nvme(let smartLog, let identify):
+            return HealthEngine.evaluate(smart: smartLog, identify: identify)
+        case .ata(let ataSnapshot):
+            return ATAHealthEvaluator.evaluate(snapshot: ataSnapshot)
+        }
+    }
+    
+    /// Vrai pendant un test de performances : son `TemperatureSampler` prend le relais des mesures.
+    var isBenchmarkRunning: Bool {
+        if runningBenchmarkDiskId != nil { return true }
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let bundleId = Bundle.main.bundleIdentifier ?? AppInfo.bundleIdentifier
+        let fileURL = appSupport.appendingPathComponent(bundleId).appendingPathComponent("bench-inflight.json")
+        if let data = try? Data(contentsOf: fileURL), let arr = try? JSONDecoder().decode([String].self, from: data), !arr.isEmpty {
+            return true
+        }
+        return false
+    }
+    
+    /// Mesure légère pour la surveillance continue : relit la santé des disques internes déjà
+    /// connus (sans nouvelle découverte), enregistre un échantillon et met à jour l'affichage.
+    func sampleNow() async {
+        if ProcessInfo.processInfo.environment["DISKHEALTH_DEMO"] == "1" { return }
+        let targets = disks.filter { $0.physical.isInternal && $0.physical.healthCapability == .supported && $0.snapshot != nil }
+        guard !targets.isEmpty else { return }
+        
+        let updated: [RealDisk] = await Task.detached(priority: .utility) {
+            var result: [RealDisk] = []
+            // Une seule lecture à la fois : les disques sont lus l'un après l'autre.
+            for disk in targets {
+                let snapshot: DiskHealthSnapshot?
+                switch disk.physical.protocolType {
+                case .nvme: snapshot = try? NVMeBackend.read(bsdName: disk.physical.bsdName)
+                case .ata, .pcieAhci: snapshot = try? ATABackend.read(bsdName: disk.physical.bsdName)
+                default: snapshot = nil
+                }
+                guard let snap = snapshot else { continue }
+                let now = Date()
+                HistoryStore.shared.record(HistorySample.from(snapshot: snap, date: now), for: DiskIdentity.key(for: snap))
+                result.append(RealDisk(physical: disk.physical, snapshot: snap, health: AppManager.evaluate(snap), lastRead: now))
+            }
+            return result
+        }.value
+        
+        guard !updated.isEmpty else { return }
+        disks = disks.map { old in updated.first(where: { $0.id == old.id }) ?? old }
+    }
+    
+    /// Disque physique qui porte le volume de démarrage (« / »), sinon le premier disque interne.
+    var bootDisk: RealDisk? {
+        if let root = volumes.first(where: { $0.mountPoint == "/" }),
+           let disk = disks.first(where: { root.physicalDiskBSDNames.contains($0.physical.bsdName) }) {
+            return disk
+        }
+        return disks.first(where: { $0.physical.isInternal && $0.snapshot != nil }) ?? disks.first
+    }
+    
+    func historyKey(for disk: RealDisk) -> String? {
+        disk.snapshot.map { DiskIdentity.key(for: $0) }
+    }
     
     func isFusionDriveMember(_ disk: RealDisk) -> Bool {
         volumes.contains { $0.physicalDiskBSDNames.count >= 2 && $0.physicalDiskBSDNames.contains(disk.physical.bsdName) }

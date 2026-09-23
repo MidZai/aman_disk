@@ -1,7 +1,37 @@
 import SwiftUI
 import AppKit
 
+enum AppScene {
+    static let mainWindowID = "main"
+}
+
+/// Mode résident : fermer la fenêtre principale garde l'app dans la barre des menus
+/// (sans icône dans le Dock) si l'option est active ; sinon l'app quitte.
+@MainActor
+enum MainWindowLifecycle {
+    static func windowDidOpen() {
+        if NSApp.activationPolicy() != .regular {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+    
+    static func windowDidClose() {
+        let stay = UserDefaults.standard.object(forKey: PreferenceKey.stayInMenuBar) as? Bool ?? true
+        if stay {
+            NSApp.setActivationPolicy(.accessory)
+        } else {
+            NSApp.terminate(nil)
+        }
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
+    // La fermeture de la dernière fenêtre est gérée par MainWindowLifecycle.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+    
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if AppManager.sharedInstance?.runningBenchmarkDiskId != nil {
             let alert = NSAlert()
@@ -31,16 +61,31 @@ struct DiskHealthApp: App {
     
     init() {
         MigrationService.migrateIfNeeded()
+        MigrationService.mergeLegacyHistoryIfNeeded()
     }
     
     var body: some Scene {
-        WindowGroup {
+        Window(AppInfo.name, id: AppScene.mainWindowID) {
             ContentView()
                 .environmentObject(appManager)
                 .frame(minWidth: 1100, minHeight: 720)
+                .onAppear { MainWindowLifecycle.windowDidOpen() }
+                .onDisappear { MainWindowLifecycle.windowDidClose() }
         }
         .defaultSize(width: 1380, height: 880)
         .windowToolbarStyle(.unified(showsTitle: true))
         .commands { DiskCommands(appManager: appManager) }
+        
+        Settings {
+            SettingsView()
+        }
+        
+        MenuBarExtra {
+            MenuBarPanel()
+                .environmentObject(appManager)
+        } label: {
+            MenuBarLabel(appManager: appManager)
+        }
+        .menuBarExtraStyle(.window)
     }
 }

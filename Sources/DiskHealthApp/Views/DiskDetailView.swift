@@ -6,9 +6,6 @@ struct DiskDetailView: View {
     @EnvironmentObject var appManager: AppManager
     let disk: RealDisk
     
-    @State private var historyRange: HistoryRange = .oneHour
-    @State private var historySamples: [HistorySample] = []
-    @State private var selectedPoint: AggregatedPoint? = nil
     @State private var showSerial = false
     
     var body: some View {
@@ -22,109 +19,7 @@ struct DiskDetailView: View {
             
             Divider()
             
-            HStack {
-                Text("Historique de température")
-                    .font(.title3.bold())
-                Spacer()
-                Picker("", selection: $historyRange) {
-                    Text("1 heure").tag(HistoryRange.oneHour)
-                    Text("24 heures").tag(HistoryRange.twentyFourHours)
-                    Text("7 jours").tag(HistoryRange.sevenDays)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 250)
-            }
-            
-            let agg = HistoryAggregation.aggregate(samples: historySamples, range: historyRange)
-            
-            if agg.points.count < 2 {
-                VStack(spacing: 8) {
-                    Spacer()
-                    Text("Aucune donnée historique disponible")
-                        .font(.headline)
-                    Text("L'application commencera à enregistrer la température\ndès que le disque sera surveillé.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                let yMin = max(0, (agg.min ?? 0) - 5)
-                let yMax = min(100, (agg.max ?? 0) + 5)
-                
-                Chart {
-                    ForEach(agg.points) { point in
-                        LineMark(
-                            x: .value("Heure", point.date),
-                            y: .value("Temp", point.temperature),
-                            series: .value("Segment", point.segment)
-                        )
-                        .foregroundStyle(Color.blue)
-                        
-                        AreaMark(
-                            x: .value("Heure", point.date),
-                            y: .value("Temp", point.temperature),
-                            series: .value("Segment", point.segment)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color.blue.opacity(0.3), Color.blue.opacity(0.0)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .alignsMarkStylesWithPlotArea(true)
-                    }
-                    
-                    if let selected = selectedPoint {
-                        RuleMark(
-                            x: .value("Heure", selected.date)
-                        )
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5]))
-                        .foregroundStyle(Color.gray)
-                        .annotation(position: .top) {
-                            VStack(alignment: .leading) {
-                                Text(selected.date.formatted(date: .omitted, time: .shortened))
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Text("\(Int(round(selected.temperature))) °C")
-                                    .font(.caption.bold())
-                            }
-                            .padding(6)
-                            .background(Color(NSColor.windowBackgroundColor).opacity(0.9))
-                            .cornerRadius(6)
-                            .shadow(radius: 2)
-                        }
-                    }
-                }
-                .chartYScale(domain: yMin...yMax)
-                .chartXAxis {
-                    AxisMarks(preset: .aligned)
-                }
-                .chartYAxis {
-                    AxisMarks(preset: .aligned)
-                }
-                .chartOverlay { proxy in
-                    GeometryReader { geo in
-                        Rectangle()
-                            .fill(Color.clear)
-                            .contentShape(Rectangle())
-                            .onContinuousHover { phase in
-                                switch phase {
-                                case .active(let location):
-                                    if let date: Date = proxy.value(atX: location.x) {
-                                        // Find closest point
-                                        selectedPoint = agg.points.min(by: { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) })
-                                    }
-                                case .ended:
-                                    selectedPoint = nil
-                                }
-                            }
-                    }
-                }
-            }
+            TemperatureHistoryView(historyKey: appManager.historyKey(for: disk), lastRead: disk.lastRead)
             
             if disk.snapshot != nil {
                 SmartTableView(disk: disk)
@@ -136,28 +31,7 @@ struct DiskDetailView: View {
         .frame(maxWidth: 1400, maxHeight: .infinity, alignment: .top)
         .frame(maxWidth: .infinity)
         }
-        .onAppear(perform: loadHistory)
-        .onChange(of: disk.lastRead) { loadHistory() }
-        .onChange(of: historyRange) { loadHistory() }
     }
-    
-    private func loadHistory() {
-        // I6: disk.identify returns NVMeIdentify? and is nil for ATA disks.
-        // Derive the history key from the snapshot type instead.
-        let key: String?
-        switch disk.snapshot {
-        case .nvme(_, let id):
-            key = DiskIdentity.key(model: id.modelNumber, serial: id.serialNumber)
-        case .ata(let ataSnap):
-            key = DiskIdentity.key(model: ataSnap.model, serial: ataSnap.serialNumber)
-        case nil:
-            key = nil
-        }
-        guard let key else { return }
-        let since = Date().addingTimeInterval(-historyRange.timeInterval)
-        historySamples = HistoryStore.shared.samples(for: key, since: since)
-    }
-
     
     private var header: some View {
         HStack(alignment: .top, spacing: 20) {

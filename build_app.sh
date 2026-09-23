@@ -2,7 +2,13 @@
 set -e
 
 echo "Compiling DiskHealthApp in release mode..."
-swift build -c release --arch arm64 --arch x86_64
+# Binaire universel si possible ; sinon (Command Line Tools sans xcbuild), architecture de la machine.
+ARCH_FLAGS="--arch arm64 --arch x86_64"
+if ! swift build -c release $ARCH_FLAGS; then
+    echo "⚠️  Compilation universelle impossible (Xcode requis) : binaire pour $(uname -m) uniquement."
+    ARCH_FLAGS=""
+    swift build -c release
+fi
 
 APP_NAME="Aman Disk.app"
 CONTENTS_DIR="$APP_NAME/Contents"
@@ -15,7 +21,7 @@ mkdir -p "$MACOS_DIR"
 mkdir -p "$RESOURCES_DIR"
 
 # Determine swift architecture path
-SWIFT_BIN_PATH=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
+SWIFT_BIN_PATH=$(swift build -c release $ARCH_FLAGS --show-bin-path)
 
 echo "Copying executable..."
 cp "$SWIFT_BIN_PATH/DiskHealthApp" "$MACOS_DIR/AmanDisk"
