@@ -62,6 +62,14 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 320)
             .listStyle(.sidebar)
+            .safeAreaInset(edge: .bottom) {
+                HStack {
+                    SupportButton()
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
         } detail: {
             Group {
                 if appManager.isLoading {
@@ -276,5 +284,33 @@ struct VolumeRowView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+}
+
+struct SupportButton: View {
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button {
+            NSWorkspace.shared.open(AppInfo.supportURL)
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "heart")
+                Text("Soutenir le projet")
+            }
+            .font(.caption)
+            .foregroundColor(isHovered ? .primary : .secondary)
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .help("Ouvre la page Ko-fi du projet dans votre navigateur")
+        .onHover { hovering in
+            isHovered = hovering
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
     }
 }
