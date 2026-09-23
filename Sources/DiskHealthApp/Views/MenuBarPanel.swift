@@ -14,6 +14,7 @@ extension RealDisk {
 struct MenuBarLabel: View {
     @ObservedObject var appManager: AppManager
     @AppStorage(PreferenceKey.showMenuBarTemperature) private var showTemperature = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         let boot = appManager.bootDisk
@@ -24,6 +25,10 @@ struct MenuBarLabel: View {
                 Text("\(t)°")
                     .monospacedDigit()
             }
+        }
+        .onAppear {
+            // Toujours présent : sert à rouvrir la fenêtre depuis une notification.
+            WindowOpener.openMain = { [openWindow] in openWindow(id: AppScene.mainWindowID) }
         }
     }
 }

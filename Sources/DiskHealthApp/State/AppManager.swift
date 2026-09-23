@@ -88,6 +88,7 @@ class AppManager: ObservableObject {
         setupHotplug()
         sampleScheduler = SampleScheduler(appManager: self)
         sampleScheduler?.start()
+        LiveStatusController.shared.start(appManager: self)
         Task { @MainActor in loadDisks() }
     }
     

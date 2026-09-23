@@ -61,6 +61,13 @@ enum AmanRingGeometry {
     static let center = CGPoint(x: 50, y: 50)
     static let radius: CGFloat = 26
     static let lineWidth: CGFloat = 10
+    
+    /// Angle balayé par l'arc : longueur = p × 2π × 26 − 10 (compense les bouts arrondis) ; cercle complet à 100 %.
+    static func sweep(fraction: Double) -> CGFloat {
+        let f = CGFloat(max(0, min(1, fraction)))
+        if f >= 1 { return 2 * .pi }
+        return max(0.001, f * 2 * .pi * radius - lineWidth) / radius
+    }
 
     /// Goutte : `M50 37 C50 37 43.5 45.5 43.5 50 A6.5 6.5 0 0 0 56.5 50 C56.5 45.5 50 37 50 37 Z`.
     /// `flipped` : repère AppKit (origine en bas), pour le dessin en NSImage.
@@ -99,7 +106,7 @@ struct MiniRingView: View {
 
             let fraction = AmanPalette.fraction(health: health, capability: capability)
             var arc = Path()
-            arc.addArc(center: c, radius: r, startAngle: .degrees(-90), endAngle: .degrees(-90 + 360 * fraction), clockwise: false)
+            arc.addArc(center: c, radius: r, startAngle: .radians(-.pi / 2), endAngle: .radians(-.pi / 2 + AmanRingGeometry.sweep(fraction: fraction)), clockwise: false)
             ctx.stroke(arc, with: .color(AmanPalette.ringColor(health: health, capability: capability)), style: StrokeStyle(lineWidth: w, lineCap: .round))
 
             ctx.fill(Path(AmanRingGeometry.dropPath(in: rect)), with: .color(.primary))
@@ -125,10 +132,9 @@ enum MenuBarIconRenderer {
             ctx.strokePath()
 
             // Départ en haut (12 h), sens horaire ; repère AppKit : angles trigonométriques.
-            let clamped = max(0, min(1, fraction))
             ctx.setStrokeColor(NSColor.black.cgColor)
             ctx.setLineCap(.round)
-            ctx.addArc(center: center, radius: r, startAngle: .pi / 2, endAngle: .pi / 2 - 2 * .pi * clamped, clockwise: true)
+            ctx.addArc(center: center, radius: r, startAngle: .pi / 2, endAngle: .pi / 2 - AmanRingGeometry.sweep(fraction: fraction), clockwise: true)
             ctx.strokePath()
 
             ctx.setFillColor(NSColor.black.cgColor)

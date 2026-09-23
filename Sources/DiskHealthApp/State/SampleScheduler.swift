@@ -5,7 +5,7 @@ import DiskHealthCore
 /// tant que le processus tourne (fenêtre ouverte ou non).
 @MainActor
 final class SampleScheduler {
-    static let interval: TimeInterval = 30
+    nonisolated static let interval: TimeInterval = 30
     static let compactionInterval: TimeInterval = 3600
 
     private weak var appManager: AppManager?

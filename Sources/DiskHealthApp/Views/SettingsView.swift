@@ -6,12 +6,17 @@ import DiskHealthCore
 enum PreferenceKey {
     static let stayInMenuBar = "stayInMenuBar"
     static let showMenuBarTemperature = "showMenuBarTemperature"
+    static let dockShowsHealth = "dockShowsHealth"
+    static let alertsEnabled = "alertsEnabled"
 }
 
 /// Réglages : une seule page, formulaire groupé (⌘,).
 struct SettingsView: View {
     @AppStorage(PreferenceKey.stayInMenuBar) private var stayInMenuBar = true
     @AppStorage(PreferenceKey.showMenuBarTemperature) private var showMenuBarTemperature = false
+    @AppStorage(PreferenceKey.dockShowsHealth) private var dockShowsHealth = true
+    @AppStorage(PreferenceKey.alertsEnabled) private var alertsEnabled = false
+    @State private var notificationsDenied = false
 
     @State private var launchAtLogin = false
     @State private var loginStatus: SMAppService.Status = .notRegistered
@@ -48,6 +53,27 @@ struct SettingsView: View {
             Section("Barre des menus") {
                 Toggle("Afficher la température à côté de l'icône", isOn: $showMenuBarTemperature)
             }
+            
+            Section("Dock") {
+                Toggle("Icône du Dock : afficher la santé du disque", isOn: $dockShowsHealth)
+                    .onChange(of: dockShowsHealth) { LiveStatusController.shared.refreshDockIcon() }
+            }
+            
+            Section("Alertes") {
+                Toggle("Me prévenir quand un disque change d'état", isOn: Binding(
+                    get: { alertsEnabled },
+                    set: { setAlerts($0) }
+                ))
+                if notificationsDenied {
+                    Text("Notifications refusées dans Réglages Système")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("État « À surveiller » ou « Défaillance probable », température élevée pendant 5 minutes, durée de vie sous 50 %, 25 % ou 10 %.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             Section("Données") {
                 LabeledContent("Historique de température", value: Formatters.bytes(historySize))
@@ -74,6 +100,20 @@ struct SettingsView: View {
         }
     }
 
+    /// L'autorisation n'est demandée qu'à l'activation. Refusée : l'interrupteur revient à « désactivé ».
+    private func setAlerts(_ enabled: Bool) {
+        guard enabled else {
+            alertsEnabled = false
+            return
+        }
+        alertsEnabled = true
+        Task { @MainActor in
+            let granted = await LiveStatusController.shared.poster.requestAuthorization()
+            notificationsDenied = !granted
+            if !granted { alertsEnabled = false }
+        }
+    }
+    
     private func refreshLoginStatus() {
         loginStatus = SMAppService.mainApp.status
         launchAtLogin = loginStatus == .enabled || loginStatus == .requiresApproval
