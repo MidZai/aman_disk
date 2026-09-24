@@ -8,6 +8,7 @@ enum PreferenceKey {
     static let showMenuBarTemperature = "showMenuBarTemperature"
     static let dockShowsHealth = "dockShowsHealth"
     static let alertsEnabled = "alertsEnabled"
+    static let autoEnableSmart = "autoEnableSmart"
     static let language = Localization.defaultsKey
 }
 
@@ -17,6 +18,7 @@ struct SettingsView: View {
     @AppStorage(PreferenceKey.showMenuBarTemperature) private var showMenuBarTemperature = false
     @AppStorage(PreferenceKey.dockShowsHealth) private var dockShowsHealth = true
     @AppStorage(PreferenceKey.alertsEnabled) private var alertsEnabled = false
+    @AppStorage(PreferenceKey.autoEnableSmart) private var autoEnableSmart = true
     @AppStorage(PreferenceKey.language) private var language = AppLanguage.english.rawValue
     @State private var notificationsDenied = false
 
@@ -62,6 +64,10 @@ struct SettingsView: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
+                Toggle(L("Turn on S.M.A.R.T. automatically if it's off", "Activer S.M.A.R.T. automatiquement s'il est désactivé"), isOn: $autoEnableSmart)
+                Text(L("SATA drives only, once per drive. Aman Disk never changes anything else on a drive.", "Disques SATA uniquement, une seule fois par disque. Aman Disk ne modifie rien d'autre sur un disque."))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
 
             Section(L("Menu Bar", "Barre des menus")) {

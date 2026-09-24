@@ -10,6 +10,10 @@ struct DiskDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 DiskHeaderView(disk: disk, isFusionMember: appManager.isFusionDriveMember(disk))
 
+                if appManager.smartNotices[disk.id] == .enabled {
+                    SmartEnabledCard { appManager.dismissSmartNotice(for: disk.id) }
+                }
+
                 if disk.health.status != .good && disk.health.status != .unknown {
                     ReasonsCallout(health: disk.health)
                 }
@@ -21,6 +25,8 @@ struct DiskDetailView: View {
                 TemperatureHistoryView(historyKey: disk.historyKey, lastRead: disk.lastRead)
 
                 SmartTableView(disk: disk)
+
+                DiskEventsView(historyKey: disk.historyKey, lastRead: disk.lastRead)
             }
             .padding(24)
             .frame(maxWidth: 1200, alignment: .leading)
@@ -200,6 +206,68 @@ private struct ReasonsCallout: View {
         .background(health.status.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(health.status.color.opacity(0.3)))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Affichée une fois, après l'activation automatique ou manuelle de S.M.A.R.T.
+private struct SmartEnabledCard: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.title3)
+                .foregroundStyle(.green)
+            Text(Strings.smartEnabledNotice)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(L("Close", "Fermer"))
+            .accessibilityLabel(L("Close", "Fermer"))
+        }
+        .padding(14)
+        .background(Color.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.green.opacity(0.3)))
+    }
+}
+
+/// Journal du disque : n'apparaît que s'il contient au moins un événement.
+private struct DiskEventsView: View {
+    let historyKey: String?
+    let lastRead: Date
+    @State private var events: [DiskEvent] = []
+
+    var body: some View {
+        Group {
+            if !events.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L("Log", "Journal"))
+                        .font(.headline)
+                    ForEach(events.reversed(), id: \.self) { event in
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(event.date.formatted(date: .abbreviated, time: .shortened))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                            Text(Self.label(event.kind))
+                        }
+                        .font(.callout)
+                    }
+                }
+            }
+        }
+        .task(id: "\(historyKey ?? "")|\(lastRead.timeIntervalSince1970)") {
+            events = historyKey.map { DiskEventLog.shared.events(for: $0) } ?? []
+        }
+    }
+
+    private static func label(_ kind: DiskEvent.Kind) -> String {
+        switch kind {
+        case .smartEnabled: return L("S.M.A.R.T. was off; Aman Disk turned it on.", "S.M.A.R.T. était désactivé ; Aman l'a activé.")
+        }
     }
 }
 

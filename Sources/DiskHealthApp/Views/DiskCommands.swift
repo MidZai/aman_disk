@@ -18,6 +18,9 @@ struct DiskCommands: Commands {
         }
         
         CommandGroup(after: .help) {
+            Button(L("Check for New Versions…", "Voir les nouvelles versions…")) {
+                NSWorkspace.shared.open(AppInfo.releasesURL)
+            }
             Button(L("Support Aman Disk on Ko-fi…", "Soutenir Aman Disk sur Ko-fi…")) {
                 NSWorkspace.shared.open(AppInfo.supportURL)
             }

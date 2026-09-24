@@ -7,7 +7,8 @@ public enum AppInfo {
     /// Identique à `CFBundleIdentifier` (build_app.sh) : sert de nom de dossier dans Application Support,
     /// y compris sous `swift run` où le bundle n'a pas d'identifiant.
     public static let bundleIdentifier = "io.github.aman-disk.AmanDisk"
-    // À remplacer par l'adresse réelle du dépôt avant publication.
-    public static let repositoryURL = URL(string: "https://github.com/mid/DiskHealth")!
+    public static let repositoryURL = URL(string: "https://github.com/MidZai/aman_disk")!
+    /// Ouverte dans le navigateur : l'app ne vérifie jamais elle-même les mises à jour.
+    public static let releasesURL = repositoryURL.appendingPathComponent("releases")
     public static let supportURL = URL(string: "https://ko-fi.com/midzai")!
 }

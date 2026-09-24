@@ -98,4 +98,11 @@ public enum ATAReader {
             throw mapError(result)
         }
     }
+
+    /// Active S.M.A.R.T. (`SMARTEnableDisableOperations(true)`) : la seule commande de réglage
+    /// qu'Aman envoie à un disque. Jamais de désactivation.
+    public static func enableSmart(bsdName: String) throws {
+        let result = bsdName.withCString { cdiskio_enable_ata_smart($0) }
+        guard result == 0 else { throw mapError(result) }
+    }
 }

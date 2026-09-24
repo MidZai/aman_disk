@@ -1,0 +1,26 @@
+name: Autre problème
+description: Un bug, une question ou une suggestion qui ne concerne pas la reconnaissance d'un disque.
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Ce qui se passe, et ce que vous attendiez.
+    validations:
+      required: true
+  - type: textarea
+    id: etapes
+    attributes:
+      label: Étapes pour reproduire
+      placeholder: |
+        1. …
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: Version d'Aman Disk
+      description: Menu Aman Disk › À propos d'Aman Disk.
+  - type: input
+    id: macos
+    attributes:
+      label: Version de macOS

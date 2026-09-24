@@ -6,8 +6,9 @@
 #include <IOKit/storage/ata/ATASMARTLib.h>
 #include <string.h>
 
-// Lecture seule : ce fichier n'envoie jamais de commande qui modifie le disque ou ses réglages
-// (pas de SMARTEnableDisableOperations, pas d'auto-sauvegarde, pas d'autotest).
+// Aucune commande qui modifie les données du disque. Seule exception, voulue et isolée :
+// cdiskio_enable_ata_smart envoie SMARTEnableDisableOperations(true). Jamais de désactivation,
+// d'auto-sauvegarde (SMARTEnableDisableAutosave), d'autotest ni d'écriture de journal.
 
 typedef struct {
     IOCFPlugInInterface **plugin;
@@ -42,7 +43,8 @@ static int is_smart_disabled(IOATASMARTInterface **smart_interface) {
     return 0;
 }
 
-static int open_handle(const char *bsd_name, ata_handle *out) {
+// require_enabled : renvoie -6 si S.M.A.R.T. est désactivé. Identify et l'activation n'en ont pas besoin.
+static int open_handle(const char *bsd_name, ata_handle *out, int require_enabled) {
     out->plugin = NULL;
     out->smart = NULL;
     if (!bsd_name) return -1;
@@ -82,8 +84,8 @@ static int open_handle(const char *bsd_name, ata_handle *out) {
 
     if (!out->smart) return -5;
 
-    // S.M.A.R.T. désactivé : on le signale, sans jamais le réactiver.
-    if (is_smart_disabled(out->smart)) {
+    // S.M.A.R.T. désactivé : on le signale ; l'activation est une commande à part.
+    if (require_enabled && is_smart_disabled(out->smart)) {
         close_handle(out);
         return -6;
     }
@@ -95,7 +97,7 @@ int cdiskio_read_ata_snapshot(const char *bsd_name, unsigned char *smart_data, u
     if (!smart_data || !thresholds || !identify || !threshold_exceeded) return -1;
 
     ata_handle h;
-    int err = open_handle(bsd_name, &h);
+    int err = open_handle(bsd_name, &h, 1);
     if (err != 0) return err;
 
     int result = 0;
@@ -123,7 +125,7 @@ done:
 int cdiskio_read_ata_smart_data(const char *bsd_name, unsigned char *out, int size) {
     if (!out || size < 512) return -1;
     ata_handle h;
-    int err = open_handle(bsd_name, &h);
+    int err = open_handle(bsd_name, &h, 1);
     if (err != 0) return err;
     IOReturn kr = (*h.smart)->SMARTReadData(h.smart, (ATASMARTData *)out);
     close_handle(&h);
@@ -133,7 +135,7 @@ int cdiskio_read_ata_smart_data(const char *bsd_name, unsigned char *out, int si
 int cdiskio_read_ata_smart_thresholds(const char *bsd_name, unsigned char *out, int size) {
     if (!out || size < 512) return -1;
     ata_handle h;
-    int err = open_handle(bsd_name, &h);
+    int err = open_handle(bsd_name, &h, 1);
     if (err != 0) return err;
     IOReturn kr = (*h.smart)->SMARTReadDataThresholds(h.smart, (ATASMARTDataThresholds *)out);
     close_handle(&h);
@@ -143,7 +145,7 @@ int cdiskio_read_ata_smart_thresholds(const char *bsd_name, unsigned char *out, 
 int cdiskio_read_ata_identify(const char *bsd_name, unsigned char *out, int size) {
     if (!out || size < 512) return -1;
     ata_handle h;
-    int err = open_handle(bsd_name, &h);
+    int err = open_handle(bsd_name, &h, 0);
     if (err != 0) return err;
     UInt32 outSize = 0;
     IOReturn kr = (*h.smart)->GetATAIdentifyData(h.smart, out, (UInt32)size, &outSize);
@@ -154,7 +156,7 @@ int cdiskio_read_ata_identify(const char *bsd_name, unsigned char *out, int size
 int cdiskio_read_ata_smart_status(const char *bsd_name, int *threshold_exceeded) {
     if (!threshold_exceeded) return -1;
     ata_handle h;
-    int err = open_handle(bsd_name, &h);
+    int err = open_handle(bsd_name, &h, 1);
     if (err != 0) return err;
     Boolean exceeded = false;
     IOReturn kr = (*h.smart)->SMARTReturnStatus(h.smart, &exceeded);
@@ -162,4 +164,14 @@ int cdiskio_read_ata_smart_status(const char *bsd_name, int *threshold_exceeded)
     if (kr != kIOReturnSuccess) return kr;
     *threshold_exceeded = exceeded ? 1 : 0;
     return 0;
+}
+
+int cdiskio_enable_ata_smart(const char *bsd_name) {
+    ata_handle h;
+    int err = open_handle(bsd_name, &h, 0);
+    if (err != 0) return err;
+    // Uniquement l'activation : le booléen est toujours vrai.
+    IOReturn kr = (*h.smart)->SMARTEnableDisableOperations(h.smart, true);
+    close_handle(&h);
+    return kr == kIOReturnSuccess ? 0 : kr;
 }

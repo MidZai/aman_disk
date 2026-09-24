@@ -19,7 +19,16 @@ enum Strings {
     static let sdCardReaderText = L("This SD card reader doesn't provide health data. SD cards have no S.M.A.R.T. interface that macOS can access.", "Ce lecteur de carte SD ne fournit pas de données de santé. Les cartes SD n'ont pas d'interface S.M.A.R.T. accessible depuis macOS.")
 
     static let smartDisabledTitle = L("S.M.A.R.T. disabled", "S.M.A.R.T. désactivé")
-    static let smartDisabledText = L("This drive supports S.M.A.R.T., but it's turned off. Aman Disk never changes a drive's settings.", "Ce disque prend en charge S.M.A.R.T., mais la fonction est désactivée. Aman Disk ne modifie jamais les réglages d'un disque.")
+    static let smartDisabledText = L("This drive supports S.M.A.R.T., but it's turned off. Without it, Aman Disk can't read the drive's health.", "Ce disque prend en charge S.M.A.R.T., mais la fonction est désactivée. Sans elle, Aman Disk ne peut pas lire la santé du disque.")
+    static let smartEnableButton = L("Turn On S.M.A.R.T.…", "Activer S.M.A.R.T.…")
+    static let smartEnableConfirmTitle = L("Turn on S.M.A.R.T. on this drive?", "Activer S.M.A.R.T. sur ce disque ?")
+    static let smartEnableConfirmText = L("Aman Disk will send the drive a single command that turns on its health monitoring. Your data isn't touched, and nothing else is changed.", "Aman Disk va envoyer au disque une seule commande, qui active sa surveillance de santé. Vos données ne sont pas touchées, et rien d'autre n'est modifié.")
+    static let smartEnabledNotice = L("S.M.A.R.T. was turned off on this drive. Aman Disk turned it on.", "S.M.A.R.T. était désactivé sur ce disque. Aman l'a activé.")
+    static let smartEnableFailedTitle = L("Couldn't turn on S.M.A.R.T.", "Impossible d'activer S.M.A.R.T.")
+    static func smartEnableFailedText(code: Int32) -> String {
+        L("The drive refused the command (code \(code)). Try again; if the problem persists, export a diagnostic.", "Le disque a refusé la commande (code \(code)). Réessayez ; si le problème persiste, exportez un diagnostic.")
+    }
+    static let retry = L("Try Again", "Réessayer")
 
     static let virtualDiskTitle = L("Virtual disk", "Disque virtuel")
     static let virtualDiskText = L("This is a virtual disk provided by virtualization software. Its health depends on the host computer's real drive.", "Ce disque est virtuel : il est fourni par un logiciel de virtualisation. Sa santé dépend du disque réel de l'ordinateur hôte.")

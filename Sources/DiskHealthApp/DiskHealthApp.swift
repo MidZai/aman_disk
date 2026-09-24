@@ -66,6 +66,7 @@ struct DiskHealthApp: App {
             // Le mode démo n'écrit jamais dans le vrai historique.
             let demoDir = FileManager.default.temporaryDirectory.appendingPathComponent("AmanDiskDemo-\(ProcessInfo.processInfo.processIdentifier)")
             HistoryStore.shared = HistoryStore(baseURL: demoDir)
+            DiskEventLog.shared = DiskEventLog(baseURL: demoDir)
         } else {
             // Fichiers de test laissés par un test interrompu (plantage, arrêt forcé).
             BenchInflight.cleanUpLeftovers()

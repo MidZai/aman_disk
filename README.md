@@ -33,9 +33,9 @@
 
 ## Confidentialité
 
-- **Aucune connexion réseau** : Aman Disk ne se connecte jamais à Internet. Pas de télémétrie, pas de vérification de mise à jour. Les seuls liens (GitHub, Ko-fi) s'ouvrent dans votre navigateur, à votre demande.
+- **Aucune connexion réseau** : Aman Disk ne se connecte jamais à Internet. Pas de télémétrie, pas de vérification de mise à jour. Les seuls liens (GitHub, dont « Voir les nouvelles versions… », et Ko-fi) s'ouvrent dans votre navigateur, à votre demande.
 - **Aucune donnée envoyée** : l'historique et les résultats restent sur votre Mac, dans `~/Library/Application Support/io.github.aman-disk.AmanDisk/`.
-- **Lecture seule** : l'app ne modifie jamais un disque ni ses réglages (elle ne réactive pas S.M.A.R.T. s'il est désactivé), et ne demande jamais de mot de passe administrateur. Seul le test de performances, lancé par vous, écrit un fichier temporaire, supprimé ensuite, même après un arrêt brutal de l'app.
+- **Aman ne modifie jamais vos données.** Seule exception : il active S.M.A.R.T. s'il est désactivé (réglable). L'app ne demande jamais de mot de passe administrateur. Le test de performances, lancé par vous, écrit un fichier temporaire, supprimé ensuite, même après un arrêt brutal de l'app.
 
 ## Installation
 

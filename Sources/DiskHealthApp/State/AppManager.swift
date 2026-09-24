@@ -11,6 +11,12 @@ enum DetailTab: Hashable {
     case health, performance
 }
 
+/// Suite d'une activation de S.M.A.R.T., affichée sur la page du disque.
+enum SmartNotice: Equatable {
+    case enabled
+    case failed(code: Int32)
+}
+
 /// Un disque physique et son dernier relevé.
 public struct RealDisk: Identifiable, Equatable {
     public var id: String { physical.bsdName }
@@ -82,6 +88,9 @@ final class AppManager: ObservableObject {
     @Published var selection: SidebarItem?
     @Published var activeTab: DetailTab = .health
     @Published var requestedVolumeToTest: String?
+    /// Par identifiant de disque. « Activé » reste affiché jusqu'à ce que l'utilisateur le ferme.
+    @Published private(set) var smartNotices: [String: SmartNotice] = [:]
+    @Published private(set) var enablingSmart: Set<String> = []
     /// Fenêtre principale ouverte. Fermée (mode barre des menus), SwiftUI garde sa hiérarchie de
     /// vues en vie et continue de la mettre à jour : son contenu est alors remplacé par une vue vide.
     @Published var isMainWindowVisible = true
@@ -93,6 +102,7 @@ final class AppManager: ObservableObject {
     private var sampleScheduler: SampleScheduler?
     private var daSession: DASession?
     private var loadTask: Task<Void, Never>?
+    nonisolated static let smartMemory = UserDefaultsActivationMemory()
 
     init() {
         AppManager.sharedInstance = self
@@ -158,31 +168,39 @@ final class AppManager: ObservableObject {
             defer { self.isRefreshing = false }
 
             let knownIdentify = self.knownIdentifies()
-            let (finalDisks, finalVolumes) = await Task.detached(priority: .userInitiated) {
+            let (finalDisks, finalVolumes, results) = await Task.detached(priority: .userInitiated) {
                 // Filtre avant toute lecture S.M.A.R.T. : les disques externes, images disque et
                 // disques virtuels ne sont pas affichés, inutile de les interroger.
                 let physicalDisks = DiskDiscovery.listPhysicalDisks().filter(DiskFilter.isMonitored)
-                let newDisks = physicalDisks.map { Self.read($0, knownIdentify: knownIdentify[$0.bsdName]) }
-                return DiskFilter.filter(disks: newDisks, volumes: VolumeDiscovery.listVolumes())
+                let results = physicalDisks.map { Self.read($0, knownIdentify: knownIdentify[$0.bsdName]) }
+                let (disks, volumes) = DiskFilter.filter(disks: results.map(\.disk), volumes: VolumeDiscovery.listVolumes())
+                return (disks, volumes, results)
             }.value
 
             guard !Task.isCancelled else { return }
             self.apply(disks: finalDisks, announceChanges: !self.disks.isEmpty)
+            self.updateSmartNotices(results)
             self.volumes = finalVolumes
             self.isLoading = false
         }
     }
 
-    /// Lecture complète d'un disque (hors fil principal).
-    nonisolated private static func read(_ physical: PhysicalDisk, knownIdentify: NVMeIdentify?) -> RealDisk {
+    /// Lecture complète d'un disque (hors fil principal). En ATA, S.M.A.R.T. désactivé est activé
+    /// une seule fois par disque si le réglage le permet (voir `SmartActivator`).
+    nonisolated private static func read(_ physical: PhysicalDisk, knownIdentify: NVMeIdentify?) -> (disk: RealDisk, notice: SmartNotice?) {
         var current = physical
         var snapshot: DiskHealthSnapshot?
+        var notice: SmartNotice?
         var health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [L("No S.M.A.R.T. information available.", "Pas d'information S.M.A.R.T. disponible.")])
         if physical.healthCapability == .supported {
             do {
                 switch physical.protocolType {
                 case .nvme: snapshot = try NVMeBackend.read(bsdName: physical.bsdName, knownIdentify: knownIdentify)
-                case .ata, .pcieAhci: snapshot = try ATABackend.read(bsdName: physical.bsdName)
+                case .ata, .pcieAhci:
+                    let autoEnable = UserDefaults.standard.object(forKey: PreferenceKey.autoEnableSmart) as? Bool ?? true
+                    let result = try SmartActivator(memory: smartMemory).read(bsdName: physical.bsdName, autoEnable: autoEnable)
+                    (snapshot, notice) = handle(result)
+                    if snapshot == nil { current = physical.withCapability(.unsupported(reason: .smartDisabled)) }
                 default: break
                 }
                 if let snap = snapshot {
@@ -196,7 +214,63 @@ final class AppManager: ObservableObject {
                 current = physical.withCapability(.unsupported(reason: .readFailed(code: "\(error)")))
             }
         }
-        return RealDisk(physical: current, snapshot: snapshot, health: health, lastRead: Date())
+        return (RealDisk(physical: current, snapshot: snapshot, health: health, lastRead: Date()), notice)
+    }
+
+    /// Relevé obtenu et message à afficher ; l'activation réussie entre dans le journal du disque.
+    nonisolated private static func handle(_ result: SmartActivationResult) -> (DiskHealthSnapshot?, SmartNotice?) {
+        switch result {
+        case .read(let snapshot):
+            return (snapshot, nil)
+        case .enabled(let snapshot):
+            DiskEventLog.shared.append(DiskEvent(kind: .smartEnabled), for: DiskIdentity.key(for: snapshot))
+            return (snapshot, .enabled)
+        case .disabled:
+            return (nil, nil)
+        case .enableFailed(let code):
+            return (nil, .failed(code: code))
+        }
+    }
+
+    private func updateSmartNotices(_ results: [(disk: RealDisk, notice: SmartNotice?)]) {
+        for (disk, notice) in results {
+            if let notice {
+                smartNotices[disk.id] = notice
+            } else if case .failed? = smartNotices[disk.id], disk.physical.healthCapability == .supported {
+                smartNotices[disk.id] = nil
+            }
+        }
+    }
+
+    func dismissSmartNotice(for diskId: String) {
+        smartNotices[diskId] = nil
+    }
+
+    /// Activation demandée par l'utilisateur (« Activer S.M.A.R.T.… » ou « Réessayer »).
+    func enableSmart(diskId: String) {
+        guard !Self.isDemo, let disk = disk(withId: diskId), !enablingSmart.contains(diskId) else { return }
+        enablingSmart.insert(diskId)
+        let bsdName = disk.physical.bsdName
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) { () -> (DiskHealthSnapshot?, SmartNotice?) in
+                do {
+                    return AppManager.handle(try SmartActivator(memory: AppManager.smartMemory).enable(bsdName: bsdName))
+                } catch {
+                    // Activé, mais la relecture a échoué : la prochaine découverte s'en chargera.
+                    return (nil, nil)
+                }
+            }.value
+            enablingSmart.remove(diskId)
+            smartNotices[diskId] = outcome.1
+            guard let snapshot = outcome.0, let index = disks.firstIndex(where: { $0.id == diskId }) else {
+                if outcome.1 == nil { loadDisks() }
+                return
+            }
+            HistoryStore.shared.record(HistorySample.from(snapshot: snapshot), for: DiskIdentity.key(for: snapshot))
+            var newDisks = disks
+            newDisks[index] = RealDisk(physical: disks[index].physical.withCapability(.supported), snapshot: snapshot, health: Self.evaluate(snapshot))
+            apply(disks: newDisks, announceChanges: false)
+        }
     }
 
     private func knownIdentifies() -> [String: NVMeIdentify] {

@@ -3,7 +3,15 @@ import AppKit
 import DiskHealthCore
 
 struct UnsupportedDiskView: View {
+    @EnvironmentObject var appManager: AppManager
     let physical: PhysicalDisk
+    @State private var confirmEnable = false
+
+    /// Échec d'une activation de S.M.A.R.T. (automatique ou manuelle).
+    private var enableFailureCode: Int32? {
+        if reason == .smartDisabled, case .failed(let code)? = appManager.smartNotices[physical.bsdName] { return code }
+        return nil
+    }
     
     private var reason: UnsupportedReason {
         if case .unsupported(let r) = physical.healthCapability {
@@ -26,7 +34,7 @@ struct UnsupportedDiskView: View {
         case .sdCardReader:
             return Strings.sdCardReaderTitle
         case .smartDisabled:
-            return Strings.smartDisabledTitle
+            return enableFailureCode == nil ? Strings.smartDisabledTitle : Strings.smartEnableFailedTitle
         case .virtualDisk:
             return Strings.virtualDiskTitle
         case .noSmartInterface:
@@ -43,7 +51,7 @@ struct UnsupportedDiskView: View {
         case .sdCardReader:
             return Strings.sdCardReaderText
         case .smartDisabled:
-            return Strings.smartDisabledText
+            return enableFailureCode.map(Strings.smartEnableFailedText(code:)) ?? Strings.smartDisabledText
         case .virtualDisk:
             return Strings.virtualDiskText
         case .noSmartInterface:
@@ -57,7 +65,9 @@ struct UnsupportedDiskView: View {
     
     private var showExportButton: Bool {
         switch reason {
-        case .sdCardReader, .smartDisabled, .virtualDisk:
+        case .smartDisabled:
+            return enableFailureCode != nil
+        case .sdCardReader, .virtualDisk:
             return false
         case .noSmartInterface, .readFailed, .usbBridge:
             return true
@@ -104,29 +114,8 @@ struct UnsupportedDiskView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         
                         if reason == .smartDisabled {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(L("Command to turn on S.M.A.R.T. (Terminal):", "Commande pour activer S.M.A.R.T. (Terminal) :"))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                HStack {
-                                    Text("smartctl -s on /dev/\(physical.bsdName)")
-                                        .font(.system(.body, design: .monospaced))
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(Color.secondary.opacity(0.1))
-                                        .cornerRadius(6)
-                                    Button {
-                                        NSPasteboard.general.clearContents()
-                                        NSPasteboard.general.setString("smartctl -s on /dev/\(physical.bsdName)", forType: .string)
-                                        ToastCenter.shared.show(message: L("Command copied", "Commande copiée"), systemImage: "doc.on.doc")
-                                    } label: {
-                                        Image(systemName: "doc.on.doc")
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help(L("Copy command", "Copier la commande"))
-                                }
-                            }
-                            .padding(.top, 4)
+                            smartActions
+                                .padding(.top, 4)
                         }
                         
                         if showExportButton {
@@ -155,6 +144,31 @@ struct UnsupportedDiskView: View {
         }
     }
     
+    /// « Réessayer » après un échec, sinon « Activer S.M.A.R.T.… » avec confirmation.
+    @ViewBuilder
+    private var smartActions: some View {
+        let isEnabling = appManager.enablingSmart.contains(physical.bsdName)
+        HStack(spacing: 10) {
+            if enableFailureCode != nil {
+                Button(Strings.retry) { appManager.enableSmart(diskId: physical.bsdName) }
+                    .disabled(isEnabling)
+            } else {
+                Button(Strings.smartEnableButton) { confirmEnable = true }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isEnabling)
+            }
+            if isEnabling {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .confirmationDialog(Strings.smartEnableConfirmTitle, isPresented: $confirmEnable) {
+            Button(L("Turn On", "Activer")) { appManager.enableSmart(diskId: physical.bsdName) }
+            Button(L("Cancel", "Annuler"), role: .cancel) {}
+        } message: {
+            Text(Strings.smartEnableConfirmText)
+        }
+    }
+
     private func exportDiagnostic() {
         let diag = Diagnostic(physical: physical)
         let encoder = JSONEncoder()
