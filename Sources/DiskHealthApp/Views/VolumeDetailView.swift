@@ -85,12 +85,12 @@ struct VolumeDetailView: View {
                     Text(volume.mountPoint).textSelection(.enabled)
                 }
                 GridRow {
-                    Text("Format").foregroundStyle(.secondary)
+                    Text(L("Format", "Format")).foregroundStyle(.secondary)
                     Text(volume.format)
                 }
                 GridRow {
                     Text(L("BSD name", "Nom BSD")).foregroundStyle(.secondary)
-                    Text(volume.bsdName).textSelection(.enabled)
+                    Text(volume.bsdName).textSelection(.enabled).environment(\.layoutDirection, .leftToRight)
                 }
             }
         }
@@ -106,6 +106,7 @@ struct VolumeDetailView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(disk.physical.model)
                             .fontWeight(.medium)
+                            .environment(\.layoutDirection, .leftToRight)
                         Label {
                             Text(disk.snapshot == nil ? L("Health not available", "Santé non disponible") : disk.health.status.localizedLabel)
                         } icon: {

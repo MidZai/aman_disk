@@ -43,7 +43,7 @@ Internal NVMe and SATA drives today. External USB drives are coming in version 1
 - **Live Dock icon**: the ring around the icon follows the health of the startup drive.
 - **Alerts**: a notification when a drive changes status, stays too hot, or drops below 50%, 25% or 10% of its life (off by default).
 - **Reports**: PDF, text or JSON export, with the serial number masked by default.
-- **English and French** interface.
+- **Multilingual interface**: available in 18 languages (English, Français, 简体中文, 繁體中文, 한국어, 日本語, Deutsch, Español, Português do Brasil, Русский, العربية with full RTL layout, Italiano, Nederlands, Polski, Türkçe, हिन्दी, Tiếng Việt, Українська). See [docs/TRANSLATING.md](docs/TRANSLATING.md) to contribute or review translations.
 
 ## Privacy
 

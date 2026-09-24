@@ -78,6 +78,8 @@ struct DiskHealthApp: App {
         Window(AppInfo.name, id: AppScene.mainWindowID) {
             ContentView()
                 .environmentObject(appManager)
+                .environment(\.layoutDirection, Localization.language.isRTL ? .rightToLeft : .leftToRight)
+                .environment(\.locale, Localization.language.locale)
                 .frame(minWidth: 960, minHeight: 640)
                 .onAppear { MainWindowLifecycle.windowDidOpen() }
                 .onDisappear { MainWindowLifecycle.windowDidClose() }
@@ -88,11 +90,15 @@ struct DiskHealthApp: App {
 
         Settings {
             SettingsView()
+                .environment(\.layoutDirection, Localization.language.isRTL ? .rightToLeft : .leftToRight)
+                .environment(\.locale, Localization.language.locale)
         }
 
         MenuBarExtra {
             MenuBarPanel()
                 .environmentObject(appManager)
+                .environment(\.layoutDirection, Localization.language.isRTL ? .rightToLeft : .leftToRight)
+                .environment(\.locale, Localization.language.locale)
         } label: {
             MenuBarLabel(appManager: appManager)
         }

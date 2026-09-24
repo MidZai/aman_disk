@@ -23,11 +23,16 @@ struct InspectorView: View {
         if let disk {
             Form {
                 Section(L("Identification", "Identification")) {
-                    LabeledContent(L("Model", "Modèle"), value: disk.physical.model)
+                    LabeledContent(L("Model", "Modèle")) {
+                        Text(disk.physical.model)
+                            .textSelection(.enabled)
+                            .environment(\.layoutDirection, .leftToRight)
+                    }
                     LabeledContent(L("Serial number", "N° de série")) {
                         HStack(spacing: 6) {
                             Text(showSerial ? (disk.serialNumber ?? "—") : SerialMasking.masked(disk.serialNumber))
                                 .textSelection(.enabled)
+                                .environment(\.layoutDirection, .leftToRight)
                             if disk.serialNumber != nil {
                                 Button {
                                     showSerial.toggle()
@@ -39,8 +44,14 @@ struct InspectorView: View {
                             }
                         }
                     }
-                    LabeledContent("Firmware", value: disk.firmware ?? "—")
-                    LabeledContent(L("BSD name", "Nom BSD"), value: disk.physical.bsdName)
+                    LabeledContent(L("Firmware", "Programme interne")) {
+                        Text(disk.firmware ?? "—")
+                            .environment(\.layoutDirection, .leftToRight)
+                    }
+                    LabeledContent(L("BSD name", "Nom BSD")) {
+                        Text(disk.physical.bsdName)
+                            .environment(\.layoutDirection, .leftToRight)
+                    }
                 }
 
                 Section(L("Capacity", "Capacité")) {
@@ -57,14 +68,14 @@ struct InspectorView: View {
                 }
 
                 Section(L("Connection", "Connexion")) {
-                    LabeledContent("Interface", value: disk.physical.interfaceLabel)
+                    LabeledContent(L("Interface", "Interface"), value: disk.physical.interfaceLabel)
                     LabeledContent(L("Location", "Emplacement"), value: disk.physical.locationLabel)
                     LabeledContent(L("Media", "Support"), value: disk.physical.mediumLabel)
                 }
 
                 let diskVolumes = appManager.volumes(on: disk)
                 if !diskVolumes.isEmpty {
-                    Section("Volumes") {
+                    Section(L("Volumes", "Volumes")) {
                         ForEach(diskVolumes) { vol in
                             LabeledContent(vol.name, value: L("\(Formatters.bytes(vol.availableBytes)) free", "\(Formatters.bytes(vol.availableBytes)) libres"))
                         }

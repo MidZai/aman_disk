@@ -10,6 +10,7 @@ enum PreferenceKey {
     static let alertsEnabled = "alertsEnabled"
     static let autoEnableSmart = "autoEnableSmart"
     static let language = Localization.defaultsKey
+    static let temperatureUnit = Formatters.temperatureUnitDefaultsKey
 }
 
 /// Settings: a single page, grouped form (⌘,).
@@ -20,6 +21,7 @@ struct SettingsView: View {
     @AppStorage(PreferenceKey.alertsEnabled) private var alertsEnabled = false
     @AppStorage(PreferenceKey.autoEnableSmart) private var autoEnableSmart = true
     @AppStorage(PreferenceKey.language) private var language = AppLanguage.english.rawValue
+    @AppStorage(PreferenceKey.temperatureUnit) private var temperatureUnit = Formatters.temperatureUnit.rawValue
     @State private var notificationsDenied = false
 
     @State private var launchAtLogin = false
@@ -32,7 +34,12 @@ struct SettingsView: View {
         Form {
             Section(L("General", "Général")) {
                 Picker(L("Language", "Langue"), selection: $language) {
-                    ForEach(AppLanguage.allCases, id: \.rawValue) { Text($0.nativeName).tag($0.rawValue) }
+                    ForEach(AppLanguage.allCases, id: \.rawValue) { Text($0.displayName).tag($0.rawValue) }
+                }
+                .onChange(of: language) { _, newLang in
+                    if let appLang = AppLanguage(rawValue: newLang) {
+                        Localization.language = appLang
+                    }
                 }
                 if language != Localization.language.rawValue {
                     HStack {
@@ -41,6 +48,18 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button(L("Relaunch Now", "Redémarrer maintenant"), action: relaunch)
+                    }
+                }
+                Text(L("You can also change the app language in System Settings › General › Language & Region › Applications.", "Vous pouvez aussi changer la langue de l'application dans Réglages Système › Général › Langue et région › Applications."))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Picker(L("Temperature unit", "Unité de température"), selection: $temperatureUnit) {
+                    Text(L("Celsius (°C)", "Celsius (°C)")).tag(TemperatureUnit.celsius.rawValue)
+                    Text(L("Fahrenheit (°F)", "Fahrenheit (°F)")).tag(TemperatureUnit.fahrenheit.rawValue)
+                }
+                .onChange(of: temperatureUnit) { _, newUnit in
+                    if let unit = TemperatureUnit(rawValue: newUnit) {
+                        Formatters.temperatureUnit = unit
                     }
                 }
                 Toggle(L("Stay in the menu bar when the window is closed", "Rester dans la barre des menus quand la fenêtre est fermée"), isOn: $stayInMenuBar)
@@ -74,7 +93,7 @@ struct SettingsView: View {
                 Toggle(L("Show the temperature next to the icon", "Afficher la température à côté de l'icône"), isOn: $showMenuBarTemperature)
             }
             
-            Section("Dock") {
+            Section(L("Dock", "Dock")) {
                 Toggle(L("Dock icon: show drive health", "Icône du Dock : afficher la santé du disque"), isOn: $dockShowsHealth)
                     .onChange(of: dockShowsHealth) { LiveStatusController.shared.refreshDockIcon() }
             }

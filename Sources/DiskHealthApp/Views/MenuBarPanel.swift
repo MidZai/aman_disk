@@ -15,7 +15,8 @@ struct MenuBarLabel: View {
         HStack(spacing: 3) {
             Image(nsImage: MenuBarIconRenderer.cachedImage(fraction: fraction))
             if showTemperature, let t = boot?.temperatureC {
-                Text("\(t)°")
+                let temp = Formatters.temperatureUnit == .fahrenheit ? Int((Double(t) * 9.0 / 5.0 + 32.0).rounded()) : t
+                Text("\(temp)°")
                     .monospacedDigit()
             }
         }
@@ -91,6 +92,7 @@ struct MenuBarPanel: View {
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .environment(\.layoutDirection, .leftToRight)
                 Text(disk.health.status.localizedLabel)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -140,10 +142,14 @@ struct MenuBarPanel: View {
                 .chartYAxis {
                     AxisMarks(position: .trailing, values: .automatic(desiredCount: 2)) { value in
                         AxisValueLabel {
-                            if let v = value.as(Double.self) { Text("\(Int(v))°") }
+                            if let v = value.as(Double.self) {
+                                let t = Formatters.temperatureUnit == .fahrenheit ? Int((v * 9.0 / 5.0 + 32.0).rounded()) : Int(v)
+                                Text("\(t)°")
+                            }
                         }
                     }
                 }
+                .environment(\.layoutDirection, .leftToRight)
                 .frame(height: 60)
                 .accessibilityLabel(L("Temperature over the last hour", "Température de la dernière heure"))
                 .accessibilityValue(TemperatureHistoryView.legendText(agg))

@@ -113,6 +113,7 @@ struct MiniRingView: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+        .environment(\.layoutDirection, .leftToRight)
     }
 }
 

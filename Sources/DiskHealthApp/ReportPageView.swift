@@ -79,7 +79,9 @@ struct ReportPageView: View {
     private var summaryPage: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(disk.physical.model).font(.system(size: 18, weight: .bold))
+                Text(disk.physical.model)
+                    .font(.system(size: 18, weight: .bold))
+                    .environment(\.layoutDirection, .leftToRight)
                 Text("\(Formatters.bytes(disk.physical.sizeBytes)) · \(disk.physical.mediumAndLocationLabel) · \(disk.physical.interfaceLabel)")
                     .font(.system(size: 10))
                     .foregroundStyle(Palette.secondary)
@@ -105,16 +107,16 @@ struct ReportPageView: View {
             .background(Palette.status(disk.health.status).opacity(0.07))
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            sectionHeader("Identification")
+            sectionHeader(L("Identification", "Identification"))
             HStack(alignment: .top, spacing: 30) {
                 VStack(alignment: .leading, spacing: 5) {
                     infoRow(L("Model", "Modèle"), disk.physical.model)
                     infoRow(L("Serial number", "Numéro de série"), report.serialText)
-                    infoRow("Firmware", disk.firmware ?? L("Unknown", "Inconnu"))
+                    infoRow(L("Firmware", "Programme interne"), disk.firmware ?? L("Unknown", "Inconnu"))
                 }
                 VStack(alignment: .leading, spacing: 5) {
                     infoRow(L("Capacity", "Capacité"), Formatters.bytes(disk.physical.sizeBytes))
-                    infoRow("Interface", disk.physical.interfaceLabel)
+                    infoRow(L("Interface", "Interface"), disk.physical.interfaceLabel)
                     infoRow(L("Read on", "Relevé"), Formatters.date(disk.lastRead))
                 }
             }
@@ -180,10 +182,15 @@ struct ReportPageView: View {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine().foregroundStyle(Palette.rule)
                 AxisValueLabel {
-                    if let v = value.as(Double.self) { Text("\(Int(v)) °C").font(.system(size: 8)).foregroundStyle(Palette.secondary) }
+                    if let v = value.as(Double.self) {
+                        Text(Formatters.temperature(Int(v)))
+                            .font(.system(size: 8))
+                            .foregroundStyle(Palette.secondary)
+                    }
                 }
             }
         }
+        .environment(\.layoutDirection, .leftToRight)
     }
 
     // MARK: Page 2
@@ -249,7 +256,7 @@ struct ReportPageView: View {
                 .font(.system(size: 9))
                 .foregroundStyle(Palette.secondary)
             HStack(spacing: 0) {
-                Text("Test").frame(width: 110, alignment: .leading)
+                Text(L("Test", "Test")).frame(width: 110, alignment: .leading)
                 Text(L("Read", "Lecture")).frame(width: 110, alignment: .trailing)
                 Text(L("Write", "Écriture")).frame(width: 110, alignment: .trailing)
             }

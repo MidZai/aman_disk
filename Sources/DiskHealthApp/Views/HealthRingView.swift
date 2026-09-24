@@ -34,6 +34,7 @@ struct HealthRingView: View {
         .onChange(of: target) { animate(to: target) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
+        .environment(\.layoutDirection, .leftToRight)
     }
 
     private func animate(to value: Double) {

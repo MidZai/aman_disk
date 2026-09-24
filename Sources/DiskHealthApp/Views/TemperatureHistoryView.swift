@@ -166,7 +166,10 @@ private struct TemperatureChart: View {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine()
                 AxisValueLabel {
-                    if let v = value.as(Double.self) { Text("\(Int(v))\(Formatters.unitSpace)°") }
+                    if let v = value.as(Double.self) {
+                        let t = Formatters.temperatureUnit == .fahrenheit ? Int((v * 9.0 / 5.0 + 32.0).rounded()) : Int(v)
+                        Text("\(t)\(Formatters.unitSpace)°")
+                    }
                 }
             }
         }
@@ -178,6 +181,7 @@ private struct TemperatureChart: View {
         }
         .accessibilityLabel(L("Temperature chart", "Courbe de température"))
         .accessibilityValue(TemperatureHistoryView.legendText(aggregation))
+        .environment(\.layoutDirection, .leftToRight)
     }
 }
 

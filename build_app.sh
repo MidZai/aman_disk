@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="${VERSION:-0.9.2}"
+VERSION="${VERSION:-0.9.3}"
 UNIVERSAL="${UNIVERSAL:-0}"
 BUILT_BINARY=".build/AmanDisk-bundle-binary"
 
@@ -75,11 +75,47 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
          (that would end monitoring), nor kill it without warning during a test. -->
     <key>NSSupportsAutomaticTermination</key>
     <false/>
-    <key>NSSupportsSuddenTermination</key>
-    <false/>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>fr</string>
+    <key>CFBundleAllowMixedLocalizations</key>
+    <true/>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>fr</string>
+        <string>en</string>
+        <string>zh-Hans</string>
+        <string>zh-Hant</string>
+        <string>ko</string>
+        <string>ar</string>
+        <string>pt-BR</string>
+        <string>pt</string>
+        <string>es</string>
+        <string>de</string>
+        <string>it</string>
+        <string>ja</string>
+        <string>ru</string>
+        <string>tr</string>
+        <string>nl</string>
+        <string>pl</string>
+        <string>hi</string>
+        <string>vi</string>
+        <string>uk</string>
+    </array>
 </dict>
 </plist>
 PLIST
+
+echo "Creating localization resources..."
+for lang in fr en zh-Hans zh-Hant ko ar pt-BR pt es de it ja ru tr nl pl hi vi uk; do
+    mkdir -p "$RESOURCES_DIR/$lang.lproj"
+    cat > "$RESOURCES_DIR/$lang.lproj/InfoPlist.strings" << EOF
+CFBundleDisplayName = "Aman Disk";
+CFBundleName = "Aman Disk";
+EOF
+    cat > "$RESOURCES_DIR/$lang.lproj/Localizable.strings" << EOF
+"CFBundleDisplayName" = "Aman Disk";
+EOF
+done
 
 echo "Creating entitlements..."
 cat > "AmanDisk-entitlement.plist" << PLIST
@@ -97,5 +133,14 @@ echo "Signing application..."
 # Ad hoc signature (no developer account: the app isn't notarized).
 codesign --force --deep --sign - --entitlements AmanDisk-entitlement.plist "$APP_NAME"
 codesign --verify --deep --strict "$APP_NAME"
+
+echo "Copying to root folder..."
+cp -R "$APP_NAME" "../$APP_NAME" 2>/dev/null || true
+
+# Re-register with macOS LaunchServices so macOS updates its per-app language list
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_NAME" 2>/dev/null || true
+if [ -d "../$APP_NAME" ]; then
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "../$APP_NAME" 2>/dev/null || true
+fi
 
 echo "Done! $APP_NAME has been created successfully."

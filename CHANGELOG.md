@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.3 — 2026-09-24
+
+- **Internationalization (i18n)**: added support for 16 new languages: Korean (`ko`), Japanese (`ja`), Simplified Chinese (`zh-Hans`), Traditional Chinese (`zh-Hant`), German (`de`), Spanish (`es`), Brazilian Portuguese (`pt-BR`), Russian (`ru`), Arabic (`ar`), Italian (`it`), Dutch (`nl`), Polish (`pl`), Turkish (`tr`), Hindi (`hi`), Vietnamese (`vi`), Ukrainian (`uk`).
+- **Right-to-Left (RTL) layout**: full RTL support for Arabic, mirroring sidebars and alignments, while preserving standard LTR orientation for time-series charts, gauge rings, model names, serial numbers and hexadecimal identifiers.
+- **Temperature unit**: added user preference for Celsius (°C) and Fahrenheit (°F) with system default auto-detection.
+- **Language settings**: added in-app language picker and guidance for changing the language per-app in macOS System Settings.
+- **Plurals & formatting**: platform-adapted pluralization for complex languages (Russian, Arabic), formatted via Foundation.
+- **Translation completeness**: automated test suite verifying 100% key coverage across all supported languages (`TranslationCompletenessTests`).
+- **Contributor guide**: added `docs/TRANSLATING.md` explaining terminology rules and how to review or improve translations.
+
 ## 0.9.2
 
 - Drive page and reports: “Internal SSD” instead of “SSD internal” in English.

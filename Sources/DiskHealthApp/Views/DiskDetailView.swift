@@ -65,6 +65,7 @@ private struct DiskHeaderView: View {
                 Text(disk.physical.model)
                     .font(.title2.bold())
                     .textSelection(.enabled)
+                    .environment(\.layoutDirection, .leftToRight)
 
                 Label {
                     Text(disk.health.status.localizedLabel)
@@ -90,10 +91,10 @@ private struct DiskHeaderView: View {
         Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 10) {
             GridRow {
                 InfoPair(label: L("Capacity", "Capacité"), value: Formatters.bytes(disk.physical.sizeBytes))
-                InfoPair(label: "Firmware", value: disk.firmware ?? "—")
+                InfoPair(label: L("Firmware", "Programme interne"), value: disk.firmware ?? "—")
             }
             GridRow {
-                InfoPair(label: "Interface", value: disk.physical.interfaceLabel)
+                InfoPair(label: L("Interface", "Interface"), value: disk.physical.interfaceLabel)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("Serial number", "N° de série"))
                         .font(.caption)
@@ -102,6 +103,7 @@ private struct DiskHeaderView: View {
                         Text(showSerial ? (disk.serialNumber ?? "—") : SerialMasking.masked(disk.serialNumber))
                             .font(.body.weight(.medium))
                             .textSelection(.enabled)
+                            .environment(\.layoutDirection, .leftToRight)
                         if disk.serialNumber != nil {
                             Button {
                                 showSerial.toggle()

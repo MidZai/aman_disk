@@ -202,6 +202,7 @@ private struct SmartRow: View {
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .frame(width: SmartColumns.id, alignment: .leading)
+                .environment(\.layoutDirection, .leftToRight)
 
             HStack(spacing: 5) {
                 Text(attr.name)
@@ -227,15 +228,28 @@ private struct SmartRow: View {
                 numeric(attr.threshold ?? "—", width: SmartColumns.normalized)
             }
 
-            Text(showRaw ? attr.rawHex : attr.value)
-                .font(showRaw ? .system(.callout, design: .monospaced) : .callout)
-                .foregroundStyle(showRaw ? .secondary : attr.state.tableColor)
-                .fontWeight(showRaw ? .regular : attr.state.fontWeight)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .textSelection(.enabled)
-                .frame(width: SmartColumns.value, alignment: .trailing)
+            if showRaw {
+                Text(attr.rawHex)
+                    .font(.system(.callout, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .fontWeight(.regular)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .textSelection(.enabled)
+                    .frame(width: SmartColumns.value, alignment: .trailing)
+                    .environment(\.layoutDirection, .leftToRight)
+            } else {
+                Text(attr.value)
+                    .font(.callout)
+                    .foregroundStyle(attr.state.tableColor)
+                    .fontWeight(attr.state.fontWeight)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .textSelection(.enabled)
+                    .frame(width: SmartColumns.value, alignment: .trailing)
+            }
 
             HStack(spacing: 6) {
                 if attr.state != .informational {

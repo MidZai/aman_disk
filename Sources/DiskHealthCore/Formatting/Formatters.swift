@@ -5,8 +5,30 @@ import Foundation
 /// Numbers follow the interface language (`Localization.language`), not the system's:
 /// otherwise “500.3 Go” would sit next to French labels, or “500,3 GB” next to English ones.
 ///
-/// The formatters are created only once: `NumberFormatter` and `DateFormatter` are expensive
-/// to create, and these functions are called on every view render.
+/// Temperature unit preference (°C or °F).
+public enum TemperatureUnit: String, CaseIterable, Identifiable, Codable, Sendable {
+    case celsius = "celsius"
+    case fahrenheit = "fahrenheit"
+
+    public var id: String { rawValue }
+
+    public var symbol: String {
+        switch self {
+        case .celsius: return "°C"
+        case .fahrenheit: return "°F"
+        }
+    }
+
+    public static var systemDefault: TemperatureUnit {
+        if #available(macOS 13, *) {
+            if Locale.current.measurementSystem == .us {
+                return .fahrenheit
+            }
+        }
+        return .celsius
+    }
+}
+
 public enum Formatters {
     public static var locale: Locale = Localization.language.locale {
         didSet { cache = Cache(locale: locale) }
@@ -22,6 +44,8 @@ public enum Formatters {
         let dateMedium: DateFormatter
         let dateLong: DateFormatter
         let time: DateFormatter
+        let dateComponentsDay: DateComponentsFormatter
+        let dateComponentsMonth: DateComponentsFormatter
 
         init(locale: Locale) {
             func number(fractionDigits: Int) -> NumberFormatter {
@@ -48,6 +72,22 @@ public enum Formatters {
             time.locale = locale
             time.dateStyle = .none
             time.timeStyle = .short
+
+            let dcfDay = DateComponentsFormatter()
+            var calDay = Calendar(identifier: .gregorian)
+            calDay.locale = locale
+            dcfDay.calendar = calDay
+            dcfDay.unitsStyle = .full
+            dcfDay.allowedUnits = [.day]
+            dateComponentsDay = dcfDay
+
+            let dcfMonth = DateComponentsFormatter()
+            var calMonth = Calendar(identifier: .gregorian)
+            calMonth.locale = locale
+            dcfMonth.calendar = calMonth
+            dcfMonth.unitsStyle = .full
+            dcfMonth.allowedUnits = [.month]
+            dateComponentsMonth = dcfMonth
         }
     }
 
@@ -141,24 +181,89 @@ public enum Formatters {
     }
 
     /// Readable equivalent of a number of hours: “143 days”, “5 months”, “3.6 years”.
-    public static func approximateDuration(hours: UInt64) -> String {
+    public static func approximateDuration(hours: UInt64, language: AppLanguage = Localization.language) -> String {
         let days = Double(hours) / 24
-        if days < 1 { return L("less than a day", "moins d'un jour") }
+        if days < 1 { return Localization.translate(english: "less than a day", french: "moins d'un jour", language: language) }
         if days < 60 {
             let d = Int(days.rounded())
-            return "\(d)\(unitSpace)\(L("day", "jour"))\(d > 1 ? "s" : "")"
+            if language == .english {
+                return "\(d)\(unitSpace)day\(d > 1 ? "s" : "")"
+            } else if language == .french {
+                return "\(d)\(unitSpace)jour\(d > 1 ? "s" : "")"
+            } else {
+                if language == Localization.language, let str = cache.dateComponentsDay.string(from: TimeInterval(d * 86400)) {
+                    return str
+                }
+                let f = DateComponentsFormatter()
+                var cal = Calendar(identifier: .gregorian)
+                cal.locale = language.locale
+                f.calendar = cal
+                f.unitsStyle = .full
+                f.allowedUnits = [.day]
+                if let str = f.string(from: TimeInterval(d * 86400)) {
+                    return str
+                }
+                return "\(d)\(unitSpace)\(Localization.translate(english: "days", french: "jours", language: language))"
+            }
         }
         let months = days / 30.44
-        if months < 24 { return "\(Int(months.rounded()))\(unitSpace)\(L("months", "mois"))" }
-        return "\(decimal(days / 365.25))\(unitSpace)\(L("years", "ans"))"
+        if months < 24 {
+            let m = Int(months.rounded())
+            if language == .english {
+                return "\(m)\(unitSpace)months"
+            } else if language == .french {
+                return "\(m)\(unitSpace)mois"
+            } else {
+                if language == Localization.language, let str = cache.dateComponentsMonth.string(from: TimeInterval(m * 30 * 86400)) {
+                    return str
+                }
+                let f = DateComponentsFormatter()
+                var cal = Calendar(identifier: .gregorian)
+                cal.locale = language.locale
+                f.calendar = cal
+                f.unitsStyle = .full
+                f.allowedUnits = [.month]
+                if let str = f.string(from: TimeInterval(m * 30 * 86400)) {
+                    return str
+                }
+                return "\(m)\(unitSpace)\(Localization.translate(english: "months", french: "mois", language: language))"
+            }
+        }
+        let yearsStr = Localization.translate(english: "years", french: "ans", language: language)
+        return "\(decimal(days / 365.25))\(unitSpace)\(yearsStr)"
     }
 
     public static func cycles(_ value: UInt64) -> String {
         integer(value)
     }
 
+    public static let temperatureUnitDefaultsKey = "temperatureUnit"
+
+    public static var temperatureUnit: TemperatureUnit {
+        get {
+            if let raw = UserDefaults.standard.string(forKey: temperatureUnitDefaultsKey),
+               let unit = TemperatureUnit(rawValue: raw) {
+                return unit
+            }
+            return TemperatureUnit.systemDefault
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: temperatureUnitDefaultsKey)
+        }
+    }
+
     public static func temperature(_ celsius: Int) -> String {
-        "\(celsius)\(unitSpace)°C"
+        temperature(celsius, unit: temperatureUnit)
+    }
+
+    public static func temperature(_ celsius: Int, unit: TemperatureUnit) -> String {
+        switch unit {
+        case .celsius:
+            return "\(celsius)\(unitSpace)°C"
+        case .fahrenheit:
+            let f = Int((Double(celsius) * 9.0 / 5.0 + 32.0).rounded())
+            return "\(f)\(unitSpace)°F"
+        }
     }
 
     /// Throughput unit: 10⁶ bytes per second.
