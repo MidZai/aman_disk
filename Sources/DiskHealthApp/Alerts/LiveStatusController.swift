@@ -105,7 +105,7 @@ final class LiveStatusController {
     private func update(disks: [RealDisk]) {
         refreshDockIcon()
         
-        let readings = disks.filter { $0.physical.isInternal && $0.snapshot != nil }.map { disk in
+        let readings = disks.filter { ($0.physical.isInternal || $0.physical.driveConnection == .thunderboltNVMe) && $0.snapshot != nil }.map { disk in
             AlertReading(
                 diskId: disk.id,
                 name: disk.physical.model,

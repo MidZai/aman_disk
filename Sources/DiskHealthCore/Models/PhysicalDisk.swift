@@ -199,4 +199,31 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
             isDiskImage: isDiskImage
         )
     }
+
+    public var isThunderbolt: Bool {
+        driveConnection == .thunderboltNVMe
+    }
+
+    /// Detailed connection type for disk details: e.g. “Thunderbolt / USB4 (PCIe)”
+    public var detailInterfaceLabel: String {
+        if driveConnection == .thunderboltNVMe {
+            return "Thunderbolt / USB4 (PCIe)"
+        }
+        switch protocolType {
+        case .nvme: return "NVMe"
+        case .pcieAhci: return "PCIe AHCI"
+        case .ata: return "SATA"
+        case .usb: return "USB"
+        case .sdCard: return "SD Card"
+        case .virtualDisk: return "Virtual"
+        case .unknown:
+            switch driveConnection {
+            case .internalNVMe, .thunderboltNVMe: return "NVMe"
+            case .internalAHCI: return "PCIe AHCI"
+            case .internalSATA: return "SATA"
+            case .usb: return "USB"
+            case .other(let name): return name.isEmpty ? "Other" : name
+            }
+        }
+    }
 }

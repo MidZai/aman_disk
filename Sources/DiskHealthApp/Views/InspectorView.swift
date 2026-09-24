@@ -68,7 +68,7 @@ struct InspectorView: View {
                 }
 
                 Section(L("Connection", "Connexion")) {
-                    LabeledContent(L("Interface", "Interface"), value: disk.physical.interfaceLabel)
+                    LabeledContent(L("Interface", "Interface"), value: disk.physical.detailInterfaceLabel)
                     LabeledContent(L("Location", "Emplacement"), value: disk.physical.locationLabel)
                     LabeledContent(L("Media", "Support"), value: disk.physical.mediumLabel)
                 }

@@ -94,7 +94,7 @@ private struct DiskHeaderView: View {
                 InfoPair(label: L("Firmware", "Programme interne"), value: disk.firmware ?? "—")
             }
             GridRow {
-                InfoPair(label: L("Interface", "Interface"), value: disk.physical.interfaceLabel)
+                InfoPair(label: L("Interface", "Interface"), value: disk.physical.detailInterfaceLabel)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("Serial number", "N° de série"))
                         .font(.caption)
@@ -152,7 +152,7 @@ private struct DiskHeaderView: View {
     }
 
     private var subtext: String {
-        var parts = [disk.physical.mediumAndLocationLabel, disk.physical.interfaceLabel]
+        var parts = [disk.physical.mediumAndLocationLabel, disk.physical.detailInterfaceLabel]
         if case .ata(let ata)? = disk.snapshot, disk.physical.mediumType == .rotational, ata.rotationRate > 1 {
             parts.append(L("\(Formatters.integer(ata.rotationRate))\(Formatters.unitSpace)\(L("rpm", "tr/min"))", "\(Formatters.integer(ata.rotationRate))\(Formatters.unitSpace)tr/min"))
         }

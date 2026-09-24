@@ -17,6 +17,9 @@ struct UnsupportedDiskView: View {
         if case .unsupported(let r) = physical.healthCapability {
             return r
         }
+        if case .error(let c) = physical.smartAvailability {
+            return .readFailed(code: "\(c)")
+        }
         return .noSmartInterface
     }
     
@@ -63,6 +66,11 @@ struct UnsupportedDiskView: View {
         }
     }
     
+    private var isReadFailed: Bool {
+        if case .readFailed = reason { return true }
+        return false
+    }
+    
     private var showExportButton: Bool {
         switch reason {
         case .smartDisabled:
@@ -87,7 +95,7 @@ struct UnsupportedDiskView: View {
                         Text(physical.model)
                             .font(.system(size: 24, weight: .semibold))
                         
-                        Text("\(Formatters.bytes(physical.sizeBytes)) · \(physical.interfaceLabel) · \(physical.locationLabel)")
+                        Text("\(Formatters.bytes(physical.sizeBytes)) · \(physical.detailInterfaceLabel) · \(physical.locationLabel)")
                             .font(.body)
                             .foregroundColor(.secondary)
                     }
@@ -116,14 +124,35 @@ struct UnsupportedDiskView: View {
                         if reason == .smartDisabled {
                             smartActions
                                 .padding(.top, 4)
+                        } else if case .readFailed = reason {
+                            HStack(spacing: 10) {
+                                Button(Strings.retry) {
+                                    appManager.loadDisks()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(appManager.isRefreshing)
+
+                                if appManager.isRefreshing {
+                                    ProgressView().controlSize(.small)
+                                }
+                            }
+                            .padding(.top, 4)
                         }
                         
                         if showExportButton {
-                            Button(Strings.exportDiagnostic) {
-                                exportDiagnostic()
+                            if isReadFailed {
+                                Button(Strings.exportDiagnostic) {
+                                    exportDiagnostic()
+                                }
+                                .buttonStyle(.bordered)
+                                .padding(.top, 4)
+                            } else {
+                                Button(Strings.exportDiagnostic) {
+                                    exportDiagnostic()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .padding(.top, 4)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .padding(.top, 4)
                         }
                     }
                 }

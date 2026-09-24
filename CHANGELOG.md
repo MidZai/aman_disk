@@ -2,12 +2,16 @@
 
 ## 0.9.4 — 2026-09-24
 
+- **Thunderbolt / USB4 NVMe enclosures**: full S.M.A.R.T. reading on external NVMe SSDs in Thunderbolt 3/4/5 and USB4 (PCIe mode) enclosures (e.g. OWC Envoy Pro FX, Acasis, Trebleet, Sabrent).
+- **Interface labeling**: displays "Thunderbolt / USB4 (PCIe)" in disk details, inspector, and headers for external PCIe drives.
+- **Monitoring & menu bar**: external Thunderbolt NVMe drives are included in continuous sampling (`sampleNow`), temperature history, live alerts, and the menu bar panel.
+- **Graceful error handling**: when S.M.A.R.T. reading fails on an external drive, reports `SmartAvailability.error(code:)` with the error code and an interactive "Try Again" / "Réessayer" button, without crashing or freezing.
 - **External drives architecture**: added data models (`DriveConnection`, `SmartAvailability`) classifying internal drives (`internalNVMe`, `internalAHCI`, `internalSATA`) and external drives (`thunderboltNVMe`, `usb`, `other`).
 - **Sidebar groups**: partitioned the drive list into distinct "Internal drives" and "External drives" sections (external section automatically hidden when no external drive is connected), with discrete connection badges ("USB", "Thunderbolt").
 - **Hot-plug detection & safety**: robust DiskArbitration monitoring with 1-second debouncing to coalesce multi-event hot-plug bursts when plugging in external enclosures; disconnecting a selected external drive safely reverts selection to the startup boot disk without crash or stale IOKit references.
 - **Safety filtering (Rule 0.1-8)**: strictly filters out disk images (`Location == "File"`), virtual interfaces (`"Virtual Interface"`), RAM disks (`"RAM Disk"` or `ram*` BSD names), network disks, and synthesized APFS containers.
 - **Demo mode**: added simulated external drive states including a healthy Thunderbolt NVMe SSD (`OWC Envoy Pro FX`), a healthy USB HDD (`Seagate Backup Plus`), an unsupported USB SSD enclosure (`Crucial X8 Portable SSD`), and a USB flash thumb drive (`SanDisk Ultra Flair`).
-- **Unit test suite**: added `DriveConnectionTests` covering simulated `Protocol Characteristics` permutations, missing keys, unknown interconnects, and strict exclusion of virtual/DMG/RAM devices.
+- **Unit test suite**: added `DriveConnectionTests` and `ThunderboltNVMeTests` covering simulated `Protocol Characteristics` permutations, Samsung 980 Pro / WD Black SN850X S.M.A.R.T. logs, parity with internal drives, error mapping, and strict exclusion of virtual/DMG/RAM devices.
 
 ## 0.9.3 — 2026-09-24
 

@@ -208,12 +208,28 @@ final class AppManager: ObservableObject {
                 if let snap = snapshot {
                     health = evaluate(snap)
                     HistoryStore.shared.record(HistorySample.from(snapshot: snap), for: DiskIdentity.key(for: snap))
+                    current = current.withSmartAvailability(.available)
                 }
             } catch ATAReadError.smartDisabled {
                 current = physical.withCapability(.unsupported(reason: .smartDisabled))
+                    .withSmartAvailability(.disabledOnDrive)
             } catch {
                 NSLog("Aman Disk: could not read S.M.A.R.T. data for %@ (%@)", physical.bsdName, "\(error)")
-                current = physical.withCapability(.unsupported(reason: .readFailed(code: "\(error)")))
+                let errorCode: Int32
+                if let nvmeErr = error as? NVMeReadError {
+                    switch nvmeErr {
+                    case .notFound: errorCode = -1
+                    case .notNVMe: errorCode = -2
+                    case .pluginFailed: errorCode = -3
+                    case .readFailed: errorCode = -4
+                    case .bufferTooSmall: errorCode = -5
+                    case .unknown(let c): errorCode = c
+                    }
+                } else {
+                    errorCode = -99
+                }
+                current = physical.withCapability(.unsupported(reason: .readFailed(code: "\(errorCode)")))
+                    .withSmartAvailability(.error(code: errorCode))
             }
         }
         return (RealDisk(physical: current, snapshot: snapshot, health: health, lastRead: Date()), notice)
@@ -338,7 +354,7 @@ final class AppManager: ObservableObject {
     /// known again (no new discovery), records a sample and updates the display.
     func sampleNow() async {
         if Self.isDemo { return }
-        let targets = disks.filter { $0.physical.isInternal && $0.physical.healthCapability == .supported && $0.snapshot != nil }
+        let targets = disks.filter { ($0.physical.isInternal || $0.physical.driveConnection == .thunderboltNVMe) && $0.physical.healthCapability == .supported && $0.snapshot != nil }
         guard !targets.isEmpty else { return }
 
         let updated: [RealDisk] = await Task.detached(priority: .utility) {

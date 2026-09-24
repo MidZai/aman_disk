@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="${VERSION:-0.9.3}"
+VERSION="${VERSION:-0.9.4}"
 UNIVERSAL="${UNIVERSAL:-0}"
 BUILT_BINARY=".build/AmanDisk-bundle-binary"
 
