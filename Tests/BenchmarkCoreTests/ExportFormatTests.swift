@@ -1,8 +1,9 @@
-import XCTest
+import Testing
+import Foundation
 @testable import BenchmarkCore
 
-final class ExportFormatTests: XCTestCase {
-    func testDecodeV2() throws {
+@Suite final class ExportFormatTests {
+    @Test func testDecodeV2() throws {
         let v2JSON = """
         {
             "schemaVersion": 2,
@@ -28,8 +29,8 @@ final class ExportFormatTests: XCTestCase {
         
         let data = v2JSON.data(using: .utf8)!
         let decoded = try JSONDecoder().decode(ExportFormat.self, from: data)
-        XCTAssertEqual(decoded.schemaVersion, 2)
-        XCTAssertNil(decoded.benchmark)
-        XCTAssertEqual(decoded.physical.model, "Apple SSD")
+        #expect(decoded.schemaVersion == 2)
+        #expect(decoded.benchmark == nil)
+        #expect(decoded.physical.model == "Apple SSD")
     }
 }

@@ -1,5 +1,7 @@
 import SwiftUI
 import AppKit
+import DiskHealthCore
+import BenchmarkCore
 
 enum AppScene {
     static let mainWindowID = "main"
@@ -10,13 +12,15 @@ enum AppScene {
 @MainActor
 enum MainWindowLifecycle {
     static func windowDidOpen() {
+        AppManager.sharedInstance?.isMainWindowVisible = true
         if NSApp.activationPolicy() != .regular {
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
         }
     }
-    
+
     static func windowDidClose() {
+        AppManager.sharedInstance?.isMainWindowVisible = false
         let stay = UserDefaults.standard.object(forKey: PreferenceKey.stayInMenuBar) as? Bool ?? true
         if stay {
             NSApp.setActivationPolicy(.accessory)
@@ -26,60 +30,65 @@ enum MainWindowLifecycle {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     // La fermeture de la dernière fenêtre est gérée par MainWindowLifecycle.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
-    
+
+    @MainActor
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if AppManager.sharedInstance?.runningBenchmarkDiskId != nil {
-            let alert = NSAlert()
-            alert.messageText = "Quitter Aman Disk ?"
-            alert.informativeText = Strings.benchQuitWarning
-            alert.addButton(withTitle: "Annuler")
-            alert.addButton(withTitle: "Quitter")
-            
-            let res = alert.runModal()
-            if res == .alertFirstButtonReturn {
-                return .terminateCancel
-            } else {
-                AppManager.sharedInstance?.cancelRunningBenchmark()
-                // Wait a bit for the cleanup
-                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-                return .terminateNow
-            }
+        guard let benchmark = AppManager.sharedInstance?.benchmark, benchmark.isRunning else {
+            return .terminateNow
         }
-        return .terminateNow
+        let alert = NSAlert()
+        alert.messageText = L("Quit Aman Disk?", "Quitter Aman Disk ?")
+        alert.informativeText = Strings.benchQuitWarning
+        alert.addButton(withTitle: L("Continue Test", "Continuer le test"))
+        alert.addButton(withTitle: L("Stop and Quit", "Arrêter et quitter"))
+        guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
+        // Réponse différée : l'app se ferme une fois le fichier de test supprimé.
+        benchmark.cancelForTermination()
+        return .terminateLater
     }
 }
 
 @main
 struct DiskHealthApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var appManager = AppManager()
-    
+    @StateObject private var appManager: AppManager
+
     init() {
         MigrationService.migrateIfNeeded()
         MigrationService.mergeLegacyHistoryIfNeeded()
+        MigrationService.removeForeignPreferences()
+        if AppManager.isDemo {
+            // Le mode démo n'écrit jamais dans le vrai historique.
+            let demoDir = FileManager.default.temporaryDirectory.appendingPathComponent("AmanDiskDemo-\(ProcessInfo.processInfo.processIdentifier)")
+            HistoryStore.shared = HistoryStore(baseURL: demoDir)
+        } else {
+            // Fichiers de test laissés par un test interrompu (plantage, arrêt forcé).
+            BenchInflight.cleanUpLeftovers()
+        }
+        _appManager = StateObject(wrappedValue: AppManager())
     }
-    
+
     var body: some Scene {
         Window(AppInfo.name, id: AppScene.mainWindowID) {
             ContentView()
                 .environmentObject(appManager)
-                .frame(minWidth: 1100, minHeight: 720)
+                .frame(minWidth: 960, minHeight: 640)
                 .onAppear { MainWindowLifecycle.windowDidOpen() }
                 .onDisappear { MainWindowLifecycle.windowDidClose() }
         }
-        .defaultSize(width: 1380, height: 880)
+        .defaultSize(width: 1280, height: 860)
         .windowToolbarStyle(.unified(showsTitle: true))
         .commands { DiskCommands(appManager: appManager) }
-        
+
         Settings {
             SettingsView()
         }
-        
+
         MenuBarExtra {
             MenuBarPanel()
                 .environmentObject(appManager)

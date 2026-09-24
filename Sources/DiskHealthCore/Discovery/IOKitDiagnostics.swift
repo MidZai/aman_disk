@@ -2,21 +2,35 @@ import Foundation
 import IOKit
 
 public enum IOKitDiagnostics {
+    /// Clés dont la valeur identifie l'appareil ou l'utilisateur.
+    static func isSensitive(_ key: String) -> Bool {
+        let k = key.lowercased()
+        return k.contains("serial") || k.contains("uuid") || k.contains("guid") || k.contains("wwn")
+            || k.contains("mac address") || k.contains("macaddress")
+    }
+
+    /// Valeur lisible et masquée. Récursive : IOKit range le numéro de série dans des dictionnaires
+    /// imbriqués (« Device Characteristics » › « Serial Number »), qui étaient recopiés tels quels.
     public static func maskValue(key: String, value: Any) -> String {
-        let lowerKey = key.lowercased()
-        if lowerKey.contains("serial") || lowerKey.contains("uuid") || lowerKey.contains("guid") {
+        if isSensitive(key) {
             return "<masqué>"
         }
+        if let dict = value as? [String: Any] {
+            let inner = dict.keys.sorted().map { "\($0)=\(maskValue(key: $0, value: dict[$0]!))" }
+            return "{" + inner.joined(separator: ", ") + "}"
+        }
+        if let array = value as? [Any] {
+            return "(" + array.map { maskValue(key: key, value: $0) }.joined(separator: ", ") + ")"
+        }
         if let s = value as? String {
-            // Check for UUID-like format (8-4-4-4-12 hex)
+            // Format UUID (8-4-4-4-12 hexadécimal).
             if s.count == 36 && s.filter({ $0 == "-" }).count == 4 {
                 return "<masqué>"
             }
             return s
         }
         if CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID() {
-            let b = CFBooleanGetValue((value as! CFBoolean))
-            return b ? "true" : "false"
+            return CFBooleanGetValue((value as! CFBoolean)) ? "true" : "false"
         }
         if let n = value as? NSNumber {
             return n.stringValue
@@ -26,7 +40,7 @@ public enum IOKitDiagnostics {
         }
         return "\(value)"
     }
-    
+
     public static func sanitizeProperties(_ dict: [String: Any]) -> [String: String] {
         var result: [String: String] = [:]
         for (k, v) in dict {
@@ -36,23 +50,7 @@ public enum IOKitDiagnostics {
     }
     
     public static func collectParentChain(bsdName: String) -> [IOKitNodeDiagnostic] {
-        var iterator: io_iterator_t = 0
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOMedia"), &iterator) == kIOReturnSuccess else {
-            return []
-        }
-        
-        var targetService: io_object_t = 0
-        var service = IOIteratorNext(iterator)
-        while service != 0 {
-            if let name = IORegistryEntrySearchCFProperty(service, kIOServicePlane, "BSD Name" as CFString, kCFAllocatorDefault, 0) as? String, name == bsdName {
-                targetService = service
-                break
-            }
-            IOObjectRelease(service)
-            service = IOIteratorNext(iterator)
-        }
-        IOObjectRelease(iterator)
-        
+        let targetService = IOServiceGetMatchingService(kIOMainPortDefault, IOBSDNameMatching(kIOMainPortDefault, 0, bsdName))
         guard targetService != 0 else { return [] }
         
         var chain: [IOKitNodeDiagnostic] = []

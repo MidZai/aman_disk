@@ -1,9 +1,10 @@
-import XCTest
+import Testing
+import Foundation
 @testable import DiskHealthApp
 import DiskHealthCore
 
-final class DiskFilterTests: XCTestCase {
-    func testDiskFiltering() {
+@Suite final class DiskFilterTests {
+    @Test func testDiskFiltering() {
         let internalDisk = PhysicalDisk(bsdName: "disk0", model: "Internal SSD", sizeBytes: 500, isInternal: true, connection: .nvmeInternal, volumeNames: ["Macintosh HD"], protocolType: .nvme, mediumType: .solidState, healthCapability: .supported, isVirtual: false, isDiskImage: false)
         let virtualDisk = PhysicalDisk(bsdName: "disk1", model: "Virtual Disk", sizeBytes: 100, isInternal: true, connection: .other, volumeNames: ["Virtual Vol"], protocolType: .unknown, mediumType: .unknown, healthCapability: .unsupported(reason: .smartDisabled), isVirtual: true, isDiskImage: false)
         let dmg1 = PhysicalDisk(bsdName: "disk2", model: "Disk Image", sizeBytes: 10, isInternal: true, connection: .other, volumeNames: ["DMG Vol 1"], protocolType: .unknown, mediumType: .unknown, healthCapability: .unsupported(reason: .smartDisabled), isVirtual: false, isDiskImage: true)
@@ -25,10 +26,10 @@ final class DiskFilterTests: XCTestCase {
         
         let (filteredDisks, filteredVols) = DiskFilter.filter(disks: disks, volumes: volumes)
         
-        XCTAssertEqual(filteredDisks.count, 1)
-        XCTAssertEqual(filteredDisks[0].id, "disk0")
+        #expect(filteredDisks.count == 1)
+        #expect(filteredDisks[0].id == "disk0")
         
-        XCTAssertEqual(filteredVols.count, 1)
-        XCTAssertEqual(filteredVols[0].bsdName, "disk0s1")
+        #expect(filteredVols.count == 1)
+        #expect(filteredVols[0].bsdName == "disk0s1")
     }
 }

@@ -1,390 +1,293 @@
 import SwiftUI
+import Charts
 import DiskHealthCore
-
 import BenchmarkCore
 
+/// Page A4 du rapport PDF. Toujours en clair (le PDF est imprimé ou partagé, quel que soit le thème du Mac).
 struct ReportPageView: View {
-    let disk: RealDisk
+    enum Page { case summary, details }
+
+    static let pageSize = CGSize(width: 595, height: 842)
+
+    static func pages(for report: ReportData) -> [Page] {
+        report.disk.snapshot == nil && report.benchmark == nil ? [.summary] : [.summary, .details]
+    }
+
+    let report: ReportData
+    let page: Page
     let pageNumber: Int
-    let includeHistory: Bool
-    var benchmarkResult: BenchmarkResult? = nil
-    
+    let pageCount: Int
+
+    private var disk: RealDisk { report.disk }
+
+    private enum Palette {
+        static let text = Color(red: 0.11, green: 0.11, blue: 0.12)
+        static let secondary = Color(red: 0.43, green: 0.43, blue: 0.45)
+        static let rule = Color(red: 0.90, green: 0.90, blue: 0.92)
+        static let stripe = Color(red: 0.965, green: 0.965, blue: 0.97)
+        static let accent = Color(red: 0.18, green: 0.62, blue: 0.84)
+
+        static func status(_ status: HealthStatus) -> Color {
+            switch status {
+            case .good: return Color(red: 0.14, green: 0.54, blue: 0.24)
+            case .caution: return Color(red: 0.79, green: 0.20, blue: 0.0)
+            case .bad: return Color(red: 0.84, green: 0.0, blue: 0.08)
+            case .unknown: return secondary
+            }
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Aman Disk")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Color(hex: "#1D1D1F"))
-                    Text("Rapport d'état de santé")
-                        .font(.system(size: 10))
-                        .foregroundColor(Color(hex: "#6E6E73"))
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(formatter.string(from: Date()))
-                        .font(.system(size: 10))
-                        .foregroundColor(Color(hex: "#6E6E73"))
-                    Text("Page \(pageNumber)")
-                        .font(.system(size: 10))
-                        .foregroundColor(Color(hex: "#6E6E73"))
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            pageHeader
+            Rectangle().fill(Palette.rule).frame(height: 1).padding(.vertical, 14)
+            switch page {
+            case .summary: summaryPage
+            case .details: detailsPage
             }
-            .padding(.bottom, 16)
-            
-            Divider()
-                .background(Color(hex: "#E5E5EA"))
-                .padding(.bottom, 20)
-            
-            if pageNumber == 1 {
-                page1Content
-            } else {
-                page2Content
-            }
-            
             Spacer(minLength: 0)
+            Text(ExportService.methodText.joined(separator: " "))
+                .font(.system(size: 7.5))
+                .foregroundStyle(Palette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(40)
-        .frame(width: 595, height: 842) // A4 format
+        .frame(width: Self.pageSize.width, height: Self.pageSize.height, alignment: .topLeading)
         .background(Color.white)
+        .foregroundStyle(Palette.text)
+        .environment(\.colorScheme, .light)
     }
-    
-    @ViewBuilder
-    private var page1Content: some View {
+
+    private var pageHeader: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Aman Disk").font(.system(size: 14, weight: .bold))
+                Text(L("Drive health report", "Rapport de santé du disque")).font(.system(size: 10)).foregroundStyle(Palette.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(Formatters.longDate(report.generatedAt))
+                Text(L("Page \(pageNumber) of \(pageCount)", "Page \(pageNumber) sur \(pageCount)"))
+            }
+            .font(.system(size: 9))
+            .foregroundStyle(Palette.secondary)
+        }
+    }
+
+    // MARK: Page 1
+
+    private var summaryPage: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Résumé")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(Color(hex: "#1D1D1F"))
-            
-            Text(disk.physical.model)
-                .font(.system(size: 13))
-                .foregroundColor(Color(hex: "#6E6E73"))
-            
+            VStack(alignment: .leading, spacing: 3) {
+                Text(disk.physical.model).font(.system(size: 18, weight: .bold))
+                Text("\(Formatters.bytes(disk.physical.sizeBytes)) · \(disk.physical.mediumLabel) \(disk.physical.locationLabel.lowercased()) · \(disk.physical.interfaceLabel)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Palette.secondary)
+            }
+
             // Verdict
             HStack(spacing: 0) {
-                Rectangle()
-                    .fill(statusColor)
-                    .frame(width: 4)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(statusString)
-                        .font(.system(size: 16, weight: .semibold))
-                    Text(disk.health.reasons.first ?? "Aucune anomalie détectée.")
-                        .font(.system(size: 11))
+                Rectangle().fill(Palette.status(disk.health.status)).frame(width: 4)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(disk.health.status.localizedLabel)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Palette.status(disk.health.status))
+                    ForEach(disk.health.reasons, id: \.self) { reason in
+                        Text(reason).font(.system(size: 10))
+                    }
+                    Text(L("Remaining life: ", "Durée de vie restante : ") + (disk.knownLifePercent.map { "\($0)\(Formatters.unitSpace)%" } ?? L("not reported by this drive", "non fournie par ce disque")))
+                        .font(.system(size: 10, weight: .medium))
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                Spacer()
+                .padding(.vertical, 9)
+                Spacer(minLength: 0)
             }
-            .background(statusColor.opacity(0.08))
-            .cornerRadius(10)
-            .padding(.bottom, 8)
-            
-            sectionHeader("1. Identification")
-            
-            HStack(alignment: .top, spacing: 40) {
-                VStack(alignment: .leading, spacing: 6) {
-                    infoRow("Modèle", disk.physical.model)
-                    let serial = disk.serialNumber
-                    infoRow("Numéro de série", serial ?? "Inconnu")
-                    let fw = disk.firmware
-                    infoRow("Firmware", fw ?? "Inconnu")
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    infoRow("Capacité", Formatters.bytes(disk.physical.sizeBytes))
-                    infoRow("Interface", disk.physical.connection.rawValue)
-                    infoRow("Emplacement", disk.physical.isInternal ? "Interne" : "Externe")
-                }
-            }
-            .padding(.bottom, 12)
-            
-            sectionHeader("2. Indicateurs clés")
-            if let snap = disk.snapshot {
-                HStack(alignment: .top, spacing: 40) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        switch snap {
-                        case .nvme(let smart, _):
-                            infoRow("Température", "\(smart.temperatureCelsius ?? 0) °C")
-                            infoRow("Endurance utilisée", "\(smart.percentageUsed) %")
-                            infoRow("Réserve disponible", "\(smart.availableSpare) %")
-                        case .ata(let ataSnap):
-                            let (tempStr, usedStr) = ataTempAndUsed(ataSnap: ataSnap)
-                            infoRow("Température", tempStr)
-                            infoRow("Endurance utilisée", usedStr)
-                            infoRow("Réserve disponible", "—")
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
-                        switch snap {
-                        case .nvme(let smart, _):
-                            let readTB = Double(smart.dataUnitsRead) * 512_000.0 / 1_000_000_000_000.0
-                            let writeTB = Double(smart.dataUnitsWritten) * 512_000.0 / 1_000_000_000_000.0
-                            infoRow("Données lues", String(format: "%.1f To", readTB))
-                            infoRow("Données écrites", String(format: "%.1f To", writeTB))
-                        case .ata(let ataSnap):
-                            let (readStr, writeStr) = ataReadWrite(ataSnap: ataSnap)
-                            infoRow("Données lues", readStr)
-                            infoRow("Données écrites", writeStr)
-                        }
-                    }
-                }
-            }
-            
-            if !includeHistory {
-                Spacer().frame(height: 20)
-                smartTable
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private var page2Content: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if let res = benchmarkResult {
-                benchmarkSection(res)
-                Spacer().frame(height: 20)
-            }
-            
-            if includeHistory {
-                smartTable
-            }
-            
-            Spacer().frame(height: 20)
-            
-            Text("Méthode et limites")
-                .font(.system(size: 10, weight: .semibold))
-            Text("L'état de santé est calculé à partir des données déclarées par le contrôleur du disque au moment de la lecture. Il reflète l'usure et les erreurs connues du disque, mais ne peut pas garantir l'absence de panne future. Sauvegardez régulièrement vos données.")
-                .font(.system(size: 9))
-                .foregroundColor(Color(hex: "#6E6E73"))
-        }
-    }
-    
-    @ViewBuilder
-    private func benchmarkSection(_ res: BenchmarkResult) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Performances")
-            
-            HStack(spacing: 20) {
-                infoRow("Date", formatter.string(from: res.date))
-                infoRow("Profil", res.profile.label)
-                infoRow("Taille", Formatters.bytes(res.fileSize))
-            }
-            
-            let tempStr = res.conditions.temperatureMaxC != nil ? "\(res.conditions.temperatureMaxC!) °C" : "N/A"
-            let batStr = res.conditions.onBattery == true ? "Sur batterie" : "Sur secteur"
-            HStack(spacing: 20) {
-                infoRow("Volume", res.conditions.volumeName)
-                infoRow("Conditions", "\(batStr) · Temp max \(tempStr)")
-                if res.conditions.encrypted == true {
-                    infoRow("Chiffrement", "Oui (FileVault)")
-                }
-            }
-            
-            Spacer().frame(height: 8)
-            
-            // Minimal grid
-            HStack(spacing: 0) {
-                Text("Test").frame(width: 100, alignment: .leading).font(.system(size: 9.5, weight: .bold))
-                Text("Lecture (Mo/s)").frame(width: 100, alignment: .trailing).font(.system(size: 9.5, weight: .bold))
-                Text("Écriture (Mo/s)").frame(width: 100, alignment: .trailing).font(.system(size: 9.5, weight: .bold))
-            }
-            .padding(.bottom, 4)
-            
-            let order = ["SEQ1M_QD8", "SEQ1M_QD1", "RND4K_QD64", "RND4K_QD1"]
-            ForEach(order, id: \.self) { specId in
-                if let readTest = res.tests.first(where: { $0.spec.id == specId && $0.direction == .read }),
-                   let writeTest = res.tests.first(where: { $0.spec.id == specId && $0.direction == .write }) {
-                    
-                    let rLabel = BenchMath.best(readTest.passes).map { String(format: "%.1f", BenchMath.megabytesPerSecond(bytes: $0.bytes, seconds: $0.seconds)) } ?? "—"
-                    let wLabel = BenchMath.best(writeTest.passes).map { String(format: "%.1f", BenchMath.megabytesPerSecond(bytes: $0.bytes, seconds: $0.seconds)) } ?? "—"
-                    
-                    HStack(spacing: 0) {
-                        Text(readTest.spec.label).frame(width: 100, alignment: .leading).font(.system(size: 9.5))
-                        Text(rLabel).frame(width: 100, alignment: .trailing).font(.system(size: 9.5))
-                        Text(wLabel).frame(width: 100, alignment: .trailing).font(.system(size: 9.5))
-                    }
-                    .padding(.vertical, 2)
-                    Divider()
-                }
-            }
-            
-            Text("Valeur affichée : la meilleure passe. La médiane de toutes les passes figure dans le rapport complet.")
-                .font(.system(size: 8))
-                .foregroundColor(Color(hex: "#6E6E73"))
-                .padding(.top, 4)
-        }
-    }
-    
-    private var smartTable: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(disk.physical.protocolType == .nvme ? "Détail NVMe SMART / Health" : "Attributs S.M.A.R.T.")
-            
-            HStack {
-                Text("ID").frame(width: 40, alignment: .leading)
-                Text("Attribut").frame(maxWidth: .infinity, alignment: .leading)
-                Text("Valeur").frame(width: 120, alignment: .trailing)
-                Text("État").frame(width: 80, alignment: .leading)
-            }
-            .font(.system(size: 9.5, weight: .semibold))
-            .foregroundColor(Color(hex: "#6E6E73"))
-            .padding(.vertical, 4)
-            .background(Color(hex: "#F5F5F7"))
-            
-            if let snap = disk.snapshot {
-                switch snap {
-                case .nvme(let smart, let identify):
-                    let attrs = NVMeAttributeCatalog.attributes(from: smart, identify: identify)
-                    ForEach(Array(attrs.enumerated()), id: \.offset) { index, attr in
-                        HStack {
-                            Text("0x\(String(format: "%02X", attr.id))")
-                                .font(.system(size: 9.5, design: .monospaced))
-                                .frame(width: 40, alignment: .leading)
-                            Text(attr.name)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Text(attr.displayValue)
-                                .frame(width: 120, alignment: .trailing)
-                            Text(attr.state == .normal ? "Normal" : (attr.state == .warning ? "Attention" : (attr.state == .critical ? "Critique" : "—")))
-                                .frame(width: 80, alignment: .leading)
-                        }
-                        .font(.system(size: 9.5))
-                        .padding(.vertical, 4)
-                        .background(index % 2 == 0 ? Color.white : Color(hex: "#F5F5F7").opacity(0.3))
-                    }
-                case .ata(let ataSnap):
-                    let profile = ATACatalog.profile(for: ataSnap.model)
-                    let unified = ataSnap.attributes.map { attr -> UnifiedAttribute in
-                        let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-                        var state: AttributeState = .normal
-                        if attr.threshold > 0 && attr.current <= attr.threshold {
-                            state = .critical
-                        } else if info.role == .reallocated || info.role == .pending || info.role == .uncorrectable {
-                            if attr.rawValue > 0 { state = .warning }
-                        }
-                        let displayValue = attr.value(for: info.role).map { Formatters.integer($0) } ?? "\(attr.current)"
-                        return UnifiedAttribute(id: attr.id, name: info.name, technicalName: "", explanation: info.explanation, valueCurrent: "\(attr.current)", worst: "\(attr.worst)", threshold: "\(attr.threshold)", donnee: displayValue, rawHex: "\(attr.rawValue)", state: state, isInformational: false)
-                    }
-                    ForEach(unified) { attr in
-                        HStack {
-                            Text("0x\(String(format: "%02X", attr.id))")
-                                .font(.system(size: 9.5, design: .monospaced))
-                                .frame(width: 40, alignment: .leading)
-                            Text(attr.name)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Text(attr.donnee)
-                                .frame(width: 120, alignment: .trailing)
-                            Text(attr.state == .normal ? "Normal" : (attr.state == .warning ? "Attention" : (attr.state == .critical ? "Critique" : "—")))
-                                .frame(width: 80, alignment: .leading)
-                        }
-                        .font(.system(size: 9.5))
-                        .padding(.vertical, 4)
-                        .background(Color.white)
-                    }
-                }
-            }
-        }
-    }
-    
-    private func sectionHeader(_ title: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color(hex: "#1D1D1F"))
-            Divider().background(Color(hex: "#E5E5EA"))
-        }
-    }
-    
-    private func infoRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(label)
-                .font(.system(size: 10.5))
-                .foregroundColor(Color(hex: "#6E6E73"))
-                .frame(width: 120, alignment: .leading)
-            Text(value)
-                .font(.system(size: 10.5))
-                .foregroundColor(Color(hex: "#1D1D1F"))
-        }
-    }
-    
-    private func ataTempAndUsed(ataSnap: ATASmartSnapshot) -> (String, String) {
-        let profile = ATACatalog.profile(for: ataSnap.model)
-        var tempStr = "—"
-        var usedStr = "—"
-        for attr in ataSnap.attributes {
-            let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-            if info.role == .temperature, let t = attr.value(for: .temperature) { tempStr = "\(t) °C" }
-            if info.role == .lifeRemainingPercentNormalized { usedStr = "\(100 - attr.current) %" }
-        }
-        return (tempStr, usedStr)
-    }
-    
-    private func ataReadWrite(ataSnap: ATASmartSnapshot) -> (String, String) {
-        let profile = ATACatalog.profile(for: ataSnap.model)
-        var readStr = "—"
-        var writeStr = "—"
-        for attr in ataSnap.attributes {
-            let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-            if case .hostReadsBytes(let mult) = info.role {
-                let readTB = Double(attr.rawValue * mult) / 1_000_000_000_000.0
-                readStr = String(format: "%.1f To", readTB)
-            }
-            if case .hostWritesBytes(let mult) = info.role {
-                let writeTB = Double(attr.rawValue * mult) / 1_000_000_000_000.0
-                writeStr = String(format: "%.1f To", writeTB)
-            }
-        }
-        return (readStr, writeStr)
-    }
-    
-    private var statusColor: Color {
-        switch disk.health.status {
-        case .good: return Color(hex: "#248A3D")
-        case .caution: return Color(hex: "#C93400")
-        case .bad: return Color(hex: "#D70015")
-        case .unknown: return Color(hex: "#6E6E73")
-        }
-    }
-    
-    private var statusString: String {
-        switch disk.health.status {
-        case .good: return "En bonne santé"
-        case .caution: return "À surveiller"
-        case .bad: return "Défaillance probable"
-        case .unknown: return "Santé inconnue"
-        }
-    }
-    
-    private var formatter: DateFormatter {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.dateStyle = .long
-        f.timeStyle = .short
-        return f
-    }
-}
+            .background(Palette.status(disk.health.status).opacity(0.07))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
 
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
+            sectionHeader("Identification")
+            HStack(alignment: .top, spacing: 30) {
+                VStack(alignment: .leading, spacing: 5) {
+                    infoRow(L("Model", "Modèle"), disk.physical.model)
+                    infoRow(L("Serial number", "Numéro de série"), report.serialText)
+                    infoRow("Firmware", disk.firmware ?? L("Unknown", "Inconnu"))
+                }
+                VStack(alignment: .leading, spacing: 5) {
+                    infoRow(L("Capacity", "Capacité"), Formatters.bytes(disk.physical.sizeBytes))
+                    infoRow("Interface", disk.physical.interfaceLabel)
+                    infoRow(L("Read on", "Relevé"), Formatters.date(disk.lastRead))
+                }
+            }
+
+            if let metrics = disk.metrics {
+                sectionHeader(L("Key indicators", "Indicateurs clés"))
+                let items = ExportService.keyIndicators(metrics, disk: disk)
+                let half = (items.count + 1) / 2
+                HStack(alignment: .top, spacing: 30) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(items.prefix(half), id: \.0) { infoRow($0.0, $0.1) }
+                    }
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(items.dropFirst(half), id: \.0) { infoRow($0.0, $0.1) }
+                    }
+                }
+            }
+
+            if report.options.includeHistory {
+                sectionHeader(L("Temperature over 7 days", "Température sur 7 jours"))
+                if report.history.points.count >= 2 {
+                    historyChart
+                        .frame(height: 150)
+                    Text(TemperatureHistoryView.legendText(report.history))
+                        .font(.system(size: 9))
+                        .foregroundStyle(Palette.secondary)
+                } else {
+                    Text(L("Not enough measurements yet.", "Pas encore assez de mesures."))
+                        .font(.system(size: 10))
+                        .foregroundStyle(Palette.secondary)
+                }
+            }
         }
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
+    }
+
+    private var historyChart: some View {
+        let agg = report.history
+        let yMin = Double(max(0, (agg.min ?? 0) - 5))
+        let yMax = Double((agg.max ?? 0) + 5)
+        let end = report.generatedAt
+        return Chart(agg.points) { point in
+            if let lo = point.minTemperature, let hi = point.maxTemperature {
+                AreaMark(x: .value("Date", point.date), yStart: .value("Min", lo), yEnd: .value("Max", hi),
+                         series: .value("Segment", point.segment))
+                    .foregroundStyle(Palette.accent.opacity(0.18))
+            }
+            LineMark(x: .value("Date", point.date), y: .value("Moyenne", point.temperature),
+                     series: .value("Segment", point.segment))
+                .foregroundStyle(Palette.accent)
+                .lineStyle(StrokeStyle(lineWidth: 1.2))
+        }
+        .chartXScale(domain: end.addingTimeInterval(-7 * 24 * 3600)...end)
+        .chartYScale(domain: yMin...yMax)
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .day)) { _ in
+                AxisGridLine().foregroundStyle(Palette.rule)
+                AxisValueLabel(format: .dateTime.weekday(.abbreviated).day())
+                    .font(.system(size: 8))
+                    .foregroundStyle(Palette.secondary)
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine().foregroundStyle(Palette.rule)
+                AxisValueLabel {
+                    if let v = value.as(Double.self) { Text("\(Int(v)) °C").font(.system(size: 8)).foregroundStyle(Palette.secondary) }
+                }
+            }
+        }
+    }
+
+    // MARK: Page 2
+
+    private var detailsPage: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let snapshot = disk.snapshot {
+                smartTable(snapshot)
+            }
+            if let bench = report.benchmark {
+                benchmarkSection(bench)
+            }
+        }
+    }
+
+    private func smartTable(_ snapshot: DiskHealthSnapshot) -> some View {
+        let rows = SmartRows.rows(for: snapshot)
+        let isATA: Bool = { if case .ata = snapshot { return true } else { return false } }()
+        return VStack(alignment: .leading, spacing: 0) {
+            sectionHeader(isATA ? L("S.M.A.R.T. attributes", "Attributs S.M.A.R.T.") : L("NVMe SMART / Health log", "Journal NVMe SMART / Health"))
+                .padding(.bottom, 6)
+            HStack(spacing: 6) {
+                Text("ID").frame(width: 30, alignment: .leading)
+                Text(L("Attribute", "Attribut")).frame(maxWidth: .infinity, alignment: .leading)
+                if isATA {
+                    Text(L("Cur.", "Act.")).frame(width: 28, alignment: .trailing)
+                    Text(L("Worst", "Pire")).frame(width: 28, alignment: .trailing)
+                    Text(L("Thres.", "Seuil")).frame(width: 30, alignment: .trailing)
+                }
+                Text(L("Value", "Valeur")).frame(width: 100, alignment: .trailing)
+                Text(L("Status", "État")).frame(width: 62, alignment: .leading)
+            }
+            .font(.system(size: 8.5, weight: .semibold))
+            .foregroundStyle(Palette.secondary)
+            .padding(.vertical, 3)
+            .background(Palette.stripe)
+
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, attr in
+                HStack(spacing: 6) {
+                    Text(attr.hexID).font(.system(size: 8.5, design: .monospaced)).frame(width: 30, alignment: .leading)
+                    Text(attr.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                    if isATA {
+                        Text(attr.current ?? "").frame(width: 28, alignment: .trailing)
+                        Text(attr.worst ?? "").frame(width: 28, alignment: .trailing)
+                        Text(attr.threshold ?? "").frame(width: 30, alignment: .trailing)
+                    }
+                    Text(attr.value).lineLimit(1).frame(width: 100, alignment: .trailing)
+                    Text(attr.state.localizedLabel)
+                        .foregroundStyle(attr.state == .normal || attr.state == .informational ? Palette.text : Palette.status(attr.state == .critical ? .bad : .caution))
+                        .frame(width: 62, alignment: .leading)
+                }
+                .font(.system(size: 8.5))
+                .padding(.vertical, 2.5)
+                .background(index.isMultiple(of: 2) ? Color.white : Palette.stripe)
+            }
+        }
+    }
+
+    private func benchmarkSection(_ res: BenchmarkResult) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionHeader(L("Latest performance test", "Dernier test de performances"))
+            Text(L("\(Formatters.date(res.date)) · \(res.profile.label), \(res.fileSize >> 30) GiB file · volume “\(res.conditions.volumeName)”", "\(Formatters.date(res.date)) · \(res.profile.label), fichier de \(res.fileSize >> 30) Gio · volume « \(res.conditions.volumeName) »"))
+                .font(.system(size: 9))
+                .foregroundStyle(Palette.secondary)
+            HStack(spacing: 0) {
+                Text("Test").frame(width: 110, alignment: .leading)
+                Text(L("Read", "Lecture")).frame(width: 110, alignment: .trailing)
+                Text(L("Write", "Écriture")).frame(width: 110, alignment: .trailing)
+            }
+            .font(.system(size: 9, weight: .semibold))
+            ForEach(BenchTestSpec.defaultGrid, id: \.id) { spec in
+                HStack(spacing: 0) {
+                    Text(spec.label).frame(width: 110, alignment: .leading)
+                    Text(ExportService.speedText(res, spec, .read)).frame(width: 110, alignment: .trailing)
+                    Text(res.profile.includesWrites ? ExportService.speedText(res, spec, .write) : L("not tested", "non testé")).frame(width: 110, alignment: .trailing)
+                }
+                .font(.system(size: 9))
+                .monospacedDigit()
+            }
+            Text(ExportService.benchmarkConditions(res))
+                .font(.system(size: 8))
+                .foregroundStyle(Palette.secondary)
+            Text(Strings.benchHelpValues)
+                .font(.system(size: 8))
+                .foregroundStyle(Palette.secondary)
+        }
+    }
+
+    // MARK: Outils
+
+    private func sectionHeader(_ title: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.system(size: 11.5, weight: .semibold))
+            Rectangle().fill(Palette.rule).frame(height: 1)
+        }
+    }
+
+    private func infoRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label)
+                .foregroundStyle(Palette.secondary)
+                .frame(width: 118, alignment: .leading)
+            Text(value)
+        }
+        .font(.system(size: 10))
     }
 }

@@ -1,381 +1,295 @@
 import SwiftUI
 import DiskHealthCore
 
-// MARK: - UnifiedAttribute
+// MARK: - Modèle commun NVMe / ATA
 
 struct UnifiedAttribute: Identifiable {
     let id: UInt8
-    let name: String              // French catalog name
-    let technicalName: String // Technical name → shown in ⓘ popover
+    let name: String
+    /// Nom technique, affiché dans la bulle d'aide.
+    let technicalName: String
     let explanation: String
-    /// Normalized value (0-255 for ATA, formatted value for NVMe)
-    let valueCurrent: String
-    /// Worst ever (ATA only)
+    /// Valeur normalisée (ATA seulement : 0 à 255, plus haut = mieux).
+    let current: String?
     let worst: String?
-    /// Threshold (ATA only)
     let threshold: String?
-    /// Interpreted / human-readable value (e.g. "40 °C", "31 495 h")
-    let donnee: String
-    /// 6 raw bytes as hex (e.g. "0x00000000 7B07")
+    /// Valeur interprétée, avec son unité (« 40 °C », « 31 495 h », « 12,3 To »).
+    let value: String
+    /// Valeur brute en hexadécimal.
     let rawHex: String
     let state: AttributeState
-    let isInformational: Bool
+
+    var hexID: String { String(format: "0x%02X", id) }
 }
 
-// MARK: - SmartTableView
+enum SmartRows {
+    static func rows(for snapshot: DiskHealthSnapshot) -> [UnifiedAttribute] {
+        switch snapshot {
+        case .nvme(let log, let identify):
+            return NVMeAttributeCatalog.attributes(from: log, identify: identify).map { a in
+                UnifiedAttribute(id: a.id, name: a.name, technicalName: "", explanation: a.explanation,
+                                 current: nil, worst: nil, threshold: nil,
+                                 value: a.displayValue, rawHex: a.rawValue, state: a.state)
+            }
+        case .ata(let ata):
+            let profile = ATACatalog.profile(for: ata.model)
+            return ata.attributes.map { attr in
+                let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
+                let (explanation, technical) = split(info.explanation)
+                return UnifiedAttribute(
+                    id: attr.id,
+                    name: info.name,
+                    technicalName: technical,
+                    explanation: explanation,
+                    current: "\(attr.current)",
+                    worst: "\(attr.worst)",
+                    threshold: attr.threshold == 0 ? "—" : "\(attr.threshold)",
+                    value: interpretedValue(attr, role: info.role),
+                    rawHex: String(format: "0x%012llX", attr.rawValue),
+                    state: state(of: attr, role: info.role)
+                )
+            }
+        }
+    }
 
+    /// Même règle que `ATAHealthEvaluator` : valeur sous le seuil = critique ; seuil franchi par le
+    /// passé ou secteurs défectueux = à surveiller.
+    static func state(of attr: ATASmartAttribute, role: ATARole) -> AttributeState {
+        if attr.threshold > 0 && attr.current <= attr.threshold { return .critical }
+        if attr.threshold > 0 && attr.worst <= attr.threshold { return .warning }
+        switch role {
+        case .reallocated, .pending, .uncorrectable:
+            return attr.rawValue > 0 ? .warning : .normal
+        default:
+            return .normal
+        }
+    }
+
+    static func interpretedValue(_ attr: ATASmartAttribute, role: ATARole) -> String {
+        switch role {
+        case .temperature:
+            return attr.value(for: role).map { Formatters.temperature(Int($0)) } ?? "—"
+        case .powerOnHours:
+            return attr.value(for: role).map(Formatters.hours) ?? "—"
+        case .powerCycles, .unsafeShutdowns, .reallocated, .pending, .uncorrectable:
+            return attr.value(for: role).map(Formatters.integer) ?? "—"
+        case .hostWritesBytes, .hostReadsBytes:
+            return attr.value(for: role).map(Formatters.bytes) ?? "—"
+        case .lifeRemainingPercentNormalized:
+            return L("\(attr.current)\(Formatters.unitSpace)% remaining", "\(attr.current)\(Formatters.unitSpace)% restants")
+        case .none:
+            return Formatters.integer(attr.rawValue)
+        }
+    }
+
+    /// Le catalogue ajoute « Nom technique : … » à la fin de l'explication.
+    private static func split(_ explanation: String) -> (String, String) {
+        guard let range = explanation.range(of: L("\n\nTechnical name: ", "\n\nNom technique : ")) else { return (explanation, "") }
+        return (String(explanation[..<range.lowerBound]),
+                String(explanation[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+}
+
+// MARK: - Tableau
+
+/// Tableau S.M.A.R.T. en vues simples (≤ 30 lignes). Un `Table` SwiftUI (NSTableView) imbriqué
+/// dans la page défilante interceptait la molette et faisait saccader le défilement.
 struct SmartTableView: View {
     @EnvironmentObject var appManager: AppManager
     let disk: RealDisk
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-
-            if let snap = disk.snapshot {
-                switch snap {
-                case .nvme(let smartLog, let identify):
-                    let attrs = NVMeAttributeCatalog.attributes(from: smartLog, identify: identify)
-                    let unified = attrs.map { a -> UnifiedAttribute in
-                        UnifiedAttribute(
-                            id: a.id,
-                            name: a.name,
-                            technicalName: a.name,  // NVMe names are already technical
-                            explanation: a.explanation,
-                            valueCurrent: a.displayValue,
-                            worst: nil,
-                            threshold: nil,
-                            donnee: a.displayValue,
-                            rawHex: a.rawValue,
-                            state: a.state,
-                            isInformational: a.state == .informational
-                        )
+        if let snapshot = disk.snapshot {
+            let rows = SmartRows.rows(for: snapshot)
+            let isATA: Bool = { if case .ata = snapshot { return true } else { return false } }()
+            VStack(alignment: .leading, spacing: 12) {
+                header(snapshot)
+                VStack(spacing: 0) {
+                    SmartHeaderRow(isATA: isATA, showRaw: appManager.showRawValues)
+                    Divider()
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, attr in
+                        SmartRow(attr: attr, isATA: isATA, showRaw: appManager.showRawValues)
+                            .background(index.isMultiple(of: 2) ? Color.clear : Color.secondary.opacity(0.06))
                     }
-                    nvmeTable(unified)
-
-                case .ata(let ataSnap):
-                    let profile = ATACatalog.profile(for: ataSnap.model)
-                    let unified = ataSnap.attributes.map { attr -> UnifiedAttribute in
-                        let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-
-                        // Determine state
-                        var state: AttributeState = .normal
-                        if attr.threshold > 0 && attr.current <= attr.threshold {
-                            state = .critical
-                        } else if info.role == .reallocated || info.role == .pending || info.role == .uncorrectable {
-                            if attr.rawValue > 0 { state = .warning }
-                        }
-
-                        // Donnée: human-readable interpretation
-                        let donnee: String
-                        switch info.role {
-                        case .temperature:
-                            if let t = attr.value(for: info.role) { donnee = "\(t) °C" }
-                            else { donnee = "—" }
-                        case .powerOnHours:
-                            if let h = attr.value(for: info.role) { donnee = Formatters.hours(h) }
-                            else { donnee = "—" }
-                        case .powerCycles, .unsafeShutdowns:
-                            if let v = attr.value(for: info.role) { donnee = Formatters.integer(v) }
-                            else { donnee = "—" }
-                        case .reallocated, .pending, .uncorrectable:
-                            donnee = Formatters.integer(attr.rawValue)
-                        case .hostWritesBytes(let mult):
-                            let bytes = attr.rawValue * mult
-                            donnee = Formatters.bytes(bytes)
-                        case .hostReadsBytes(let mult):
-                            let bytes = attr.rawValue * mult
-                            donnee = Formatters.bytes(bytes)
-                        case .lifeRemainingPercentNormalized:
-                            donnee = "\(attr.current) %"
-                        case .none:
-                            donnee = "—"
-                        }
-
-                        // Raw hex: 6 bytes split "0xXXXXXXXX XXXX"
-                        let rawArr = attr.raw  // [UInt8], 6 bytes, LSB first
-                        // Pad to 6 if shorter
-                        var r = Array(rawArr.prefix(6))
-                        while r.count < 6 { r.append(0) }
-                        let hi32 = String(format: "%02X%02X%02X%02X", r[3], r[2], r[1], r[0])
-                        let lo16 = String(format: "%02X%02X", r[5], r[4])
-                        let rawHex = "0x\(hi32) \(lo16)"
-
-                        let thresholdStr = attr.threshold == 0 ? "—" : "\(attr.threshold)"
-                        let isInfo = state == .informational
-
-                        // Extract the technical name from the explanation (after "\n\nNom technique : ")
-                        let stName: String
-                        if let range = info.explanation.range(of: "\n\nNom technique : ") {
-                            stName = String(info.explanation[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                        } else {
-                            stName = ""
-                        }
-                        // Explanation without the technical name suffix
-                        let cleanExpl: String
-                        if let range = info.explanation.range(of: "\n\nNom technique : ") {
-                            cleanExpl = String(info.explanation[..<range.lowerBound])
-                        } else {
-                            cleanExpl = info.explanation
-                        }
-
-                        return UnifiedAttribute(
-                            id: attr.id,
-                            name: info.name,
-                            technicalName: stName,
-                            explanation: cleanExpl,
-                            valueCurrent: "\(attr.current)",
-                            worst: "\(attr.worst)",
-                            threshold: thresholdStr,
-                            donnee: donnee,
-                            rawHex: rawHex,
-                            state: state,
-                            isInformational: isInfo
-                        )
-                    }
-                    ataTable(unified)
                 }
+                .background(Color(nsColor: .textBackgroundColor).opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.secondary.opacity(0.2)))
             }
+            .padding(16)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.secondary.opacity(0.15)))
         }
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
-        )
     }
 
-    // MARK: - Header
-
-    private var header: some View {
+    private func header(_ snapshot: DiskHealthSnapshot) -> some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Attributs S.M.A.R.T.")
+                Text(L("S.M.A.R.T. attributes", "Attributs S.M.A.R.T."))
                     .font(.headline)
-
-                if let snap = disk.snapshot {
-                    switch snap {
-                    case .nvme:
-                        Text("Journal NVMe SMART / Health Information")
+                switch snapshot {
+                case .nvme:
+                    Text(L("NVMe “SMART / Health Information” log", "Journal NVMe « SMART / Health Information »"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                case .ata(let ata):
+                    Text(L("ATA S.M.A.R.T. · normalized values: higher is better, the threshold is set by the manufacturer", "ATA S.M.A.R.T. · valeurs normalisées : plus haut = mieux, le seuil est fixé par le fabricant"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if !ata.checksumValid {
+                        Label(L("Data not verified (bad checksum)", "Données non vérifiées (somme de contrôle incorrecte)"), systemImage: "exclamationmark.triangle")
                             .font(.caption)
-                            .foregroundColor(.secondary)
-                    case .ata(let ata):
-                        Text("ATA S.M.A.R.T.")
+                            .foregroundStyle(.orange)
+                    }
+                    if !ata.thresholdsChecksumValid {
+                        Label(L("Thresholds not verified (bad checksum)", "Seuils non vérifiés (somme de contrôle incorrecte)"), systemImage: "exclamationmark.triangle")
                             .font(.caption)
-                            .foregroundColor(.secondary)
-                        if !ata.checksumValid {
-                            Text("Données non vérifiées (somme de contrôle incorrecte)")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                        }
-                        if !ata.thresholdsChecksumValid {
-                            Text("Seuils non vérifiés (somme de contrôle incorrecte)")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                        }
+                            .foregroundStyle(.orange)
                     }
                 }
             }
-
             Spacer()
-
-            Toggle("Valeurs brutes", isOn: $appManager.showRawValues.animation(.easeInOut(duration: 0.2)))
+            Toggle(L("Raw values", "Valeurs brutes"), isOn: $appManager.showRawValues)
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                .help(L("Shows raw values in hexadecimal (⌥⌘R)", "Affiche les valeurs brutes en hexadécimal (⌥⌘R)"))
         }
     }
-
-    // MARK: - NVMe table
-
-    private func nvmeTable(_ attrs: [UnifiedAttribute]) -> some View {
-        Table(attrs) {
-            TableColumn("ID") { attr in
-                idCell(attr)
-            }.width(40)
-
-            TableColumn("Attribut") { attr in
-                AttributeCell(attr: attr)
-                    .padding(.vertical, 6)
-                    .contextMenu { contextMenu(for: attr) }
-            }
-
-            TableColumn("Valeur") { attr in
-                Text(attr.valueCurrent)
-                    .font(.system(.body, design: .monospaced))
-                    .fontWeight(weight(for: attr.state))
-                    .foregroundColor(color(for: attr.state))
-                    .padding(.vertical, 6)
-                    .contextMenu { contextMenu(for: attr) }
-            }.width(180)
-
-            TableColumn(appManager.showRawValues ? "Brute" : "Donnée") { attr in
-                if appManager.showRawValues {
-                    Text(attr.rawHex)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.secondary)
-                        .textSelection(.enabled)
-                        .padding(.vertical, 6)
-                } else {
-                    Text(attr.donnee)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 6)
-                }
-            }.width(180)
-
-            TableColumn("État") { attr in
-                stateCell(attr)
-            }.width(100)
-        }
-        .environment(\.defaultMinListRowHeight, 32)
-        .tableStyle(.bordered)
-        .frame(minHeight: CGFloat(38 + (attrs.count * 32)))
-    }
-
-    // MARK: - ATA table
-
-    private func ataTable(_ attrs: [UnifiedAttribute]) -> some View {
-        Table(attrs) {
-            TableColumn("ID") { attr in
-                idCell(attr)
-            }.width(40)
-
-            TableColumn("Attribut") { attr in
-                AttributeCell(attr: attr)
-                    .padding(.vertical, 6)
-                    .contextMenu { contextMenu(for: attr) }
-            }
-
-            TableColumn("Valeur") { attr in
-                Text(attr.valueCurrent)
-                    .font(.system(.body, design: .monospaced))
-                    .fontWeight(weight(for: attr.state))
-                    .foregroundColor(color(for: attr.state))
-                    .padding(.vertical, 6)
-                    .contextMenu { contextMenu(for: attr) }
-            }.width(70)
-
-            TableColumn("Pire") { attr in
-                Text(attr.worst ?? "—")
-                    .font(.system(.body, design: .monospaced))
-                    .padding(.vertical, 6)
-            }.width(55)
-
-            TableColumn("Seuil") { attr in
-                Text(attr.threshold ?? "—")
-                    .font(.system(.body, design: .monospaced))
-                    .padding(.vertical, 6)
-            }.width(55)
-
-            TableColumn(appManager.showRawValues ? "Brute" : "Donnée") { attr in
-                if appManager.showRawValues {
-                    Text(attr.rawHex)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.secondary)
-                        .textSelection(.enabled)
-                        .padding(.vertical, 6)
-                } else {
-                    Text(attr.donnee)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 6)
-                }
-            }.width(appManager.showRawValues ? 160 : 120)
-
-            TableColumn("État") { attr in
-                stateCell(attr)
-            }.width(100)
-        }
-        .environment(\.defaultMinListRowHeight, 32)
-        .tableStyle(.bordered)
-        .frame(minHeight: CGFloat(38 + (attrs.count * 32)))
-    }
-
-    // MARK: - Cells
-
-    @ViewBuilder private func idCell(_ attr: UnifiedAttribute) -> some View {
-        let hex = String(format: "0x%02X", attr.id)
-        Text(hex)
-            .font(.system(.subheadline, design: .monospaced))
-            .foregroundColor(.secondary)
-            .padding(.vertical, 6)
-            .contextMenu { contextMenu(for: attr) }
-    }
-
-    @ViewBuilder private func stateCell(_ attr: UnifiedAttribute) -> some View {
-        HStack(spacing: 8) {
-            if attr.isInformational {
-                Text("—").foregroundColor(.secondary)
-            } else {
-                Circle()
-                    .fill(color(for: attr.state))
-                    .frame(width: 8, height: 8)
-                Text(stateLabel(attr.state))
-                    .foregroundColor(.primary)
-            }
-        }
-        .padding(.vertical, 6)
-        .contextMenu { contextMenu(for: attr) }
-    }
-
-    @ViewBuilder
-    private func contextMenu(for attr: UnifiedAttribute) -> some View {
-        Button("Copier la valeur") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(attr.donnee, forType: .string)
-        }
-        Button("Copier la ligne") {
-            NSPasteboard.general.clearContents()
-            let hexID = String(format: "0x%02X", attr.id)
-            NSPasteboard.general.setString("\(hexID) \(attr.name) : \(attr.donnee)", forType: .string)
-        }
-    }
-
-    private func color(for state: AttributeState) -> Color { state.tableColor }
-    private func stateLabel(_ state: AttributeState) -> String { state.localizedLabel }
-    private func weight(for state: AttributeState) -> Font.Weight { state.fontWeight }
 }
 
-// MARK: - AttributeCell
+private enum SmartColumns {
+    static let id: CGFloat = 46
+    static let normalized: CGFloat = 52
+    static let value: CGFloat = 150
+    static let state: CGFloat = 112
+}
 
-struct AttributeCell: View {
-    let attr: UnifiedAttribute
-    @State private var showPopover = false
+private struct SmartHeaderRow: View {
+    let isATA: Bool
+    let showRaw: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text(attr.name)
-                .fontWeight(attr.state.fontWeight)
-                .foregroundColor(attr.state.tableColor)
-
-            Button {
-                showPopover.toggle()
-            } label: {
-                Image(systemName: "info.circle")
-                    .foregroundColor(.secondary)
+        HStack(spacing: 10) {
+            Text("ID").frame(width: SmartColumns.id, alignment: .leading)
+            Text(L("Attribute", "Attribut")).frame(maxWidth: .infinity, alignment: .leading)
+            if isATA {
+                Text(L("Current", "Actuelle")).frame(width: SmartColumns.normalized, alignment: .trailing)
+                    .help(L("Current normalized value", "Valeur normalisée actuelle"))
+                Text(L("Worst", "Pire")).frame(width: SmartColumns.normalized, alignment: .trailing)
+                    .help(L("Lowest normalized value reached", "Plus basse valeur normalisée atteinte"))
+                Text(L("Threshold", "Seuil")).frame(width: SmartColumns.normalized, alignment: .trailing)
+                    .help(L("Failure threshold set by the manufacturer", "Seuil de défaillance fixé par le fabricant"))
             }
-            .buttonStyle(.plain)
-            .popover(isPresented: $showPopover, arrowEdge: .bottom) {
-                popoverView
-            }
+            Text(showRaw ? L("Raw", "Brute") : L("Value", "Valeur")).frame(width: SmartColumns.value, alignment: .trailing)
+            Text(L("Status", "État")).frame(width: SmartColumns.state, alignment: .leading)
         }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+    }
+}
+
+private struct SmartRow: View {
+    let attr: UnifiedAttribute
+    let isATA: Bool
+    let showRaw: Bool
+    @State private var showInfo = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(attr.hexID)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: SmartColumns.id, alignment: .leading)
+
+            HStack(spacing: 5) {
+                Text(attr.name)
+                    .fontWeight(attr.state.fontWeight)
+                    .foregroundStyle(attr.state.tableColor)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Button {
+                    showInfo.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Explanation: \(attr.name)", "Explication : \(attr.name)"))
+                .popover(isPresented: $showInfo, arrowEdge: .bottom) { infoPopover }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if isATA {
+                numeric(attr.current ?? "—", width: SmartColumns.normalized)
+                numeric(attr.worst ?? "—", width: SmartColumns.normalized)
+                numeric(attr.threshold ?? "—", width: SmartColumns.normalized)
+            }
+
+            Text(showRaw ? attr.rawHex : attr.value)
+                .font(showRaw ? .system(.callout, design: .monospaced) : .callout)
+                .foregroundStyle(showRaw ? .secondary : attr.state.tableColor)
+                .fontWeight(showRaw ? .regular : attr.state.fontWeight)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .textSelection(.enabled)
+                .frame(width: SmartColumns.value, alignment: .trailing)
+
+            HStack(spacing: 6) {
+                if attr.state != .informational {
+                    Circle()
+                        .fill(attr.state.dotColor)
+                        .frame(width: 7, height: 7)
+                }
+                Text(attr.state.localizedLabel)
+                    .foregroundStyle(attr.state == .informational ? .tertiary : .primary)
+            }
+            .font(.callout)
+            .frame(width: SmartColumns.state, alignment: .leading)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button(L("Copy Value", "Copier la valeur")) { copy(attr.value) }
+            Button(L("Copy Raw Value", "Copier la valeur brute")) { copy(attr.rawHex) }
+            Button(L("Copy Row", "Copier la ligne")) { copy(L("\(attr.hexID) \(attr.name): \(attr.value) (\(attr.rawHex))", "\(attr.hexID) \(attr.name) : \(attr.value) (\(attr.rawHex))")) }
+        }
+        .accessibilityElement(children: .combine)
     }
 
-    private var popoverView: some View {
+    private func numeric(_ text: String, width: CGFloat) -> some View {
+        Text(text)
+            .font(.callout)
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            .frame(width: width, alignment: .trailing)
+    }
+
+    private func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private var infoPopover: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(attr.name).font(.headline)
             if !attr.technicalName.isEmpty {
-                Text("Nom technique : \(attr.technicalName)")
+                Text(L("Technical name: \(attr.technicalName)", "Nom technique : \(attr.technicalName)"))
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
             Divider()
-            Text(attr.explanation).font(.callout)
-            if attr.donnee != "—" {
-                Text("Valeur interprétée : \(attr.donnee)")
+            Text(attr.explanation)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            if attr.value != "—" {
+                Text(L("Value: \(attr.value) · raw: \(attr.rawHex)", "Valeur : \(attr.value) · brute : \(attr.rawHex)"))
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
         }
         .padding()

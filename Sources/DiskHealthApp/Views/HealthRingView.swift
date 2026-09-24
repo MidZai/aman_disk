@@ -1,75 +1,79 @@
 import SwiftUI
 import DiskHealthCore
 
+/// Anneau-jauge de l'en-tête : fond encre, piste, arc de durée de vie, goutte.
+/// Même géométrie que l'icône du Dock et de la barre des menus (`AmanRingGeometry`).
 struct HealthRingView: View {
     let health: HealthAssessment
     let capability: HealthCapability
-    
+
     @State private var progress: Double = 0
-    @Environment(\.accessibilityReduceMotion) var reduceMotion
-    
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        let pct = percentage
-        
-        ZStack {
-            // Track
-            Circle()
-                .stroke(Color.white.opacity(0.16), lineWidth: 10)
-                .frame(width: 52, height: 52)
-            
-            // Arc
-            if pct > 0 {
+        let target = AmanPalette.fraction(health: health, capability: capability)
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            let scale = side / 100
+            ZStack {
+                Circle().fill(AmanPalette.ink)
                 Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(
-                        ringColor,
-                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 52, height: 52)
+                    .inset(by: (50 - AmanRingGeometry.radius) * scale)
+                    .stroke(Color.white.opacity(0.16), lineWidth: AmanRingGeometry.lineWidth * scale)
+                AmanArc(fraction: progress)
+                    .stroke(AmanPalette.ringColor(health: health, capability: capability),
+                            style: StrokeStyle(lineWidth: AmanRingGeometry.lineWidth * scale, lineCap: .round))
+                Path(AmanRingGeometry.dropPath(in: CGRect(x: 0, y: 0, width: side, height: side)))
+                    .fill(Color.white)
             }
-            
-            // Drop
-            Path { path in
-                path.move(to: CGPoint(x: 50, y: 37))
-                path.addCurve(to: CGPoint(x: 43.5, y: 50), control1: CGPoint(x: 50, y: 37), control2: CGPoint(x: 43.5, y: 45.5))
-                path.addArc(center: CGPoint(x: 50, y: 50), radius: 6.5, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: true)
-                path.addCurve(to: CGPoint(x: 50, y: 37), control1: CGPoint(x: 56.5, y: 45.5), control2: CGPoint(x: 50, y: 37))
-                path.closeSubpath()
-            }
-            .fill(Color.white)
-            // The path is defined in a 100x100 coordinate space
-            .scaleEffect(0.96) // (96 / 100)
+            .frame(width: side, height: side)
         }
-        .frame(width: 96, height: 96)
-        .background(Color(hex: "#0B2230"))
-        .clipShape(Circle())
-        .onAppear {
-            if reduceMotion {
-                progress = pct
-            } else {
-                withAnimation(.easeOut(duration: 0.6)) {
-                    progress = pct
-                }
-            }
-        }
+        .aspectRatio(1, contentMode: .fit)
+        .onAppear { animate(to: target) }
+        // Le relevé change (toutes les 30 s) : l'arc suit, sans repartir de zéro.
+        .onChange(of: target) { animate(to: target) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
-    
-    private var percentage: Double {
-        AmanPalette.fraction(health: health, capability: capability)
-    }
-    
-    private var ringColor: Color {
-        AmanPalette.ringColor(health: health, capability: capability)
-    }
-    
-    private var accessibilityText: String {
-        let status = health.status == .good ? "en bonne santé" : (health.status == .caution ? "attention" : "défaillance probable")
-        if capability == .supported, let hp = health.healthPercent {
-            return "Santé : \(status), \(hp) % de durée de vie"
+
+    private func animate(to value: Double) {
+        if reduceMotion {
+            progress = value
+        } else {
+            withAnimation(.easeOut(duration: 0.6)) { progress = value }
         }
-        return "Santé : \(status), durée de vie non fournie par ce disque"
+    }
+
+    private var accessibilityText: String {
+        let status = health.status.localizedLabel
+        if let hp = AmanPalette.knownPercent(health: health, capability: capability) {
+            return L("\(status), \(hp)% life remaining", "\(status), \(hp) % de durée de vie restante")
+        }
+        return L("\(status), remaining life not reported by this drive", "\(status), durée de vie non fournie par ce disque")
+    }
+}
+
+/// Arc qui part de midi, dans le sens horaire, avec la règle de longueur de l'icône
+/// (les bouts arrondis ne font pas paraître la jauge plus remplie qu'elle ne l'est).
+private struct AmanArc: Shape {
+    var fraction: Double
+
+    var animatableData: Double {
+        get { fraction }
+        set { fraction = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        guard fraction > 0 else { return Path() }
+        let side = min(rect.width, rect.height)
+        let scale = side / 100
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = AmanRingGeometry.radius * scale
+        // `sweep` est défini dans le repère 100 × 100 : l'angle ne dépend pas de l'échelle.
+        let sweep = AmanRingGeometry.sweep(fraction: fraction)
+        var path = Path()
+        path.addArc(center: center, radius: radius, startAngle: .radians(-.pi / 2),
+                    endAngle: .radians(-.pi / 2 + Double(sweep)), clockwise: false)
+        return path
     }
 }

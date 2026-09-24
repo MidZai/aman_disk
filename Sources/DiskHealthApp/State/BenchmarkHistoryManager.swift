@@ -1,52 +1,75 @@
 import Foundation
+import DiskHealthCore
 import BenchmarkCore
 
-public class BenchmarkHistoryManager {
-    public static let shared = BenchmarkHistoryManager()
-    
-    private let queue = DispatchQueue(label: "io.github.aman-disk.BenchmarkHistory")
-    private let directoryUrl: URL
-    
-    private init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let bundleId = Bundle.main.bundleIdentifier ?? AppInfo.bundleIdentifier
-        directoryUrl = appSupport.appendingPathComponent(bundleId).appendingPathComponent("benchmarks")
-        try? FileManager.default.createDirectory(at: directoryUrl, withIntermediateDirectories: true)
+/// Résultats des tests de performances, un fichier JSON par disque (50 résultats au plus).
+final class BenchmarkHistoryManager: @unchecked Sendable {
+    static let shared = BenchmarkHistoryManager()
+    static let maxResults = 50
+
+    private let queue = DispatchQueue(label: "io.github.aman-disk.benchmark-history", qos: .utility)
+    private let directoryURL: URL
+
+    init(directoryURL: URL? = nil) {
+        if let directoryURL {
+            self.directoryURL = directoryURL
+        } else {
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
+            self.directoryURL = appSupport.appendingPathComponent(AppInfo.bundleIdentifier).appendingPathComponent("benchmarks")
+        }
+        try? FileManager.default.createDirectory(at: self.directoryURL, withIntermediateDirectories: true)
     }
-    
-    public func saveResult(_ result: BenchmarkResult, forDiskKey diskKey: String) {
+
+    /// Enregistre un résultat sous `result.diskKey`.
+    func save(_ result: BenchmarkResult) {
         queue.async {
-            var results = self.loadResultsSync(forDiskKey: diskKey)
+            var results = self.read(key: result.diskKey)
             results.insert(result, at: 0)
-            if results.count > 50 {
-                results = Array(results.prefix(50))
-            }
-            self.saveResultsSync(results, forDiskKey: diskKey)
+            self.write(Array(results.prefix(Self.maxResults)), key: result.diskKey)
         }
     }
-    
-    public func loadResults(forDiskKey diskKey: String, completion: @escaping ([BenchmarkResult]) -> Void) {
-        queue.async {
-            let res = self.loadResultsSync(forDiskKey: diskKey)
-            DispatchQueue.main.async {
-                completion(res)
-            }
+
+    /// Résultats d'un disque, du plus récent au plus ancien.
+    /// Jusqu'à la 0.9, les résultats étaient enregistrés sous un hachage du seul modèle et relus
+    /// sous le nom BSD (`disk0`) : l'historique restait donc toujours vide. Les deux anciennes clés
+    /// sont relues pour ne rien perdre.
+    func results(for disk: RealDisk) -> [BenchmarkResult] {
+        queue.sync { self.readAll(keys: Self.keys(for: disk)) }
+    }
+
+    func loadResults(for disk: RealDisk) async -> [BenchmarkResult] {
+        let keys = Self.keys(for: disk)
+        return await withCheckedContinuation { continuation in
+            queue.async { continuation.resume(returning: self.readAll(keys: keys)) }
         }
     }
-    
-    public func loadResultsSync(forDiskKey diskKey: String) -> [BenchmarkResult] {
-        let fileUrl = directoryUrl.appendingPathComponent("\(diskKey).json")
-        guard let data = try? Data(contentsOf: fileUrl) else { return [] }
-        guard let results = try? JSONDecoder().decode([BenchmarkResult].self, from: data) else { return [] }
-        return results
+
+    private static func keys(for disk: RealDisk) -> [String] {
+        var keys = [disk.benchmarkKey, DiskIdentity.key(model: disk.physical.model, serial: ""), disk.physical.bsdName]
+        var seen = Set<String>()
+        keys = keys.filter { seen.insert($0).inserted }
+        return keys
     }
-    
-    private func saveResultsSync(_ results: [BenchmarkResult], forDiskKey diskKey: String) {
-        let fileUrl = directoryUrl.appendingPathComponent("\(diskKey).json")
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-        if let data = try? encoder.encode(results) {
-            try? data.write(to: fileUrl)
-        }
+
+    private func readAll(keys: [String]) -> [BenchmarkResult] {
+        var seen = Set<UUID>()
+        return keys.flatMap { read(key: $0) }
+            .filter { seen.insert($0.id).inserted }
+            .sorted { $0.date > $1.date }
+    }
+
+    private func fileURL(key: String) -> URL {
+        directoryURL.appendingPathComponent("\(key).json")
+    }
+
+    private func read(key: String) -> [BenchmarkResult] {
+        guard let data = try? Data(contentsOf: fileURL(key: key)) else { return [] }
+        return (try? JSONDecoder().decode([BenchmarkResult].self, from: data)) ?? []
+    }
+
+    private func write(_ results: [BenchmarkResult], key: String) {
+        guard let data = try? JSONEncoder().encode(results) else { return }
+        try? data.write(to: fileURL(key: key), options: .atomic)
     }
 }

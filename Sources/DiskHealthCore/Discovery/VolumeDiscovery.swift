@@ -21,7 +21,9 @@ public enum VolumeDiscovery {
         
         for url in urls {
             let path = url.path
-            if path != "/" && path != "/System/Volumes/Data" && !path.hasPrefix("/Volumes/") {
+            // « / » (système) et « /System/Volumes/Data » (données) partagent le même conteneur APFS
+            // et le même espace : comme le Finder, on n'affiche que « Macintosh HD ».
+            if path != "/" && !path.hasPrefix("/Volumes/") {
                 continue
             }
             

@@ -1,68 +1,56 @@
 import Foundation
 
 public enum HealthEngine {
+    /// En dessous de ce pourcentage de durée de vie restante, le disque passe « À surveiller ».
+    /// Même seuil que le passage au rouge de l'anneau (charte : rouge à 25 % et moins) : un anneau
+    /// rouge à côté de « En bonne santé » serait contradictoire.
+    public static let lowLifeThreshold = 25
+
     public static func evaluate(smart: NVMeSmartLog, identify: NVMeIdentify) -> HealthAssessment {
         var reasons: [String] = []
         var status: HealthStatus = .good
-        
-        let healthPercentValue = max(0, 100 - Int(smart.percentageUsed))
-        let healthPercent: Int? = (smart.percentageUsed <= 150) ? healthPercentValue : 0
-        
-        // Critical failures
+
+        // « Pourcentage utilisé » peut dépasser 100 : la durée de vie restante est alors de 0 %.
+        let healthPercent = max(0, 100 - Int(smart.percentageUsed))
+
+        // Défaillances (bits 0, 2, 3 et 4 de « Critical Warning »).
+        let spareReason = L("Spare capacity has dropped below the manufacturer's threshold.", "La réserve de secours est passée sous le seuil du fabricant.")
         if (smart.criticalWarning & 0b0001_1101) != 0 {
             status = .bad
-            if (smart.criticalWarning & 0b0000_0001) != 0 {
-                reasons.append("La réserve de secours est passée sous le seuil du fabricant.")
-            }
-            if (smart.criticalWarning & 0b0000_0100) != 0 {
-                reasons.append("La fiabilité du disque est dégradée.")
-            }
-            if (smart.criticalWarning & 0b0000_1000) != 0 {
-                reasons.append("Le disque est passé en mode lecture seule.")
-            }
-            if (smart.criticalWarning & 0b0001_0000) != 0 {
-                reasons.append("La sauvegarde de la mémoire volatile a échoué.")
-            }
+            if (smart.criticalWarning & 0b0000_0001) != 0 { reasons.append(spareReason) }
+            if (smart.criticalWarning & 0b0000_0100) != 0 { reasons.append(L("Drive reliability is degraded (internal errors).", "La fiabilité du disque est dégradée (erreurs internes).")) }
+            if (smart.criticalWarning & 0b0000_1000) != 0 { reasons.append(L("The drive has switched to read-only mode.", "Le disque est passé en lecture seule.")) }
+            if (smart.criticalWarning & 0b0001_0000) != 0 { reasons.append(L("Volatile memory backup has failed.", "La sauvegarde de la mémoire volatile a échoué.")) }
         }
-        
         if smart.availableSpare < smart.availableSpareThreshold {
-            if status != .bad {
-                status = .bad
-            }
-            if !reasons.contains("La réserve de secours est passée sous le seuil du fabricant.") {
-                reasons.append("La réserve de secours est passée sous le seuil du fabricant.")
-            }
+            status = .bad
+            if !reasons.contains(spareReason) { reasons.append(spareReason) }
         }
-        
-        // Caution failures
-        var isCaution = false
-        if status != .bad {
-            if smart.percentageUsed >= 90 {
-                isCaution = true
-                reasons.append("L'usure du disque a atteint ou dépassé 90 %.")
-            }
-            if smart.mediaErrors > 0 {
-                isCaution = true
-                reasons.append("Des erreurs de média ou d'intégrité ont été détectées.")
-            }
-            if (smart.criticalWarning & 0b0000_0010) != 0 {
-                isCaution = true
-                reasons.append("La température a dépassé un seuil critique selon le fabricant.")
-            }
-            if identify.warningTempKelvin > 0 && smart.compositeTemperatureKelvin >= identify.warningTempKelvin {
-                isCaution = true
-                reasons.append("La température actuelle dépasse le seuil d'avertissement.")
-            }
-            
-            if isCaution {
-                status = .caution
-            }
+        // À surveiller. Ces constats sont listés même si l'état est déjà « Défaillance probable » :
+        // l'utilisateur doit voir tout ce qui ne va pas, pas seulement le plus grave.
+        var cautionReasons: [String] = []
+        if smart.percentageUsed >= 100 {
+            // Au-delà de 100 %, l'endurance garantie est dépassée, sans panne certaine pour autant.
+            cautionReasons.append(L("The manufacturer's rated endurance is fully used up (\(smart.percentageUsed)% used).", "L'endurance prévue par le fabricant est entièrement consommée (\(smart.percentageUsed) % utilisés)."))
+        } else if healthPercent <= lowLifeThreshold {
+            cautionReasons.append(L("Remaining life is low (\(healthPercent)%).", "La durée de vie restante est faible (\(healthPercent) %)."))
         }
-        
+        if smart.mediaErrors > 0 {
+            cautionReasons.append(L("\(Formatters.integer(smart.mediaErrors)) uncorrected data error(s) detected.", "\(Formatters.integer(smart.mediaErrors)) erreur(s) de données non corrigée(s) détectée(s)."))
+        }
+        if !cautionReasons.isEmpty {
+            if status == .good { status = .caution }
+            reasons += cautionReasons
+        }
+
+        // La température n'entre pas dans l'état de santé : une chauffe passagère (copie, test)
+        // ferait basculer l'état et déclencher des alertes « changement d'état » à tort.
+        // Elle a son propre indicateur et sa propre alerte (5 min au-dessus du seuil).
+
         if status == .good {
-            reasons.append("Aucune anomalie détectée.")
+            reasons.append(L("No problems detected.", "Aucune anomalie détectée."))
         }
-        
+
         return HealthAssessment(status: status, healthPercent: healthPercent, reasons: reasons)
     }
 }

@@ -2,22 +2,33 @@ import AppKit
 import SwiftUI
 import DiskHealthCore
 
-public enum DiskIconProvider {
-    public static func icon(for physical: PhysicalDisk) -> some View {
-        let name = physical.isInternal ? "internaldrive" : "externaldrive"
-        return Image(systemName: name)
+enum DiskIconProvider {
+    static func icon(for physical: PhysicalDisk) -> some View {
+        Image(systemName: physical.isInternal ? "internaldrive" : "externaldrive")
             .foregroundStyle(.secondary)
             .fontWeight(.light)
     }
-    
-    public static func icon(for disk: RealDisk) -> some View {
-        return icon(for: disk.physical)
+
+    static func icon(for disk: RealDisk) -> some View {
+        icon(for: disk.physical)
     }
-    
-    public static func icon(for volume: Volume) -> some View {
-        let nsIcon = NSWorkspace.shared.icon(forFile: volume.mountPoint)
-        return Image(nsImage: nsIcon)
+
+    /// Icône Finder du volume, mise en cache : `NSWorkspace.icon(forFile:)` interroge le système
+    /// de fichiers, et la barre latérale est redessinée à chaque relevé (toutes les 30 s).
+    @MainActor
+    static func icon(for volume: Volume) -> some View {
+        Image(nsImage: cachedIcon(path: volume.mountPoint))
             .resizable()
             .scaledToFit()
+    }
+
+    @MainActor private static var cache: [String: NSImage] = [:]
+
+    @MainActor
+    private static func cachedIcon(path: String) -> NSImage {
+        if let icon = cache[path] { return icon }
+        let icon = NSWorkspace.shared.icon(forFile: path)
+        cache[path] = icon
+        return icon
     }
 }

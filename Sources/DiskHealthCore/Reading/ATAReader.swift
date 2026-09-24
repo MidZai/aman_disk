@@ -10,6 +10,15 @@ public enum ATAReadError: Error, Equatable {
     case smartDisabled
     case ioError(Int32)
     case unknown(Int32)
+    case parseFailed
+}
+
+/// Données brutes d'une lecture ATA complète.
+public struct ATARawData {
+    public let smart: Data
+    public let thresholds: Data
+    public let identify: Data
+    public let thresholdExceeded: Bool
 }
 
 public enum ATAReader {
@@ -21,11 +30,23 @@ public enum ATAReader {
         case -4: return .smartServiceNotFound
         case -5: return .pluginCreationFailed
         case -6: return .smartDisabled
-        case -7: return .ioError(code)
         default: return .ioError(code)
         }
     }
     
+    /// Données S.M.A.R.T., seuils, Identify et statut, avec une seule ouverture du pilote.
+    public static func readAll(bsdName: String) throws -> ATARawData {
+        var smart = [UInt8](repeating: 0, count: 512)
+        var thresholds = [UInt8](repeating: 0, count: 512)
+        var identify = [UInt8](repeating: 0, count: 512)
+        var exceeded: Int32 = 0
+        let result = bsdName.withCString { cString in
+            cdiskio_read_ata_snapshot(cString, &smart, &thresholds, &identify, &exceeded)
+        }
+        guard result == 0 else { throw mapError(result) }
+        return ATARawData(smart: Data(smart), thresholds: Data(thresholds), identify: Data(identify), thresholdExceeded: exceeded != 0)
+    }
+
     public static func readSmartData(bsdName: String) throws -> Data {
         var buffer = [UInt8](repeating: 0, count: 512)
         let result = bsdName.withCString { cString in

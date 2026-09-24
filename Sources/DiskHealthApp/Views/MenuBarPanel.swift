@@ -3,13 +3,6 @@ import Charts
 import AppKit
 import DiskHealthCore
 
-extension RealDisk {
-    /// Température actuelle, lue dans le dernier relevé.
-    var temperatureC: Int? {
-        snapshot.flatMap { HistorySample.from(snapshot: $0, date: lastRead).temperatureC }
-    }
-}
-
 /// Libellé de l'élément de barre des menus : anneau *template* et, en option, la température.
 struct MenuBarLabel: View {
     @ObservedObject var appManager: AppManager
@@ -20,7 +13,7 @@ struct MenuBarLabel: View {
         let boot = appManager.bootDisk
         let fraction = boot.map { AmanPalette.fraction(health: $0.health, capability: $0.physical.healthCapability) } ?? 1
         HStack(spacing: 3) {
-            Image(nsImage: MenuBarIconRenderer.image(fraction: fraction))
+            Image(nsImage: MenuBarIconRenderer.cachedImage(fraction: fraction))
             if showTemperature, let t = boot?.temperatureC {
                 Text("\(t)°")
                     .monospacedDigit()
@@ -50,8 +43,8 @@ struct MenuBarPanel: View {
             Text("Aman Disk")
                 .font(.headline)
 
-            if internalDisks.isEmpty {
-                Text(appManager.isLoading ? "Lecture des disques…" : "Aucun disque interne détecté")
+            if internalDisks.isEmpty || appManager.isLoading {
+                Text(appManager.isLoading ? L("Reading drives…", "Lecture des disques…") : L("No internal drive found", "Aucun disque interne détecté"))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
@@ -70,25 +63,24 @@ struct MenuBarPanel: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 2) {
-                menuButton("Ouvrir Aman Disk") {
+                menuButton(L("Open Aman Disk", "Ouvrir Aman Disk")) {
                     NSApp.setActivationPolicy(.regular)
                     openWindow(id: AppScene.mainWindowID)
                     NSApp.activate(ignoringOtherApps: true)
                 }
-                menuButton("Réglages…") {
+                menuButton(L("Settings…", "Réglages…")) {
                     openSettings()
                     NSApp.activate(ignoringOtherApps: true)
                 }
                 Divider().padding(.vertical, 2)
-                menuButton("Quitter") {
+                menuButton(L("Quit Aman Disk", "Quitter Aman Disk")) {
                     NSApp.terminate(nil)
                 }
             }
         }
         .padding(14)
         .frame(width: 320)
-        .onAppear(perform: loadBootHistory)
-        .onChange(of: appManager.bootDisk?.lastRead) { loadBootHistory() }
+        .task(id: appManager.bootDisk?.lastRead) { await loadBootHistory() }
     }
 
     private func diskRow(_ disk: RealDisk) -> some View {
@@ -110,8 +102,8 @@ struct MenuBarPanel: View {
                         .font(.callout)
                         .monospacedDigit()
                 }
-                if let pct = AmanPalette.knownPercent(health: disk.health, capability: disk.physical.healthCapability) {
-                    Text("\(pct) % de vie")
+                if let pct = disk.knownLifePercent {
+                    Text(L("\(pct)\(Formatters.unitSpace)% life", "\(pct)\(Formatters.unitSpace)% de vie"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -125,11 +117,11 @@ struct MenuBarPanel: View {
     private func miniChart(boot: RealDisk) -> some View {
         let agg = HistoryAggregation.aggregate(samples: bootSamples, range: .oneHour)
         VStack(alignment: .leading, spacing: 4) {
-            Text("Température — dernière heure")
+            Text(L("Temperature — last hour", "Température — dernière heure"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if agg.points.count < 2 {
-                Text("Pas encore assez de mesures.")
+                Text(L("Not enough measurements yet.", "Pas encore assez de mesures."))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, minHeight: 60)
@@ -153,7 +145,8 @@ struct MenuBarPanel: View {
                     }
                 }
                 .frame(height: 60)
-                .accessibilityLabel("Température de la dernière heure : minimum \(agg.min ?? 0) °C, maximum \(agg.max ?? 0) °C")
+                .accessibilityLabel(L("Temperature over the last hour", "Température de la dernière heure"))
+                .accessibilityValue(TemperatureHistoryView.legendText(agg))
             }
         }
     }
@@ -162,12 +155,12 @@ struct MenuBarPanel: View {
         MenuRowButton(title: title, action: action)
     }
 
-    private func loadBootHistory() {
-        guard let boot = appManager.bootDisk, let key = appManager.historyKey(for: boot) else {
+    private func loadBootHistory() async {
+        guard let key = appManager.bootDisk?.historyKey else {
             bootSamples = []
             return
         }
-        bootSamples = HistoryStore.shared.samples(for: key, since: Date().addingTimeInterval(-3600))
+        bootSamples = await HistoryStore.shared.loadSamples(for: key, since: Date().addingTimeInterval(-3600))
     }
 }
 

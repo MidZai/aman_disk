@@ -8,23 +8,8 @@ public enum ProtocolDetector {
             return (.unknown, .unknown, .unsupported(reason: .noSmartInterface))
         }
 
-        // I4: Always release the IOKit iterator.
-        var iterator: io_iterator_t = 0
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOMedia"), &iterator) == kIOReturnSuccess else {
-            return (.unknown, .unknown, .unsupported(reason: .noSmartInterface))
-        }
-        defer { IOObjectRelease(iterator) }
-
-        var targetService: io_object_t = 0
-        var service = IOIteratorNext(iterator)
-        while service != 0 {
-            if let name = IORegistryEntrySearchCFProperty(service, kIOServicePlane, "BSD Name" as CFString, kCFAllocatorDefault, 0) as? String, name == bsdName {
-                targetService = service
-                break
-            }
-            IOObjectRelease(service)
-            service = IOIteratorNext(iterator)
-        }
+        // Recherche directe par nom BSD (au lieu de parcourir tous les IOMedia du système).
+        let targetService = IOServiceGetMatchingService(kIOMainPortDefault, IOBSDNameMatching(kIOMainPortDefault, 0, bsdName))
 
         guard targetService != 0 else {
             return (.unknown, .unknown, .unsupported(reason: .noSmartInterface))

@@ -60,7 +60,7 @@ final class SystemNotificationPoster: NSObject, NotificationPosting, UNUserNotif
         await MainActor.run {
             if let diskId {
                 AppManager.sharedInstance?.selection = .physicalDisk(diskId)
-                AppManager.sharedInstance?.activeTab = 1
+                AppManager.sharedInstance?.activeTab = .health
             }
             WindowOpener.showMainWindow()
         }

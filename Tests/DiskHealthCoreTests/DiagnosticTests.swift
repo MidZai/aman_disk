@@ -1,8 +1,9 @@
-import XCTest
+import Testing
+import Foundation
 @testable import DiskHealthCore
 
-final class DiagnosticTests: XCTestCase {
-    func testIOKitDiagnosticsMasking() {
+@Suite final class DiagnosticTests {
+    @Test func testIOKitDiagnosticsMasking() {
         let rawProps: [String: Any] = [
             "Device Model": "Apple SSD SM0512G",
             "Serial Number": "C02412300ABCD",
@@ -15,16 +16,16 @@ final class DiagnosticTests: XCTestCase {
         
         let sanitized = IOKitDiagnostics.sanitizeProperties(rawProps)
         
-        XCTAssertEqual(sanitized["Device Model"], "Apple SSD SM0512G")
-        XCTAssertEqual(sanitized["Serial Number"], "<masqué>")
-        XCTAssertEqual(sanitized["UUID"], "<masqué>")
-        XCTAssertEqual(sanitized["media-guid"], "<masqué>")
-        XCTAssertEqual(sanitized["RandomNumber"], "42")
-        XCTAssertEqual(sanitized["IsInternal"], "true")
-        XCTAssertEqual(sanitized["RawUUIDValue"], "<masqué>")
+        #expect(sanitized["Device Model"] == "Apple SSD SM0512G")
+        #expect(sanitized["Serial Number"] == "<masqué>")
+        #expect(sanitized["UUID"] == "<masqué>")
+        #expect(sanitized["media-guid"] == "<masqué>")
+        #expect(sanitized["RandomNumber"] == "42")
+        #expect(sanitized["IsInternal"] == "true")
+        #expect(sanitized["RawUUIDValue"] == "<masqué>")
     }
     
-    func testDiagnosticEncodingDecoding() throws {
+    @Test func testDiagnosticEncodingDecoding() throws {
         let disk = PhysicalDisk(
             bsdName: "disk0",
             model: "APPLE SSD SM0512G",
@@ -49,24 +50,24 @@ final class DiagnosticTests: XCTestCase {
         let data = try encoder.encode(diag)
         let jsonStr = String(data: data, encoding: .utf8)!
         
-        XCTAssertTrue(jsonStr.contains("\"bsd_name\" : \"disk0\""))
-        XCTAssertTrue(jsonStr.contains("\"reason\" : \"smartDisabled\""))
-        XCTAssertTrue(jsonStr.contains("\"protocol_type\" : \"nvme\""))
-        XCTAssertTrue(jsonStr.contains("\"medium_type\" : \"solidState\""))
-        XCTAssertTrue(jsonStr.contains("\"iokit_parent_chain\" : ["))
+        #expect(jsonStr.contains("\"bsd_name\" : \"disk0\""))
+        #expect(jsonStr.contains("\"reason\" : \"smartDisabled\""))
+        #expect(jsonStr.contains("\"protocol_type\" : \"nvme\""))
+        #expect(jsonStr.contains("\"medium_type\" : \"solidState\""))
+        #expect(jsonStr.contains("\"iokit_parent_chain\" : ["))
         
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let decoded = try decoder.decode(Diagnostic.self, from: data)
         
-        XCTAssertEqual(decoded.model, "APPLE SSD SM0512G")
-        XCTAssertEqual(decoded.bsdName, "disk0")
-        XCTAssertEqual(decoded.reason, "smartDisabled")
-        XCTAssertEqual(decoded.iokitParentChain.count, 1)
-        XCTAssertEqual(decoded.iokitParentChain[0].className, "IOBlockStorageDriver")
+        #expect(decoded.model == "APPLE SSD SM0512G")
+        #expect(decoded.bsdName == "disk0")
+        #expect(decoded.reason == "smartDisabled")
+        #expect(decoded.iokitParentChain.count == 1)
+        #expect(decoded.iokitParentChain[0].className == "IOBlockStorageDriver")
     }
     
-    func testUnsupportedReasons() throws {
+    @Test func testUnsupportedReasons() throws {
         let reasons: [UnsupportedReason] = [
             .usbBridge,
             .sdCardReader,
@@ -82,14 +83,14 @@ final class DiagnosticTests: XCTestCase {
         for reason in reasons {
             let data = try encoder.encode(reason)
             let decoded = try decoder.decode(UnsupportedReason.self, from: data)
-            XCTAssertEqual(reason, decoded)
+            #expect(reason == decoded)
         }
         
-        XCTAssertEqual(UnsupportedReason.usbBridge.rawValue, "usbBridge")
-        XCTAssertEqual(UnsupportedReason.sdCardReader.rawValue, "sdCardReader")
-        XCTAssertEqual(UnsupportedReason.virtualDisk.rawValue, "virtualDisk")
-        XCTAssertEqual(UnsupportedReason.smartDisabled.rawValue, "smartDisabled")
-        XCTAssertEqual(UnsupportedReason.noSmartInterface.rawValue, "noSmartInterface")
-        XCTAssertEqual(UnsupportedReason.readFailed(code: "-6").rawValue, "readFailed(-6)")
+        #expect(UnsupportedReason.usbBridge.rawValue == "usbBridge")
+        #expect(UnsupportedReason.sdCardReader.rawValue == "sdCardReader")
+        #expect(UnsupportedReason.virtualDisk.rawValue == "virtualDisk")
+        #expect(UnsupportedReason.smartDisabled.rawValue == "smartDisabled")
+        #expect(UnsupportedReason.noSmartInterface.rawValue == "noSmartInterface")
+        #expect(UnsupportedReason.readFailed(code: "-6").rawValue == "readFailed(-6)")
     }
 }

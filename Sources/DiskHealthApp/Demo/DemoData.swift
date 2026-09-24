@@ -279,7 +279,7 @@ public enum DemoData {
 
     private static func makeDisk4() -> DemoDisk {
         let physical = PhysicalDisk(bsdName: "disk3", model: "External SSD", sizeBytes: 1_000_000_000_000, isInternal: false, connection: .usb, volumeNames: ["Sauvegardes"], usbVendorID: 0x0BDA, usbProductID: 0x9210, protocolType: .usb, mediumType: .solidState, healthCapability: .unsupported(reason: .usbBridge))
-        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: ["Santé non lisible"])
+        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [L("Health unreadable", "Santé non lisible")])
         return DemoDisk(physical: physical, snapshot: nil, health: health)
     }
 

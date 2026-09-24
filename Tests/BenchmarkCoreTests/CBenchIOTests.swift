@@ -1,44 +1,43 @@
-import XCTest
+import Testing
+import Foundation
 import CBenchIO
 
-final class CBenchIOTests: XCTestCase {
+@Suite final class CBenchIOTests {
     
     var tempFile: String!
     
-    override func setUp() {
-        super.setUp()
+    init() {
         let tempDir = NSTemporaryDirectory()
         tempFile = (tempDir as NSString).appendingPathComponent(UUID().uuidString + ".tmp")
     }
     
-    override func tearDown() {
+    deinit {
         try? FileManager.default.removeItem(atPath: tempFile)
-        super.tearDown()
     }
     
-    func testPrepareFileAndNotAllZeros() {
+    @Test func testPrepareFileAndNotAllZeros() {
         let ctx = cbench_ctx_create()
         defer { cbench_ctx_destroy(ctx) }
         
         let size: UInt64 = 16 * 1024 * 1024 // 16 MiB
         let err = cbench_prepare_file(ctx, tempFile, size)
-        XCTAssertEqual(err, 0)
+        #expect(err == 0)
         
         var st = stat()
-        XCTAssertEqual(stat(tempFile, &st), 0)
-        XCTAssertEqual(UInt64(st.st_size), size)
-        XCTAssertTrue(UInt64(st.st_blocks) * 512 >= size, "Fichier ne doit pas être creux")
+        #expect(stat(tempFile, &st) == 0)
+        #expect(UInt64(st.st_size) == size)
+        #expect(UInt64(st.st_blocks) * 512 >= size, "Fichier ne doit pas être creux")
         
         let handle = FileHandle(forReadingAtPath: tempFile)!
         let data = handle.readData(ofLength: 4096)
         handle.closeFile()
         
-        XCTAssertEqual(data.count, 4096)
+        #expect(data.count == 4096)
         let zeros = Data(repeating: 0, count: 4096)
-        XCTAssertNotEqual(data, zeros, "Fichier ne doit pas être rempli de zéros")
+        #expect(data != zeros, "Fichier ne doit pas être rempli de zéros")
     }
     
-    func testRunPassSeqReadQD1() {
+    @Test func testRunPassSeqReadQD1() {
         let ctx = cbench_ctx_create()
         defer { cbench_ctx_destroy(ctx) }
         
@@ -58,13 +57,13 @@ final class CBenchIOTests: XCTestCase {
         var result = cbench_result()
         let err = cbench_run_pass(ctx, tempFile, &params, &result, nil, 0, nil)
         
-        XCTAssertEqual(err, 0)
-        XCTAssertEqual(result.error, 0)
-        XCTAssertTrue(result.bytes > 0)
-        XCTAssertTrue(result.ios > 0)
+        #expect(err == 0)
+        #expect(result.error == 0)
+        #expect(result.bytes > 0)
+        #expect(result.ios > 0)
     }
     
-    func testRunPassSeqWriteQD8() {
+    @Test func testRunPassSeqWriteQD8() {
         let ctx = cbench_ctx_create()
         defer { cbench_ctx_destroy(ctx) }
         
@@ -84,12 +83,12 @@ final class CBenchIOTests: XCTestCase {
         var result = cbench_result()
         let err = cbench_run_pass(ctx, tempFile, &params, &result, nil, 0, nil)
         
-        XCTAssertEqual(err, 0)
-        XCTAssertEqual(result.error, 0)
-        XCTAssertEqual(result.bytes, size, "Passe d'écriture séquentielle doit correspondre exactement à file_size")
+        #expect(err == 0)
+        #expect(result.error == 0)
+        #expect(result.bytes == size, "Passe d'écriture séquentielle doit correspondre exactement à file_size")
     }
     
-    func testRunPassRndQD1WithLatencies() {
+    @Test func testRunPassRndQD1WithLatencies() {
         let ctx = cbench_ctx_create()
         defer { cbench_ctx_destroy(ctx) }
         
@@ -112,12 +111,12 @@ final class CBenchIOTests: XCTestCase {
         
         let err = cbench_run_pass(ctx, tempFile, &params, &result, &latencies, UInt64(latencies.count), &latenciesCount)
         
-        XCTAssertEqual(err, 0)
-        XCTAssertEqual(result.error, 0)
-        XCTAssertEqual(latenciesCount, result.ios, "Latencies count should equal ios")
+        #expect(err == 0)
+        #expect(result.error == 0)
+        #expect(latenciesCount == result.ios, "Latencies count should equal ios")
     }
     
-    func testCancellation() {
+    @Test func testCancellation() {
         let ctx = cbench_ctx_create()
         defer { cbench_ctx_destroy(ctx) }
         
@@ -149,8 +148,8 @@ final class CBenchIOTests: XCTestCase {
         let err = cbench_run_pass(ctx, tempFile, &params, &result, nil, 0, nil)
         let elapsed = Date().timeIntervalSince(start)
         
-        XCTAssertEqual(err, -100)
-        XCTAssertEqual(result.error, -100)
-        XCTAssertLessThan(elapsed, 1.0, "Doit retourner en moins d'une seconde")
+        #expect(err == -100)
+        #expect(result.error == -100)
+        #expect(elapsed < 1.0, "Doit retourner en moins d'une seconde")
     }
 }

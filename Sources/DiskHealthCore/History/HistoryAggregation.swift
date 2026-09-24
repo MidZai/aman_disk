@@ -33,8 +33,9 @@ public enum HistoryRange: String, CaseIterable, Identifiable {
     }
 }
 
-public struct AggregatedPoint: Identifiable {
-    public let id = UUID()
+public struct AggregatedPoint: Identifiable, Equatable {
+    /// Identifiant stable (la date) : Swift Charts peut comparer deux rendus au lieu de tout redessiner.
+    public var id: Date { date }
     public let date: Date
     public let temperature: Double
     public let segment: Int
@@ -50,7 +51,9 @@ public struct AggregatedPoint: Identifiable {
     }
 }
 
-public struct AggregationResult {
+public struct AggregationResult: Equatable {
+    public static let empty = AggregationResult(points: [], min: nil, max: nil, average: nil, measurementCount: 0, gaps: [])
+
     public let points: [AggregatedPoint]
     public let min: Int?
     public let max: Int?
@@ -68,7 +71,7 @@ public enum HistoryAggregation {
     public static func aggregate(samples: [HistorySample], range: HistoryRange) -> AggregationResult {
         let withTemp = samples.filter { $0.temperatureC != nil }
         if withTemp.isEmpty {
-            return AggregationResult(points: [], min: nil, max: nil, average: nil, measurementCount: 0, gaps: [])
+            return .empty
         }
 
         var minTemp: Int? = nil
@@ -142,14 +145,15 @@ public enum HistoryAggregation {
         return result
     }
 
+    /// Regroupe les mesures en tranches alignées sur l'horloge (multiples de `chunkSize`) :
+    /// les tranches ne bougent pas d'un rechargement à l'autre, donc la courbe ne « tremble » pas
+    /// toutes les 30 s quand la fenêtre glisse.
     private static func groupAndAverage(samples: [HistorySample], chunkSize: TimeInterval) -> [AggregatedPoint] {
-        guard let first = samples.first else { return [] }
-
         var points: [AggregatedPoint] = []
-        var currentChunkStart = first.date
         var chunk: [HistorySample] = []
+        var chunkStart: TimeInterval = -1
         var currentSegment = 0
-        var lastChunkStart: Date? = nil
+        var lastChunkStart: TimeInterval? = nil
 
         func closeChunk() {
             guard !chunk.isEmpty else { return }
@@ -158,29 +162,30 @@ public enum HistoryAggregation {
             var lo = Double.greatestFiniteMagnitude
             var hi = -Double.greatestFiniteMagnitude
             for s in chunk {
-                let t = Double(s.temperatureC!)
+                guard let temperature = s.temperatureC else { continue }
+                let t = Double(temperature)
                 sum += t * Double(s.measurementCount)
                 weight += s.measurementCount
                 lo = Swift.min(lo, s.temperatureMinC.map(Double.init) ?? t)
                 hi = Swift.max(hi, s.temperatureMaxC.map(Double.init) ?? t)
             }
-            if let lastStart = lastChunkStart, currentChunkStart.timeIntervalSince(lastStart) > (3 * chunkSize) {
+            guard weight > 0 else { return }
+            if let lastStart = lastChunkStart, chunkStart - lastStart > 3 * chunkSize {
                 currentSegment += 1
             }
-            points.append(AggregatedPoint(date: currentChunkStart, temperature: sum / Double(weight), segment: currentSegment, minTemperature: lo, maxTemperature: hi))
-            lastChunkStart = currentChunkStart
+            // Point placé au milieu de sa tranche.
+            points.append(AggregatedPoint(date: Date(timeIntervalSince1970: chunkStart + chunkSize / 2), temperature: sum / Double(weight), segment: currentSegment, minTemperature: lo, maxTemperature: hi))
+            lastChunkStart = chunkStart
         }
 
         for sample in samples {
-            if sample.date.timeIntervalSince(currentChunkStart) >= chunkSize {
+            let start = floor(sample.date.timeIntervalSince1970 / chunkSize) * chunkSize
+            if start != chunkStart {
                 closeChunk()
-                // Avance au bloc qui contient la mesure courante
-                let intervals = floor(sample.date.timeIntervalSince(currentChunkStart) / chunkSize)
-                currentChunkStart = currentChunkStart.addingTimeInterval(intervals * chunkSize)
-                chunk = [sample]
-            } else {
-                chunk.append(sample)
+                chunk = []
+                chunkStart = start
             }
+            chunk.append(sample)
         }
         closeChunk()
 

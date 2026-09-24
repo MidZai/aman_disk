@@ -7,15 +7,10 @@ public struct ATABackend: HealthBackend {
     }
     
     public static func read(bsdName: String) throws -> DiskHealthSnapshot {
-        let smartData = try ATAReader.readSmartData(bsdName: bsdName)
-        let thresholdsData = try ATAReader.readSmartThresholds(bsdName: bsdName)
-        let identifyData = try ATAReader.readIdentify(bsdName: bsdName)
-        let status = try ATAReader.readSmartStatus(bsdName: bsdName)
-        
-        guard let snapshot = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: status) else {
-            throw ATAReadError.invalidArguments // or readFailed
+        let raw = try ATAReader.readAll(bsdName: bsdName)
+        guard let snapshot = ATASmartParser.parse(smartData: raw.smart, thresholdsData: raw.thresholds, identifyData: raw.identify, statusExceeded: raw.thresholdExceeded) else {
+            throw ATAReadError.parseFailed
         }
-        
         return .ata(snapshot)
     }
 }

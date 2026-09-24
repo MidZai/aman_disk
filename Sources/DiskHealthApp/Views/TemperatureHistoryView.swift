@@ -3,47 +3,58 @@ import Charts
 import DiskHealthCore
 
 /// Historique de température d'un disque : sélecteur de plage, courbe, coupures et légende.
+///
+/// Performances : les mesures sont lues hors du fil principal et agrégées une seule fois par
+/// chargement (et non à chaque rendu). Le survol est isolé dans `ChartHoverOverlay` : bouger la
+/// souris ne redessine que le repère et l'info-bulle, pas les centaines de points de la courbe.
 struct TemperatureHistoryView: View {
     let historyKey: String?
     /// Change à chaque nouvelle mesure : déclenche le rechargement.
     let lastRead: Date
 
-    @State private var range: HistoryRange = .oneHour
-    @State private var samples: [HistorySample] = []
-    @State private var hoverDate: Date?
+    @AppStorage("temperatureHistoryRange") private var range: HistoryRange = .oneHour
+    @State private var aggregation: AggregationResult = .empty
+    @State private var domainEnd = Date()
+    @State private var hasLoaded = false
 
     var body: some View {
-        let agg = HistoryAggregation.aggregate(samples: samples, range: range)
-
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Historique de température")
+                Text(L("Temperature history", "Historique de température"))
                     .font(.title3.bold())
                 Spacer()
-                Picker("Plage", selection: $range) {
-                    Text("1 heure").tag(HistoryRange.oneHour)
-                    Text("24 heures").tag(HistoryRange.twentyFourHours)
-                    Text("7 jours").tag(HistoryRange.sevenDays)
-                    Text("30 jours").tag(HistoryRange.thirtyDays)
+                Picker(L("Range", "Plage"), selection: $range) {
+                    Text(L("1 hour", "1 heure")).tag(HistoryRange.oneHour)
+                    Text(L("24 hours", "24 heures")).tag(HistoryRange.twentyFourHours)
+                    Text(L("7 days", "7 jours")).tag(HistoryRange.sevenDays)
+                    Text(L("30 days", "30 jours")).tag(HistoryRange.thirtyDays)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 340)
+                .fixedSize()
             }
 
             // Moins de 3 mesures : pas de courbe exploitable.
-            if agg.points.count < 2 || agg.measurementCount < 3 {
+            if aggregation.points.count < 2 || aggregation.measurementCount < 3 {
                 emptyState
             } else {
-                chart(agg)
+                TemperatureChart(aggregation: aggregation, range: range, domainEnd: domainEnd)
                     .frame(height: 220)
-                legend(agg)
+                Text(Self.legendText(aggregation))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
             }
         }
-        .onAppear(perform: load)
-        .onChange(of: lastRead) { load() }
-        .onChange(of: range) { load() }
-        .onChange(of: historyKey) { load() }
+        .task(id: LoadKey(historyKey: historyKey, range: range, lastRead: lastRead)) {
+            await load()
+        }
+    }
+
+    private struct LoadKey: Equatable {
+        let historyKey: String?
+        let range: HistoryRange
+        let lastRead: Date
     }
 
     private var emptyState: some View {
@@ -51,26 +62,69 @@ struct TemperatureHistoryView: View {
             Image(systemName: "thermometer.medium")
                 .font(.title2)
                 .foregroundStyle(.tertiary)
-            Text("Pas encore assez de mesures.")
+            Text(hasLoaded ? L("Not enough measurements yet.", "Pas encore assez de mesures.") : L("Loading…", "Chargement…"))
                 .font(.headline)
-            Text("Laissez Aman dans la barre des menus pour suivre la température en continu.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            if hasLoaded {
+                Text(L("Aman measures the temperature every 30 seconds. Keep it in the menu bar for continuous tracking.", "Aman mesure la température toutes les 30 secondes. Laissez-le dans la barre des menus pour un suivi continu."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 180)
     }
 
-    private func chart(_ agg: AggregationResult) -> some View {
-        let yMin = Double(max(0, (agg.min ?? 0) - 5))
-        let yMax = Double(min(100, (agg.max ?? 0) + 5))
-        let hoveredGap = hoverDate.flatMap { d in agg.gaps.first(where: { $0.contains(d) }) }
-        let hoveredPoint: AggregatedPoint? = hoveredGap == nil ? hoverDate.flatMap { d in
-            agg.points.min(by: { abs($0.date.timeIntervalSince(d)) < abs($1.date.timeIntervalSince(d)) })
-        } : nil
+    static func legendText(_ agg: AggregationResult) -> String {
+        var parts: [String] = []
+        if let v = agg.min { parts.append(L("Min \(Formatters.temperature(v))", "Min \(Formatters.temperature(v))")) }
+        if let v = agg.average { parts.append(L("Average \(Formatters.temperature(v))", "Moyenne \(Formatters.temperature(v))")) }
+        if let v = agg.max { parts.append("Max \(Formatters.temperature(v))") }
+        let n = agg.measurementCount
+        parts.append("\(Formatters.integer(n)) \(n > 1 ? L("measurements", "mesures") : L("measurement", "mesure"))")
+        return parts.joined(separator: " · ")
+    }
 
-        return Chart {
-            ForEach(agg.points) { point in
+    private func load() async {
+        guard let historyKey else {
+            aggregation = .empty
+            hasLoaded = true
+            return
+        }
+        let range = self.range
+        let now = Date()
+        let samples = await HistoryStore.shared.loadSamples(for: historyKey, since: now.addingTimeInterval(-range.timeInterval))
+        let result = await Task.detached(priority: .userInitiated) {
+            HistoryAggregation.aggregate(samples: samples, range: range)
+        }.value
+        guard !Task.isCancelled else { return }
+        domainEnd = now
+        if result != aggregation { aggregation = result }
+        hasLoaded = true
+    }
+}
+
+extension HistoryRange {
+    var axisDateFormat: Date.FormatStyle {
+        switch self {
+        case .oneHour, .twentyFourHours: return .dateTime.hour().minute()
+        case .sevenDays: return .dateTime.weekday(.abbreviated).day()
+        case .thirtyDays: return .dateTime.day().month(.abbreviated)
+        }
+    }
+}
+
+/// La courbe elle-même : ne dépend que des données agrégées, jamais de la position de la souris.
+private struct TemperatureChart: View {
+    let aggregation: AggregationResult
+    let range: HistoryRange
+    let domainEnd: Date
+
+    var body: some View {
+        let yMin = Double(max(0, (aggregation.min ?? 0) - 5))
+        let yMax = Double(min(110, (aggregation.max ?? 0) + 5))
+
+        Chart {
+            ForEach(aggregation.points) { point in
                 if range.showsMinMaxBand, let lo = point.minTemperature, let hi = point.maxTemperature {
                     AreaMark(
                         x: .value("Heure", point.date),
@@ -78,146 +132,187 @@ struct TemperatureHistoryView: View {
                         yEnd: .value("Max", hi),
                         series: .value("Segment", point.segment)
                     )
-                    .foregroundStyle(Color.blue.opacity(0.15))
+                    .foregroundStyle(Color.accentColor.opacity(0.15))
                 } else {
                     AreaMark(
                         x: .value("Heure", point.date),
-                        y: .value("Temp", point.temperature),
+                        yStart: .value("Base", yMin),
+                        yEnd: .value("Temp", point.temperature),
                         series: .value("Segment", point.segment)
                     )
                     .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.blue.opacity(0.3), Color.blue.opacity(0.0)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                        LinearGradient(colors: [Color.accentColor.opacity(0.25), Color.accentColor.opacity(0)],
+                                       startPoint: .top, endPoint: .bottom)
                     )
-                    .alignsMarkStylesWithPlotArea(true)
                 }
-
                 LineMark(
                     x: .value("Heure", point.date),
                     y: .value("Temp", point.temperature),
                     series: .value("Segment", point.segment)
                 )
-                .foregroundStyle(Color.blue)
-            }
-
-            if let gap = hoveredGap, let d = hoverDate {
-                RuleMark(x: .value("Heure", d))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5]))
-                    .foregroundStyle(Color.gray)
-                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        tooltip(title: gapTitle(gap), value: "Aucune mesure — Aman n'était pas ouvert")
-                    }
-            } else if let point = hoveredPoint {
-                RuleMark(x: .value("Heure", point.date))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5]))
-                    .foregroundStyle(Color.gray)
-                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        tooltip(title: dateLabel(point.date), value: valueLabel(point))
-                    }
+                .foregroundStyle(Color.accentColor)
+                .lineStyle(StrokeStyle(lineWidth: 1.5, lineJoin: .round))
             }
         }
-        .chartXScale(domain: Date().addingTimeInterval(-range.timeInterval)...Date())
+        .chartXScale(domain: domainEnd.addingTimeInterval(-range.timeInterval)...domainEnd)
         .chartYScale(domain: yMin...yMax)
-        .chartXAxis { AxisMarks(preset: .aligned) }
-        .chartYAxis { AxisMarks(preset: .aligned) }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 6)) { _ in
+                AxisGridLine()
+                AxisValueLabel(format: range.axisDateFormat)
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let v = value.as(Double.self) { Text("\(Int(v))\(Formatters.unitSpace)°") }
+                }
+            }
+        }
         .chartBackground { proxy in
-            // Coupures : bande hachurée très discrète, sans ligne ni remplissage.
-            GeometryReader { geo in
-                if let plotAnchor = proxy.plotFrame {
-                    let plot = geo[plotAnchor]
-                    ForEach(agg.gaps, id: \.self) { gap in
-                        if let x0 = proxy.position(forX: gap.start), let x1 = proxy.position(forX: gap.end), x1 > x0 {
-                            HatchPattern()
-                                .stroke(.quaternary, lineWidth: 1)
-                                .frame(width: x1 - x0, height: plot.height)
-                                .clipped()
-                                .offset(x: plot.minX + x0, y: plot.minY)
-                        }
+            GapHatching(proxy: proxy, gaps: aggregation.gaps)
+        }
+        .chartOverlay { proxy in
+            ChartHoverOverlay(proxy: proxy, aggregation: aggregation, range: range)
+        }
+        .accessibilityLabel(L("Temperature chart", "Courbe de température"))
+        .accessibilityValue(TemperatureHistoryView.legendText(aggregation))
+    }
+}
+
+/// Coupures : bande hachurée très discrète, sans ligne ni remplissage.
+private struct GapHatching: View {
+    let proxy: ChartProxy
+    let gaps: [DateInterval]
+
+    var body: some View {
+        GeometryReader { geo in
+            if let plotAnchor = proxy.plotFrame {
+                let plot = geo[plotAnchor]
+                ForEach(gaps, id: \.self) { gap in
+                    if let x0 = proxy.position(forX: gap.start), let x1 = proxy.position(forX: gap.end), x1 > x0 {
+                        HatchPattern()
+                            .stroke(.quaternary, lineWidth: 1)
+                            .frame(width: x1 - x0, height: plot.height)
+                            .clipped()
+                            .offset(x: plot.minX + x0, y: plot.minY)
                     }
                 }
             }
         }
-        .chartOverlay { proxy in
-            GeometryReader { geo in
+    }
+}
+
+/// Repère vertical et info-bulle. Seule cette vue dépend de la position de la souris.
+private struct ChartHoverOverlay: View {
+    let proxy: ChartProxy
+    let aggregation: AggregationResult
+    let range: HistoryRange
+    @State private var hoverX: CGFloat?
+
+    var body: some View {
+        GeometryReader { geo in
+            let plot = proxy.plotFrame.map { geo[$0] } ?? .zero
+            ZStack(alignment: .topLeading) {
                 Rectangle()
                     .fill(Color.clear)
                     .contentShape(Rectangle())
                     .onContinuousHover { phase in
                         switch phase {
-                        case .active(let location):
-                            if let plotAnchor = proxy.plotFrame {
-                                let x = location.x - geo[plotAnchor].minX
-                                hoverDate = proxy.value(atX: x)
-                            }
-                        case .ended:
-                            hoverDate = nil
+                        case .active(let location): hoverX = location.x
+                        case .ended: hoverX = nil
                         }
                     }
+
+                if let hoverX, plot.width > 0, let date = proxy.value(atX: hoverX - plot.minX, as: Date.self) {
+                    marker(date: date, plot: plot, containerWidth: geo.size.width)
+                }
             }
         }
-        .accessibilityLabel("Courbe de température")
-        .accessibilityValue(legendText(agg))
     }
 
-    private func legend(_ agg: AggregationResult) -> some View {
-        Text(legendText(agg))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .monospacedDigit()
-    }
+    @ViewBuilder
+    private func marker(date: Date, plot: CGRect, containerWidth: CGFloat) -> some View {
+        let gap = aggregation.gaps.first { $0.contains(date) }
+        let point = gap == nil ? nearestPoint(to: date) : nil
+        let markerDate = point?.date ?? date
+        if let x = proxy.position(forX: markerDate) {
+            let xInPlot = plot.minX + x
+            Rectangle()
+                .fill(Color.secondary.opacity(0.6))
+                .frame(width: 1, height: plot.height)
+                .offset(x: xInPlot, y: plot.minY)
+                .allowsHitTesting(false)
 
-    private func legendText(_ agg: AggregationResult) -> String {
-        var parts: [String] = []
-        if let v = agg.min { parts.append("Min \(Formatters.temperature(v))") }
-        if let v = agg.average { parts.append("Moyenne \(Formatters.temperature(v))") }
-        if let v = agg.max { parts.append("Max \(Formatters.temperature(v))") }
-        let n = agg.measurementCount
-        parts.append("\(Formatters.integer(UInt64(n))) \(n > 1 ? "mesures" : "mesure")")
-        return parts.joined(separator: " · ")
-    }
+            if let point, let y = proxy.position(forY: point.temperature) {
+                Circle()
+                    .fill(Color.accentColor)
+                    .overlay(Circle().stroke(Color(nsColor: .windowBackgroundColor), lineWidth: 2))
+                    .frame(width: 9, height: 9)
+                    .offset(x: xInPlot - 4.5, y: plot.minY + y - 4.5)
+                    .allowsHitTesting(false)
+            }
 
-    private func tooltip(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.caption.bold())
+            let tooltipWidth: CGFloat = gap == nil ? 150 : 196
+            tooltip(for: gap, point: point)
+                .offset(x: min(max(0, xInPlot - tooltipWidth / 2), containerWidth - tooltipWidth), y: plot.minY + 4)
+                .allowsHitTesting(false)
         }
-        .padding(6)
-        .background(Color(NSColor.windowBackgroundColor).opacity(0.95))
-        .cornerRadius(6)
-        .shadow(radius: 2)
+    }
+
+    private func nearestPoint(to date: Date) -> AggregatedPoint? {
+        // Points triés par date : recherche dichotomique plutôt qu'un parcours complet à chaque mouvement.
+        let points = aggregation.points
+        guard !points.isEmpty else { return nil }
+        var lo = 0, hi = points.count - 1
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if points[mid].date < date { lo = mid + 1 } else { hi = mid }
+        }
+        if lo > 0, abs(points[lo - 1].date.timeIntervalSince(date)) < abs(points[lo].date.timeIntervalSince(date)) {
+            return points[lo - 1]
+        }
+        return points[lo]
+    }
+
+    @ViewBuilder
+    private func tooltip(for gap: DateInterval?, point: AggregatedPoint?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let gap {
+                Text("\(dateLabel(gap.start)) – \(dateLabel(gap.end))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(L("No measurements (Mac asleep or Aman closed)", "Aucune mesure (Mac en veille ou Aman fermé)"))
+                    .font(.caption.bold())
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let point {
+                Text(dateLabel(point.date))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(valueLabel(point))
+                    .font(.caption.bold())
+                    .monospacedDigit()
+            }
+        }
+        .frame(width: gap == nil ? nil : 180, alignment: .leading)
+        .fixedSize(horizontal: gap == nil, vertical: false)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.secondary.opacity(0.2)))
     }
 
     private func dateLabel(_ date: Date) -> String {
-        range == .oneHour
-            ? date.formatted(date: .omitted, time: .shortened)
-            : date.formatted(date: .abbreviated, time: .shortened)
-    }
-
-    private func gapTitle(_ gap: DateInterval) -> String {
-        "\(dateLabel(gap.start)) – \(dateLabel(gap.end))"
+        range == .oneHour ? Formatters.time(date) : Formatters.date(date)
     }
 
     private func valueLabel(_ point: AggregatedPoint) -> String {
         let avg = Formatters.temperature(Int(point.temperature.rounded()))
-        if range.showsMinMaxBand, let lo = point.minTemperature, let hi = point.maxTemperature {
-            return "\(avg) (min \(Int(lo.rounded())), max \(Int(hi.rounded())))"
+        if range != .oneHour, let lo = point.minTemperature, let hi = point.maxTemperature, lo != hi {
+            return L("\(avg) average (\(Int(lo.rounded())) to \(Int(hi.rounded()))\(Formatters.unitSpace)°C)", "\(avg) en moyenne (\(Int(lo.rounded())) à \(Int(hi.rounded()))\(Formatters.unitSpace)°C)")
         }
         return avg
-    }
-
-    private func load() {
-        guard let historyKey else {
-            samples = []
-            return
-        }
-        let since = Date().addingTimeInterval(-range.timeInterval)
-        samples = HistoryStore.shared.samples(for: historyKey, since: since)
     }
 }
 

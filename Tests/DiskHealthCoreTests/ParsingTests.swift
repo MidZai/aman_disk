@@ -1,38 +1,38 @@
-import XCTest
-@testable import DiskHealthCore
+import Testing
 import Foundation
+@testable import DiskHealthCore
 
-final class ParsingTests: XCTestCase {
-    func testRealFixtureParsing() throws {
+@Suite final class ParsingTests {
+    @Test func testRealFixtureParsing() throws {
         let fixturePath = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()
             .appendingPathComponent("Fixtures/disk0/smart.bin")
         
         guard FileManager.default.fileExists(atPath: fixturePath.path) else {
-            throw XCTSkip("Fixture not found at \(fixturePath.path)")
+            Issue.record(Comment(rawValue: "Fixture not found at \(fixturePath.path)")); return
         }
         
         let data = try Data(contentsOf: fixturePath)
         let smartLog = NVMeSmartParser.parse(data)
         
-        XCTAssertNotNil(smartLog)
+        #expect(smartLog != nil)
         
         if let log = smartLog {
-            XCTAssertEqual(log.temperatureCelsius, 28)
-            XCTAssertEqual(log.percentageUsed, 0)
-            XCTAssertEqual(log.dataUnitsRead, 27756904)
-            XCTAssertEqual(log.dataUnitsWritten, 14747252)
-            XCTAssertEqual(log.powerCycles, 151)
-            XCTAssertEqual(log.powerOnHours, 268)
+            #expect(log.temperatureCelsius == 28)
+            #expect(log.percentageUsed == 0)
+            #expect(log.dataUnitsRead == 27756904)
+            #expect(log.dataUnitsWritten == 14747252)
+            #expect(log.powerCycles == 151)
+            #expect(log.powerOnHours == 268)
         }
     }
-    func testATAAppleParser() throws {
+    @Test func testATAAppleParser() throws {
         let fixturePath = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()
             .appendingPathComponent("Fixtures/ata_apple_sm0512g")
         
         guard FileManager.default.fileExists(atPath: fixturePath.path) else {
-            throw XCTSkip("Fixture ata_apple_sm0512g not found")
+            Issue.record(Comment(rawValue: "Fixture ata_apple_sm0512g not found")); return
         }
         
         let smartData = try Data(contentsOf: fixturePath.appendingPathComponent("smart.bin"))
@@ -41,7 +41,7 @@ final class ParsingTests: XCTestCase {
         let referenceData = try Data(contentsOf: fixturePath.appendingPathComponent("reference.json"))
         
         let snapshot = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false)
-        XCTAssertNotNil(snapshot)
+        #expect(snapshot != nil)
         
         struct RefInfo: Codable {
             let model_name: String
@@ -49,7 +49,7 @@ final class ParsingTests: XCTestCase {
         }
         
         let ref = try JSONDecoder().decode(RefInfo.self, from: referenceData)
-        XCTAssertEqual(snapshot?.model, ref.model_name)
-        XCTAssertEqual(snapshot?.firmware, ref.firmware_version)
+        #expect(snapshot?.model == ref.model_name)
+        #expect(snapshot?.firmware == ref.firmware_version)
     }
 }

@@ -22,6 +22,17 @@ public enum NVMeReader {
         }
     }
 
+    /// Journal SMART (512 octets) et Identify (4096 octets), avec une seule ouverture du pilote.
+    public static func readAll(bsdName: String) throws -> (smart: Data, identify: Data) {
+        var smart = [UInt8](repeating: 0, count: 512)
+        var identify = [UInt8](repeating: 0, count: 4096)
+        let result = bsdName.withCString { bsdNameC in
+            cdiskio_read_nvme_all(bsdNameC, &smart, &identify)
+        }
+        guard result == 0 else { throw mapError(result) }
+        return (Data(smart), Data(identify))
+    }
+
     public static func readSmartLog(bsdName: String) throws -> Data {
         var buffer = [UInt8](repeating: 0, count: 512)
         let result = bsdName.withCString { bsdNameC in

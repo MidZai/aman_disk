@@ -65,10 +65,10 @@ let package = Package(
             name: "DiskHealthAppTests",
             dependencies: ["DiskHealthApp"]
         ),
-        // Tests Swift Testing (0.9) : exécutables sans Xcode, avec les Command Line Tools.
+        // Tous les tests utilisent Swift Testing. Sans Xcode : scripts/test.sh.
         .testTarget(
             name: "AmanDiskTests",
-            dependencies: ["DiskHealthCore", "DiskHealthApp"]
+            dependencies: ["DiskHealthCore", "BenchmarkCore", "DiskHealthApp"]
         )
     ]
 )

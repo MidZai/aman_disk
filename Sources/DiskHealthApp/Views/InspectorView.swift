@@ -3,120 +3,98 @@ import DiskHealthCore
 
 struct InspectorView: View {
     @EnvironmentObject var appManager: AppManager
-    let selection: SidebarItem
-    
+    let selection: SidebarItem?
+
     @State private var showSerial = false
-    
-    var disk: RealDisk? {
+
+    private var disk: RealDisk? {
         switch selection {
-        case .physicalDisk(let id):
-            return appManager.disks.first(where: { $0.id == id })
-        case .volume(let id):
-            let vol = appManager.volumes.first(where: { $0.id == id })
-            if let phys = vol?.physicalDiskBSDNames.first {
-                return appManager.disks.first(where: { $0.id == phys })
-            }
+        case .physicalDisk(let id)?:
+            return appManager.disk(withId: id)
+        case .volume(let id)?:
+            let volume = appManager.volumes.first { $0.id == id }
+            return volume?.physicalDiskBSDNames.first.flatMap(appManager.disk(withId:))
+        case nil:
             return nil
         }
     }
-    
+
     var body: some View {
-        if let disk = disk {
+        if let disk {
             Form {
-                Section("Identification") {
-                    LabeledContent("Modèle", value: disk.physical.model)
-                    
-                    LabeledContent("N° de série") {
-                        HStack {
-                            if showSerial {
-                                let rawSerial = disk.serialNumber ?? "—"
-                                Text(rawSerial)
-                            } else {
-                                Text(serialObfuscated)
+                Section(L("Identification", "Identification")) {
+                    LabeledContent(L("Model", "Modèle"), value: disk.physical.model)
+                    LabeledContent(L("Serial number", "N° de série")) {
+                        HStack(spacing: 6) {
+                            Text(showSerial ? (disk.serialNumber ?? "—") : SerialMasking.masked(disk.serialNumber))
+                                .textSelection(.enabled)
+                            if disk.serialNumber != nil {
+                                Button {
+                                    showSerial.toggle()
+                                } label: {
+                                    Image(systemName: showSerial ? "eye.slash" : "eye")
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(showSerial ? L("Hide serial number", "Masquer le numéro de série") : L("Show serial number", "Afficher le numéro de série"))
                             }
-                            Button {
-                                showSerial.toggle()
-                            } label: {
-                                Image(systemName: showSerial ? "eye.slash" : "eye")
-                            }
-                            .buttonStyle(.plain)
                         }
                     }
-                    
-                    let fw = disk.firmware ?? "—"
-                    LabeledContent("Firmware", value: fw)
-                    LabeledContent("Nom BSD", value: disk.physical.bsdName)
+                    LabeledContent("Firmware", value: disk.firmware ?? "—")
+                    LabeledContent(L("BSD name", "Nom BSD"), value: disk.physical.bsdName)
                 }
-                
-                Section("Capacité") {
-                    LabeledContent("Capacité totale", value: formatGB(disk.physical.sizeBytes))
+
+                Section(L("Capacity", "Capacité")) {
+                    LabeledContent(L("Capacity", "Capacité"), value: Formatters.bytes(disk.physical.sizeBytes))
                     if let identify = disk.identify, identify.totalCapacityBytes > 0 {
-                        LabeledContent("Espace NVM total", value: formatGB(identify.totalCapacityBytes))
+                        LabeledContent(L("Reported NVMe capacity", "Capacité NVMe annoncée"), value: Formatters.bytes(identify.totalCapacityBytes))
                     }
                 }
-                
-                Section("Températures fabricant") {
-                    let warn = disk.identify?.warningTempKelvin ?? 0
-                    let crit = disk.identify?.criticalTempKelvin ?? 0
-                    let warnStr = warn > 0 ? "\(warn - 273) °C" : "Non défini"
-                    let critStr = crit > 0 ? "\(crit - 273) °C" : "Non défini"
-                    LabeledContent("Seuil d'alerte", value: warnStr)
-                    LabeledContent("Seuil critique", value: critStr)
+
+                Section(L("Temperature thresholds", "Seuils de température")) {
+                    let (warning, critical) = temperatureLimits(disk)
+                    LabeledContent(L("Warning", "Alerte"), value: warning)
+                    LabeledContent(L("Critical", "Critique"), value: critical)
                 }
-                
-                Section("Connexion") {
-                    LabeledContent("Interface", value: interfaceStr(disk.physical))
-                    LabeledContent("Emplacement", value: disk.physical.isInternal ? "Interne" : "Externe")
-                    if let vid = disk.physical.usbVendorID, let pid = disk.physical.usbProductID {
-                        LabeledContent("VID:PID", value: String(format: "0x%04X:0x%04X", vid, pid))
-                    }
+
+                Section(L("Connection", "Connexion")) {
+                    LabeledContent("Interface", value: disk.physical.interfaceLabel)
+                    LabeledContent(L("Location", "Emplacement"), value: disk.physical.locationLabel)
+                    LabeledContent(L("Media", "Support"), value: disk.physical.mediumLabel)
                 }
-                
-                let diskVolumes = appManager.volumes.filter { $0.physicalDiskBSDNames.contains(disk.id) }
+
+                let diskVolumes = appManager.volumes(on: disk)
                 if !diskVolumes.isEmpty {
                     Section("Volumes") {
                         ForEach(diskVolumes) { vol in
-                            Text(vol.name)
+                            LabeledContent(vol.name, value: L("\(Formatters.bytes(vol.availableBytes)) free", "\(Formatters.bytes(vol.availableBytes)) libres"))
                         }
                     }
                 }
-                
+
                 Section {
-                    Button("Copier toutes les informations") {
-                        let serialStr = disk.serialNumber ?? "—"
-                        let text = "Modèle: \(disk.physical.model)\nSérie: \(serialStr)\n"
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString(text, forType: .string)
+                    Button(L("Copy Summary", "Copier le résumé")) {
+                        ExportService.copySummary(disk: disk)
+                        ToastCenter.shared.show(message: L("Summary copied", "Résumé copié"), systemImage: "doc.on.doc")
                     }
+                    .help(L("Copies the status and key figures, without the serial number", "Copie l'état et les indicateurs clés, sans le numéro de série"))
                 }
             }
             .formStyle(.grouped)
-            .frame(minWidth: 280, idealWidth: 300, maxWidth: 350, maxHeight: .infinity)
         } else {
-            Text("Aucune information")
-                .frame(minWidth: 280, idealWidth: 300, maxWidth: 350, maxHeight: .infinity)
+            Text(L("No selection", "Aucune sélection"))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
-    
-    private var serialObfuscated: String {
-        guard let s = disk?.serialNumber, s.count > 4 else {
-            return disk?.serialNumber ?? "—"
+
+    /// Seuils annoncés par le disque (NVMe), sinon seuils génériques utilisés par l'app.
+    private func temperatureLimits(_ disk: RealDisk) -> (String, String) {
+        if let id = disk.identify, id.warningTempKelvin > 0 || id.criticalTempKelvin > 0 {
+            let warning = id.warningTempKelvin > 0 ? Formatters.temperature(Int(id.warningTempKelvin) - 273) : L("Not reported", "Non annoncé")
+            let critical = id.criticalTempKelvin > 0 ? Formatters.temperature(Int(id.criticalTempKelvin) - 273) : L("Not reported", "Non annoncé")
+            return (L("\(warning) (manufacturer)", "\(warning) (fabricant)"), L("\(critical) (manufacturer)", "\(critical) (fabricant)"))
         }
-        let suffix = s.suffix(4)
-        return "••••\(suffix)"
-    }
-    
-    private func formatGB(_ bytes: UInt64) -> String {
-        return Formatters.bytes(bytes)
-    }
-    
-    private func interfaceStr(_ phys: PhysicalDisk) -> String {
-        switch phys.connection {
-        case .nvmeInternal, .nvmeExternal: return "NVMe"
-        case .sata: return "SATA"
-        case .usb: return "USB"
-        case .other: return "Autre"
-        }
+        let limits = TemperatureStatus.genericThresholds(isRotational: disk.physical.mediumType == .rotational)
+        return (L("\(Formatters.temperature(limits.warning)) (default)", "\(Formatters.temperature(limits.warning)) (par défaut)"), L("\(Formatters.temperature(limits.critical)) (default)", "\(Formatters.temperature(limits.critical)) (par défaut)"))
     }
 }

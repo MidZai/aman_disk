@@ -5,81 +5,77 @@ public protocol TemperatureSamplerDelegate: AnyObject {
     func temperatureSamplerDidUpdate(_ temp: Int)
 }
 
-public class TemperatureSampler {
+/// Relève la température du disque pendant un test de performances (toutes les 2 s en NVMe, 5 s sinon).
+///
+/// Minuterie GCD sur une file série : l'ancienne version bloquait sa propre file avec
+/// `RunLoop.run()`, si bien qu'aucune mesure n'était prise après la première (l'arrêt de sécurité
+/// à 70 °C ne pouvait jamais se déclencher) et que le fil et la minuterie fuyaient à chaque test.
+public final class TemperatureSampler: @unchecked Sendable {
     private let bsdName: String
     private let protocolType: StorageProtocol
     private let connection: Connection
-    private var timer: Timer?
-    private let queue: DispatchQueue
+    private let queue = DispatchQueue(label: "io.github.aman-disk.temperature-sampler", qos: .utility)
+    private var timer: DispatchSourceTimer?
+    private var knownIdentify: NVMeIdentify?
+    private let lock = NSLock()
+    private var _currentTempC: Int?
+    private var _maxTempC: Int?
+
     public weak var delegate: TemperatureSamplerDelegate?
-    
-    public private(set) var currentTempC: Int?
-    public private(set) var maxTempC: Int?
-    
+    /// Chaque relevé complet, pour que l'historique de température n'ait pas de trou pendant le test.
+    public var onSnapshot: ((DiskHealthSnapshot, Date) -> Void)?
+
+    public var currentTempC: Int? { lock.withLock { _currentTempC } }
+    public var maxTempC: Int? { lock.withLock { _maxTempC } }
+
     public init(bsdName: String, protocolType: StorageProtocol, connection: Connection) {
         self.bsdName = bsdName
         self.protocolType = protocolType
         self.connection = connection
-        self.queue = DispatchQueue(label: "io.github.aman-disk.TemperatureSampler", qos: .background)
     }
-    
+
+    deinit {
+        timer?.cancel()
+    }
+
+    /// Démarre les mesures. La première est prise immédiatement, de façon synchrone :
+    /// la température de départ est donc connue dès le retour de cette fonction.
     public func start() {
-        let interval: TimeInterval = connection == .nvmeInternal || connection == .nvmeExternal ? 2.0 : 5.0
-        
-        queue.async {
-            self.sample()
-            
-            let t = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-                self?.queue.async {
-                    self?.sample()
-                }
-            }
-            RunLoop.current.add(t, forMode: .common)
-            self.timer = t
-            RunLoop.current.run()
-        }
+        queue.sync { self.sample() }
+        let interval: TimeInterval = protocolType == .nvme ? 2.0 : 5.0
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(250))
+        t.setEventHandler { [weak self] in self?.sample() }
+        t.resume()
+        queue.sync { self.timer = t }
     }
-    
+
     public func stop() {
-        queue.async {
-            self.timer?.invalidate()
-            self.timer = nil
+        queue.sync {
+            timer?.cancel()
+            timer = nil
         }
     }
-    
+
+    /// À appeler sur `queue`.
     private func sample() {
-        var temp: Int? = nil
-        if protocolType == .nvme {
-            if let snapshot = try? NVMeBackend.read(bsdName: bsdName) {
-                if case .nvme(let smartLog, _) = snapshot {
-                    temp = smartLog.temperatureCelsius
-                }
-            }
-        } else if protocolType == .ata || protocolType == .pcieAhci {
-            if let snapshot = try? ATABackend.read(bsdName: bsdName) {
-                if case .ata(let ata) = snapshot {
-                    let profile = ATACatalog.profile(for: ata.model)
-                    for attr in ata.attributes {
-                        let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-                        if info.role == .temperature {
-                            if let v = attr.value(for: .temperature) {
-                                temp = Int(v)
-                            }
-                            break
-                        }
-                    }
-                }
-            }
+        let snapshot: DiskHealthSnapshot?
+        switch protocolType {
+        case .nvme:
+            snapshot = try? NVMeBackend.read(bsdName: bsdName, knownIdentify: knownIdentify)
+            if case .nvme(_, let identify)? = snapshot { knownIdentify = identify }
+        case .ata, .pcieAhci:
+            snapshot = try? ATABackend.read(bsdName: bsdName)
+        default:
+            snapshot = nil
         }
-        
-        if let t = temp {
-            currentTempC = t
-            if let mt = maxTempC {
-                maxTempC = max(mt, t)
-            } else {
-                maxTempC = t
-            }
-            delegate?.temperatureSamplerDidUpdate(t)
+        guard let snapshot else { return }
+        onSnapshot?(snapshot, Date())
+        guard let t = DiskMetrics(snapshot: snapshot).temperatureC else { return }
+        lock.withLock {
+            _currentTempC = t
+            _maxTempC = max(_maxTempC ?? t, t)
         }
+        delegate?.temperatureSamplerDidUpdate(t)
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import DiskHealthCore
 
 public enum BenchPattern: String, Codable { case sequential, random }
 public enum BenchDirection: String, Codable { case read, write }
@@ -24,9 +25,9 @@ public enum BenchProfile: String, Codable, CaseIterable {
     
     public var label: String {
         switch self {
-        case .quick: return "Rapide"
+        case .quick: return L("Quick", "Rapide")
         case .standard: return "Standard"
-        case .readOnly: return "Lecture seule"
+        case .readOnly: return L("Read only", "Lecture seule")
         }
     }
     

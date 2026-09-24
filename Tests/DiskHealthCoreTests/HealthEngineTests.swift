@@ -1,7 +1,8 @@
-import XCTest
+import Testing
+import Foundation
 @testable import DiskHealthCore
 
-final class HealthEngineTests: XCTestCase {
+@Suite final class HealthEngineTests {
     
     private func makeSmartLog(
         percentageUsed: UInt8 = 0,
@@ -39,75 +40,75 @@ final class HealthEngineTests: XCTestCase {
         )
     }
 
-    func testHealthEngine_Good() {
+    @Test func testHealthEngine_Good() {
         let data = makeSmartLog(percentageUsed: 0)
         let smartLog = NVMeSmartParser.parse(data)!
         let identify = defaultIdentify()
         
         let assessment = HealthEngine.evaluate(smart: smartLog, identify: identify)
-        XCTAssertEqual(assessment.status, .good)
-        XCTAssertEqual(assessment.healthPercent, 100)
+        #expect(assessment.status == .good)
+        #expect(assessment.healthPercent == 100)
     }
     
-    func testHealthEngine_GoodWithSlightWear() {
+    @Test func testHealthEngine_GoodWithSlightWear() {
         let data = makeSmartLog(percentageUsed: 2)
         let smartLog = NVMeSmartParser.parse(data)!
         
         let assessment = HealthEngine.evaluate(smart: smartLog, identify: defaultIdentify())
-        XCTAssertEqual(assessment.status, .good)
-        XCTAssertEqual(assessment.healthPercent, 98)
+        #expect(assessment.status == .good)
+        #expect(assessment.healthPercent == 98)
     }
     
-    func testHealthEngine_CautionWear() {
+    @Test func testHealthEngine_CautionWear() {
         let data = makeSmartLog(percentageUsed: 91)
         let smartLog = NVMeSmartParser.parse(data)!
         
         let assessment = HealthEngine.evaluate(smart: smartLog, identify: defaultIdentify())
-        XCTAssertEqual(assessment.status, .caution)
-        XCTAssertEqual(assessment.healthPercent, 9)
+        #expect(assessment.status == .caution)
+        #expect(assessment.healthPercent == 9)
     }
     
-    func testHealthEngine_CautionMediaErrors() {
+    @Test func testHealthEngine_CautionMediaErrors() {
         let data = makeSmartLog(mediaErrors: 1)
         let smartLog = NVMeSmartParser.parse(data)!
         
         let assessment = HealthEngine.evaluate(smart: smartLog, identify: defaultIdentify())
-        XCTAssertEqual(assessment.status, .caution)
+        #expect(assessment.status == .caution)
     }
     
-    func testHealthEngine_BadAvailableSpare() {
+    @Test func testHealthEngine_BadAvailableSpare() {
         let data = makeSmartLog(availableSpare: 4, threshold: 10)
         let smartLog = NVMeSmartParser.parse(data)!
         
         let assessment = HealthEngine.evaluate(smart: smartLog, identify: defaultIdentify())
-        XCTAssertEqual(assessment.status, .bad)
+        #expect(assessment.status == .bad)
     }
     
-    func testHealthEngine_BadCriticalWarningReadOnly() {
+    @Test func testHealthEngine_BadCriticalWarningReadOnly() {
         // bit 3 = read only = 0x08
         let data = makeSmartLog(criticalWarning: 0b0000_1000)
         let smartLog = NVMeSmartParser.parse(data)!
         
         let assessment = HealthEngine.evaluate(smart: smartLog, identify: defaultIdentify())
-        XCTAssertEqual(assessment.status, .bad)
+        #expect(assessment.status == .bad)
     }
     
-    func testHealthEngine_PercentageUsedClamped() {
+    @Test func testHealthEngine_PercentageUsedClamped() {
         let data = makeSmartLog(percentageUsed: 150)
         let smartLog = NVMeSmartParser.parse(data)!
         
         let assessment = HealthEngine.evaluate(smart: smartLog, identify: defaultIdentify())
         // status may be .caution due to wear >= 90
-        XCTAssertEqual(assessment.status, .caution)
-        XCTAssertEqual(assessment.healthPercent, 0)
+        #expect(assessment.status == .caution)
+        #expect(assessment.healthPercent == 0)
     }
     
-    func testHealthEngine_PercentageUsedTooHighDoesNotCrash() {
+    @Test func testHealthEngine_PercentageUsedTooHighDoesNotCrash() {
         let data = makeSmartLog(percentageUsed: 255)
         let smartLog = NVMeSmartParser.parse(data)!
         
         let assessment = HealthEngine.evaluate(smart: smartLog, identify: defaultIdentify())
-        XCTAssertEqual(assessment.status, .caution)
-        XCTAssertEqual(assessment.healthPercent, 0)
+        #expect(assessment.status == .caution)
+        #expect(assessment.healthPercent == 0)
     }
 }

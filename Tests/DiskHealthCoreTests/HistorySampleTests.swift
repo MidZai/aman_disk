@@ -1,8 +1,9 @@
-import XCTest
+import Testing
+import Foundation
 @testable import DiskHealthCore
 
-final class HistorySampleTests: XCTestCase {
-    func testLegacyHistorySampleDecoding() throws {
+@Suite final class HistorySampleTests {
+    @Test func testLegacyHistorySampleDecoding() throws {
         let legacyJSON = """
         {
             "date": 718300000,
@@ -19,12 +20,12 @@ final class HistorySampleTests: XCTestCase {
         let decoder = JSONDecoder()
         let sample = try decoder.decode(HistorySample.self, from: legacyJSON)
         
-        XCTAssertEqual(sample.temperatureC, 35)
-        XCTAssertEqual(sample.percentageUsed, 2)
-        XCTAssertEqual(sample.dataUnitsWritten, 12345)
+        #expect(sample.temperatureC == 35)
+        #expect(sample.percentageUsed == 2)
+        #expect(sample.dataUnitsWritten == 12345)
     }
     
-    func testATAHistorySampleDecoding() throws {
+    @Test func testATAHistorySampleDecoding() throws {
         let newJSON = """
         {
             "date": 718300000,
@@ -36,8 +37,8 @@ final class HistorySampleTests: XCTestCase {
         let decoder = JSONDecoder()
         let sample = try decoder.decode(HistorySample.self, from: newJSON)
         
-        XCTAssertEqual(sample.temperatureC, 35)
-        XCTAssertNil(sample.percentageUsed)
-        XCTAssertEqual(sample.powerOnHours, 100)
+        #expect(sample.temperatureC == 35)
+        #expect(sample.percentageUsed == nil)
+        #expect(sample.powerOnHours == 100)
     }
 }

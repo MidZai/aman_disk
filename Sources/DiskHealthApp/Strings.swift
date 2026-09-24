@@ -1,101 +1,56 @@
 import Foundation
+import DiskHealthCore
 
+/// Textes partagés entre plusieurs vues (les autres restent au plus près de leur vue).
 enum Strings {
-    static let appName = "Aman Disk"
-    static let refresh = "Actualiser"
-    static let copyReport = "Copier le rapport"
-    static let history = "Historique"
-    static let health = "santé"
-    static let statusGood = "En bonne santé"
-    static let statusCaution = "À surveiller"
-    static let statusBad = "Défaillance probable"
-    static let statusUnknown = "Santé inconnue"
-    
-    static let tileTemperature = "Température"
-    static let tileTemperatureHelp = "Dernière heure, max 44 °C"
-    static let tileDataWritten = "Données écrites"
-    static let tileLifeLeft = "Durée de vie restante"
-    static let tileLifeLeftHelp = "Estimation disponible après 7 jours"
-    
-    static let infoTitle = "Informations"
-    static let infoCapacity = "Capacité"
-    static let infoInterface = "Interface"
-    static let infoFirmware = "Firmware"
-    static let infoSerial = "Numéro de série"
-    static let infoPowerOnHours = "Heures d'allumage"
-    static let infoPowerCycles = "Cycles d'allumage"
-    static let infoUnsafeShutdowns = "Arrêts non propres"
-    static let infoMediaErrors = "Erreurs média"
-    static let actionShow = "Afficher"
-    static let actionHide = "Masquer"
-    
-    static let smartTitle = "Journal SMART / Health"
-    static let smartColId = "ID"
-    static let smartColAttr = "Attribut"
-    static let smartColRaw = "Brut"
-    static let smartColValue = "Valeur"
-    
-    static let attr01 = "Avertissement critique"
-    static let attr02 = "Température composite"
-    static let attr03 = "Réserve disponible"
-    static let attr04 = "Seuil de réserve"
-    static let attr05 = "Pourcentage utilisé"
-    static let attr06 = "Données lues"
-    static let attr07 = "Données écrites"
-    static let attr08 = "Commandes de lecture"
-    static let attr09 = "Commandes d'écriture"
-    static let attr0A = "Temps d'activité du contrôleur"
-    static let attr0B = "Cycles d'allumage"
-    static let attr0C = "Heures d'allumage"
-    static let attr0D = "Arrêts non propres"
-    static let attr0E = "Erreurs média et intégrité"
-    static let attr0F = "Entrées du journal d'erreurs"
-    
-    static let unsupportedTitle = "Les données de santé de ce disque ne sont pas accessibles"
-    static let unsupportedText1 = "Son boîtier USB ne transmet pas les commandes SMART à macOS. Le disque fonctionne normalement : seules l'usure et la température restent invisibles."
-    static let unsupportedText2 = "Exportez un diagnostic anonymisé et joignez-le à une demande sur GitHub. Chaque boîtier documenté peut être pris en charge dans une prochaine version."
-    static let exportDiagnostic = "Exporter le diagnostic…"
-    static let viewSupported = "Voir les boîtiers pris en charge"
-    
-    // Phase F
-    static let sdCardReaderTitle = "Lecteur de carte SD"
-    static let sdCardReaderText = "Ce lecteur de carte SD ne fournit pas de données de santé. Les cartes SD n'ont pas d'interface S.M.A.R.T. accessible depuis macOS."
-    
-    static let smartDisabledTitle = "S.M.A.R.T. désactivé"
-    static let smartDisabledText = "Ce disque prend en charge S.M.A.R.T., mais la fonction est désactivée. Aman Disk ne modifie jamais les réglages d'un disque."
-    
-    static let virtualDiskTitle = "Disque virtuel"
-    static let virtualDiskText = "Ce disque est virtuel : il est fourni par un logiciel de virtualisation. Sa santé dépend du disque réel de l'ordinateur hôte."
-    
-    static let noSmartInterfaceTitle = "Santé non disponible"
-    static let noSmartInterfaceText = "macOS n'expose aucune interface de santé pour ce disque. Exportez un diagnostic pour nous aider à le prendre en charge."
-    
-    static let readErrorTitle = "Erreur de lecture"
+    static let statusGood = L("Healthy", "En bonne santé")
+    static let statusCaution = L("Needs attention", "À surveiller")
+    static let statusBad = L("Likely failing", "Défaillance probable")
+    static let statusUnknown = L("Health unknown", "Santé inconnue")
+
+    static let fusionDriveMember = L("Part of a Fusion Drive", "Fait partie d'un Fusion Drive")
+
+    // Disques sans données de santé
+    static let unsupportedTitle = L("This drive's health data isn't accessible", "Les données de santé de ce disque ne sont pas accessibles")
+    static let unsupportedText1 = L("Its USB enclosure doesn't pass S.M.A.R.T. commands through to macOS. The drive works normally; only wear and temperature can't be seen.", "Son boîtier USB ne transmet pas les commandes S.M.A.R.T. à macOS. Le disque fonctionne normalement : seules l'usure et la température restent invisibles.")
+    static let exportDiagnostic = L("Export Diagnostic…", "Exporter le diagnostic…")
+
+    static let sdCardReaderTitle = L("SD card reader", "Lecteur de carte SD")
+    static let sdCardReaderText = L("This SD card reader doesn't provide health data. SD cards have no S.M.A.R.T. interface that macOS can access.", "Ce lecteur de carte SD ne fournit pas de données de santé. Les cartes SD n'ont pas d'interface S.M.A.R.T. accessible depuis macOS.")
+
+    static let smartDisabledTitle = L("S.M.A.R.T. disabled", "S.M.A.R.T. désactivé")
+    static let smartDisabledText = L("This drive supports S.M.A.R.T., but it's turned off. Aman Disk never changes a drive's settings.", "Ce disque prend en charge S.M.A.R.T., mais la fonction est désactivée. Aman Disk ne modifie jamais les réglages d'un disque.")
+
+    static let virtualDiskTitle = L("Virtual disk", "Disque virtuel")
+    static let virtualDiskText = L("This is a virtual disk provided by virtualization software. Its health depends on the host computer's real drive.", "Ce disque est virtuel : il est fourni par un logiciel de virtualisation. Sa santé dépend du disque réel de l'ordinateur hôte.")
+
+    static let noSmartInterfaceTitle = L("Health not available", "Santé non disponible")
+    static let noSmartInterfaceText = L("macOS doesn't expose any health interface for this drive. Export a diagnostic to help us support it.", "macOS n'expose aucune interface de santé pour ce disque. Exportez un diagnostic pour nous aider à le prendre en charge.")
+
+    static let readErrorTitle = L("Read error", "Erreur de lecture")
     static func readErrorText(code: String) -> String {
-        "La lecture des données de santé a échoué (\(code)). Réessayez ; si le problème persiste, exportez un diagnostic."
+        L("Reading health data failed (\(code)). Try again; if the problem persists, export a diagnostic.", "La lecture des données de santé a échoué (\(code)). Réessayez ; si le problème persiste, exportez un diagnostic.")
     }
-    
-    static let fusionDriveMember = "Fait partie d'un Fusion Drive"
-    
-    // Benchmark Strings
+
+    // Test de performances
     static func benchConfirmMessage(volume: String, size: String, duration: String, maxWritten: String) -> String {
-        return "Aman Disk va créer un fichier de test de \(size) sur « \(volume) », le lire et l'écrire, puis le supprimer. Durée estimée : \(duration). Données écrites au plus : \(maxWritten). Fermez les applications qui utilisent beaucoup le disque pour des résultats fiables."
+        L("Aman Disk will create a \(size) test file on “\(volume)”, read and write it, then delete it. Duration: \(duration). Data written: up to \(maxWritten). Quit apps that use the disk heavily for reliable results.", "Aman Disk va créer un fichier de test de \(size) sur « \(volume) », le lire et l'écrire, puis le supprimer. Durée : \(duration). Données écrites : \(maxWritten) au plus. Fermez les applications qui utilisent beaucoup le disque pour des résultats fiables.")
     }
-    static let benchConfirmInternal = "Ce disque est interne. Sur la plupart des Mac récents, il est soudé et ne peut pas être remplacé. Un test consomme une part infime de son endurance, mais évitez de le lancer en boucle."
+    static let benchConfirmInternal = L("This is an internal drive. On most recent Macs it's soldered and can't be replaced. A test uses a tiny fraction of its endurance, but avoid running it over and over.", "Ce disque est interne. Sur la plupart des Mac récents, il est soudé et ne peut pas être remplacé. Un test consomme une part infime de son endurance, mais évitez de le lancer en boucle.")
     static func benchNoSpace(volume: String, size: String, required: String) -> String {
-        return "Espace libre insuffisant : il faut au moins \(required) de libre sur « \(volume) » pour un fichier de \(size). Choisissez une taille plus petite."
+        L("Not enough free space: a \(size) file needs at least \(required) free on “\(volume)”. Choose a smaller size.", "Espace libre insuffisant : il faut au moins \(required) de libre sur « \(volume) » pour un fichier de \(size). Choisissez une taille plus petite.")
     }
     static func benchAccessDenied(volume: String) -> String {
-        return "macOS n'a pas autorisé Aman Disk à écrire sur « \(volume) ». Vous pouvez l'autoriser dans Réglages Système › Confidentialité et sécurité › Fichiers et dossiers."
+        L("macOS didn't allow Aman Disk to write to “\(volume)”. You can allow it in System Settings › Privacy & Security › Files and Folders.", "macOS n'a pas autorisé Aman Disk à écrire sur « \(volume) ». Vous pouvez l'autoriser dans Réglages Système › Confidentialité et sécurité › Fichiers et dossiers.")
     }
-    static let benchQuitWarning = "Un test de performances est en cours. Quitter l'arrête et supprime le fichier de test."
+    static let benchQuitWarning = L("A performance test is running. Quitting stops it and deletes the test file.", "Un test de performances est en cours. Quitter l'arrête et supprime le fichier de test.")
     static func benchStoppedTemp(temp: String) -> String {
-        return "Test arrêté : le disque a atteint \(temp) °C. Laissez-le refroidir avant de relancer."
+        L("Test stopped: the drive reached \(temp) °C. Let it cool down before running it again.", "Test arrêté : le disque a atteint \(temp) °C. Laissez-le refroidir avant de relancer.")
     }
-    static let benchCancelled = "Test annulé. Le fichier de test a été supprimé."
-    static let benchHelpVolume = "Volume sur lequel le fichier de test est créé. Le test mesure le disque physique qui porte ce volume."
-    static let benchHelpProfile = "Rapide : 3 passes de 2 s. Standard : 5 passes de 5 s. Lecture seule : écrit le fichier de test une seule fois, puis ne fait que des lectures."
-    static let benchHelpSize = "Taille du fichier de test. Un fichier plus grand limite l'effet des caches du disque, mais écrit davantage."
-    static let benchHelpValues = "Valeur affichée : la meilleure passe. La médiane de toutes les passes figure dans le rapport."
-    static let benchHelpQD = "QD (profondeur de file) : nombre de requêtes envoyées en parallèle. Sur macOS, elle est simulée par des fils d'exécution parallèles. Les résultats sont comparables entre Mac, pas directement avec des tests faits sous Windows."
+    static let benchCancelled = L("Test cancelled. The test file was deleted.", "Test annulé. Le fichier de test a été supprimé.")
+    static let benchHelpVolume = L("Volume where the test file is created. The test measures the physical drive that holds this volume.", "Volume sur lequel le fichier de test est créé. Le test mesure le disque physique qui porte ce volume.")
+    static let benchHelpProfile = L("Quick: 3 passes of 2 s. Standard: 5 passes of 5 s. Read only: writes the test file once, then only reads.", "Rapide : 3 passes de 2 s. Standard : 5 passes de 5 s. Lecture seule : écrit le fichier de test une seule fois, puis ne fait que des lectures.")
+    static let benchHelpSize = L("Size of the test file. A larger file reduces the effect of the drive's caches, but writes more data.", "Taille du fichier de test. Un fichier plus grand limite l'effet des caches du disque, mais écrit davantage.")
+    static let benchHelpValues = L("Each value is the best pass. Hover over a cell for the median and latency. 1 MB/s = 1,000,000 bytes per second.", "Valeur affichée : la meilleure passe. Survolez une case pour la médiane et la latence. 1 Mo/s = 1 000 000 octets par seconde.")
+    static let benchHelpQD = L("Number of requests sent in parallel (queue depth). On macOS it's simulated with parallel threads, so results compare between Macs, not directly with tests run on Windows.", "Nombre de requêtes envoyées en parallèle (profondeur de file). Sur macOS, elle est simulée par des fils d'exécution parallèles : les résultats se comparent donc entre Mac, pas directement avec des tests faits sous Windows.")
 }

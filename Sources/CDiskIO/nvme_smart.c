@@ -3,15 +3,11 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/IOCFPlugIn.h>
-#include <stdio.h>
 #include <string.h>
 
-static int _cdiskio_do_nvme_operation(const char *bsd_name, unsigned char *out_buffer, int buffer_size, int op_type) {
-    // op_type: 1 = SMART, 2 = Identify
-    if ((op_type == 1 && buffer_size < 512) || (op_type == 2 && buffer_size < 4096)) {
-        return -5;
-    }
-
+// op_mask : 1 = journal SMART (512 octets), 2 = données Identify (4096 octets), 3 = les deux
+// avec une seule ouverture du plug-in.
+static int _cdiskio_do_nvme_operation(const char *bsd_name, unsigned char *smart_buffer, unsigned char *identify_buffer, int op_mask) {
     io_service_t service = MACH_PORT_NULL;
     io_service_t target_service = MACH_PORT_NULL;
     IOCFPlugInInterface **plugin = NULL;
@@ -20,90 +16,72 @@ static int _cdiskio_do_nvme_operation(const char *bsd_name, unsigned char *out_b
     SInt32 score = 0;
     IOReturn err = kIOReturnSuccess;
 
-    // 1. Get IOMedia service from bsd_name
+    // 1. IOMedia à partir du nom BSD (IOServiceGetMatchingService consomme le dictionnaire).
     CFMutableDictionaryRef matchingDict = IOBSDNameMatching(kIOMainPortDefault, 0, bsd_name);
     if (!matchingDict) {
         return -1;
     }
-
     service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict);
     if (service == MACH_PORT_NULL) {
         return -1;
     }
 
-    // 2. Traverse parents in kIOServicePlane to find NVMe SMART Capable
-    io_iterator_t iter;
-    err = IORegistryEntryCreateIterator(service, kIOServicePlane, kIORegistryIterateRecursively | kIORegistryIterateParents, &iter);
-    if (err != kIOReturnSuccess) {
-        result = -2;
-        goto cleanup;
-    }
-
+    // 2. Remonte les parents jusqu'au contrôleur qui annonce « NVMe SMART Capable ».
     target_service = service;
     IOObjectRetain(target_service);
-
     bool found = false;
     while (target_service != MACH_PORT_NULL) {
         CFTypeRef smartCapable = IORegistryEntryCreateCFProperty(target_service, CFSTR("NVMe SMART Capable"), kCFAllocatorDefault, 0);
         if (smartCapable) {
-            if (CFGetTypeID(smartCapable) == CFBooleanGetTypeID() && CFBooleanGetValue((CFBooleanRef)smartCapable)) {
+            bool capable = CFGetTypeID(smartCapable) == CFBooleanGetTypeID() && CFBooleanGetValue((CFBooleanRef)smartCapable);
+            CFRelease(smartCapable);
+            if (capable) {
                 found = true;
-                CFRelease(smartCapable);
                 break;
             }
-            CFRelease(smartCapable);
         }
-        
         io_service_t parent = MACH_PORT_NULL;
         IORegistryEntryGetParentEntry(target_service, kIOServicePlane, &parent);
         IOObjectRelease(target_service);
         target_service = parent;
     }
-    IOObjectRelease(iter);
-
     if (!found || target_service == MACH_PORT_NULL) {
         result = -2;
         goto cleanup;
     }
 
-    // 3. IOCreatePlugInInterfaceForService
+    // 3. Plug-in et interface NVMe SMART.
     err = IOCreatePlugInInterfaceForService(target_service, kIONVMeSMARTUserClientTypeID, kIOCFPlugInInterfaceID, &plugin, &score);
     if (err != kIOReturnSuccess || !plugin) {
-        fprintf(stderr, "IOCreatePlugInInterfaceForService failed: 0x%08x\n", err);
         result = -3;
         goto cleanup;
     }
-
-    // 4. QueryInterface
     err = (*plugin)->QueryInterface(plugin, CFUUIDGetUUIDBytes(kIONVMeSMARTInterfaceID), (LPVOID *)&smartIf);
     if (err != kIOReturnSuccess || !smartIf) {
-        fprintf(stderr, "QueryInterface failed: 0x%08x\n", err);
+        smartIf = NULL;
         result = -3;
         goto cleanup;
     }
 
-    // 5. Read data
-    memset(out_buffer, 0, buffer_size);
-    if (op_type == 1) {
-        err = (*smartIf)->SMARTReadData(smartIf, out_buffer);
-        if (err != kIOReturnSuccess) {
-            fprintf(stderr, "SMARTReadData failed: 0x%08x\n", err);
+    // 4. Lectures.
+    result = 0;
+    if (op_mask & 1) {
+        memset(smart_buffer, 0, 512);
+        if ((*smartIf)->SMARTReadData(smartIf, smart_buffer) != kIOReturnSuccess) {
             result = -4;
-        } else {
-            result = 0;
+            goto cleanup;
         }
-    } else if (op_type == 2) {
-        err = (*smartIf)->GetIdentifyData(smartIf, out_buffer, 0); // namespace 0 implies controller for Apple's interface?
-        if (err != kIOReturnSuccess) {
-            fprintf(stderr, "GetIdentifyData failed: 0x%08x\n", err);
+    }
+    if (op_mask & 2) {
+        memset(identify_buffer, 0, 4096);
+        // Espace de noms 0 : données Identify du contrôleur.
+        if ((*smartIf)->GetIdentifyData(smartIf, identify_buffer, 0) != kIOReturnSuccess) {
             result = -4;
-        } else {
-            result = 0;
+            goto cleanup;
         }
     }
 
 cleanup:
-    // 6. Cleanup
     if (smartIf) {
         (*smartIf)->Release(smartIf);
     }
@@ -116,7 +94,6 @@ cleanup:
     if (service != MACH_PORT_NULL) {
         IOObjectRelease(service);
     }
-
     return result;
 }
 
@@ -124,11 +101,16 @@ cleanup:
 int cdiskio_read_nvme_smart(const char *bsd_name, unsigned char *out_buffer, int buffer_size) {
     if (bsd_name == NULL || out_buffer == NULL) return -1;
     if (buffer_size < 512) return -5;
-    return _cdiskio_do_nvme_operation(bsd_name, out_buffer, buffer_size, 1);
+    return _cdiskio_do_nvme_operation(bsd_name, out_buffer, NULL, 1);
 }
 
 int cdiskio_read_nvme_identify(const char *bsd_name, unsigned char *out_buffer, int buffer_size) {
     if (bsd_name == NULL || out_buffer == NULL) return -1;
     if (buffer_size < 4096) return -5;
-    return _cdiskio_do_nvme_operation(bsd_name, out_buffer, buffer_size, 2);
+    return _cdiskio_do_nvme_operation(bsd_name, NULL, out_buffer, 2);
+}
+
+int cdiskio_read_nvme_all(const char *bsd_name, unsigned char *smart_buffer, unsigned char *identify_buffer) {
+    if (bsd_name == NULL || smart_buffer == NULL || identify_buffer == NULL) return -1;
+    return _cdiskio_do_nvme_operation(bsd_name, smart_buffer, identify_buffer, 3);
 }

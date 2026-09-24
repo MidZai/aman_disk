@@ -5,197 +5,161 @@
 #include <IOKit/IOCFPlugIn.h>
 #include <IOKit/storage/ata/ATASMARTLib.h>
 #include <string.h>
-#include <stdio.h>
+
+// Lecture seule : ce fichier n'envoie jamais de commande qui modifie le disque ou ses réglages
+// (pas de SMARTEnableDisableOperations, pas d'auto-sauvegarde, pas d'autotest).
+
+typedef struct {
+    IOCFPlugInInterface **plugin;
+    IOATASMARTInterface **smart;
+} ata_handle;
+
+static void close_handle(ata_handle *h) {
+    // QueryInterface a ajouté une référence : elle doit être rendue avant de détruire le plug-in,
+    // sinon la connexion au pilote reste ouverte à chaque lecture.
+    if (h->smart) {
+        (*h->smart)->Release(h->smart);
+        h->smart = NULL;
+    }
+    if (h->plugin) {
+        IODestroyPlugInInterface(h->plugin);
+        h->plugin = NULL;
+    }
+}
 
 static int is_smart_disabled(IOATASMARTInterface **smart_interface) {
-    if (!smart_interface) return 0;
     unsigned char identify[512] = {0};
     UInt32 outSize = 0;
     IOReturn ikr = (*smart_interface)->GetATAIdentifyData(smart_interface, identify, 512, &outSize);
     if (ikr == kIOReturnSuccess && outSize >= 512) {
-        unsigned short *words = (unsigned short *)identify;
-        // Word 82 bit 0 = SMART feature set supported
-        // Word 85 bit 0 = SMART feature set enabled
-        if ((words[82] & 0x0001) != 0 && (words[85] & 0x0001) == 0) {
+        // Mots 82 et 85, bit 0 : S.M.A.R.T. pris en charge / activé (petit-boutiste).
+        unsigned short w82 = (unsigned short)(identify[164] | (identify[165] << 8));
+        unsigned short w85 = (unsigned short)(identify[170] | (identify[171] << 8));
+        if ((w82 & 0x0001) != 0 && (w85 & 0x0001) == 0) {
             return 1;
         }
     }
     return 0;
 }
 
-static int get_ata_smart_interface(const char *bsd_name, IOCFPlugInInterface ***out_plugin, IOATASMARTInterface ***out_smart_interface) {
-    if (!bsd_name || !out_plugin || !out_smart_interface) return -1;
-    
-    CFDictionaryRef matching = IOBSDNameMatching(kIOMainPortDefault, 0, bsd_name);
-    if (!matching) {
-        return -2;
-    }
-    
-    io_iterator_t iterator = 0;
-    kern_return_t kr = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator);
-    if (kr != kIOReturnSuccess || iterator == 0) {
-        return -2;
-    }
-    
-    io_object_t media = IOIteratorNext(iterator);
-    IOObjectRelease(iterator);
-    
-    if (media == 0) {
-        return -3;
-    }
-    
+static int open_handle(const char *bsd_name, ata_handle *out) {
+    out->plugin = NULL;
+    out->smart = NULL;
+    if (!bsd_name) return -1;
+
+    CFMutableDictionaryRef matching = IOBSDNameMatching(kIOMainPortDefault, 0, bsd_name);
+    if (!matching) return -2;
+
+    // IOServiceGetMatchingService consomme la référence du dictionnaire.
+    io_object_t media = IOServiceGetMatchingService(kIOMainPortDefault, matching);
+    if (media == 0) return -3;
+
+    // Le plug-in ATA S.M.A.R.T. est publié par un ancêtre (IOAHCIBlockStorageDevice, etc.) :
+    // on remonte l'arbre jusqu'au premier nœud qui l'accepte.
     io_object_t current = media;
     IOObjectRetain(current);
-    
-    IOCFPlugInInterface **plugin = NULL;
-    IOATASMARTInterface **smart_interface = NULL;
-    
     while (current != 0) {
         SInt32 score = 0;
-        IOCFPlugInInterface **test_plugin = NULL;
-        kr = IOCreatePlugInInterfaceForService(
-            current,
-            kIOATASMARTUserClientTypeID,
-            kIOCFPlugInInterfaceID,
-            &test_plugin,
-            &score
-        );
-        
-        if (kr == kIOReturnSuccess && test_plugin != NULL) {
-            IOATASMARTInterface **test_smart = NULL;
-            HRESULT res = (*test_plugin)->QueryInterface(
-                test_plugin,
-                CFUUIDGetUUIDBytes(kIOATASMARTInterfaceID),
-                (LPVOID *)&test_smart
-            );
-            if (res == S_OK && test_smart != NULL) {
-                plugin = test_plugin;
-                smart_interface = test_smart;
+        IOCFPlugInInterface **plugin = NULL;
+        kern_return_t kr = IOCreatePlugInInterfaceForService(current, kIOATASMARTUserClientTypeID, kIOCFPlugInInterfaceID, &plugin, &score);
+        if (kr == kIOReturnSuccess && plugin != NULL) {
+            IOATASMARTInterface **smart = NULL;
+            HRESULT res = (*plugin)->QueryInterface(plugin, CFUUIDGetUUIDBytes(kIOATASMARTInterfaceID), (LPVOID *)&smart);
+            if (res == S_OK && smart != NULL) {
+                out->plugin = plugin;
+                out->smart = smart;
                 IOObjectRelease(current);
                 break;
             }
-            IODestroyPlugInInterface(test_plugin);
+            IODestroyPlugInInterface(plugin);
         }
-        
         io_object_t parent = 0;
         kr = IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent);
         IOObjectRelease(current);
-        if (kr == kIOReturnSuccess && parent != 0) {
-            current = parent;
-        } else {
-            current = 0;
-        }
+        current = (kr == kIOReturnSuccess) ? parent : 0;
     }
-    
     IOObjectRelease(media);
-    
-    if (!plugin || !smart_interface) {
-        return -5;
+
+    if (!out->smart) return -5;
+
+    // S.M.A.R.T. désactivé : on le signale, sans jamais le réactiver.
+    if (is_smart_disabled(out->smart)) {
+        close_handle(out);
+        return -6;
     }
-    
-    // B2: Check if SMART is disabled once, right after obtaining a valid interface,
-    // before any read command is issued by the callers.
-    if (is_smart_disabled(smart_interface)) {
-        // Auto-enable SMART as requested by the user
-        IOReturn enable_kr = (*smart_interface)->SMARTEnableDisableOperations(smart_interface, true);
-        if (enable_kr != kIOReturnSuccess || is_smart_disabled(smart_interface)) {
-            IODestroyPlugInInterface(plugin);
-            return -6;
-        }
-    }
-    
-    *out_plugin = plugin;
-    *out_smart_interface = smart_interface;
     return 0;
 }
 
+int cdiskio_read_ata_snapshot(const char *bsd_name, unsigned char *smart_data, unsigned char *thresholds,
+                              unsigned char *identify, int *threshold_exceeded) {
+    if (!smart_data || !thresholds || !identify || !threshold_exceeded) return -1;
+
+    ata_handle h;
+    int err = open_handle(bsd_name, &h);
+    if (err != 0) return err;
+
+    int result = 0;
+    IOReturn kr = (*h.smart)->SMARTReadData(h.smart, (ATASMARTData *)smart_data);
+    if (kr != kIOReturnSuccess) { result = kr; goto done; }
+
+    // Une somme de contrôle invalide n'empêche pas la lecture : l'appelant la vérifie et l'affiche.
+    kr = (*h.smart)->SMARTReadDataThresholds(h.smart, (ATASMARTDataThresholds *)thresholds);
+    if (kr != kIOReturnSuccess) { result = kr; goto done; }
+
+    UInt32 outSize = 0;
+    kr = (*h.smart)->GetATAIdentifyData(h.smart, identify, 512, &outSize);
+    if (kr != kIOReturnSuccess) { result = kr; goto done; }
+
+    Boolean exceeded = false;
+    kr = (*h.smart)->SMARTReturnStatus(h.smart, &exceeded);
+    if (kr != kIOReturnSuccess) { result = kr; goto done; }
+    *threshold_exceeded = exceeded ? 1 : 0;
+
+done:
+    close_handle(&h);
+    return result;
+}
 
 int cdiskio_read_ata_smart_data(const char *bsd_name, unsigned char *out, int size) {
-    if (size < 512) return -1;
-    
-    IOCFPlugInInterface **plugin = NULL;
-    IOATASMARTInterface **smart_interface = NULL;
-    
-    int err = get_ata_smart_interface(bsd_name, &plugin, &smart_interface);
+    if (!out || size < 512) return -1;
+    ata_handle h;
+    int err = open_handle(bsd_name, &h);
     if (err != 0) return err;
-    
-    IOReturn kr = (*smart_interface)->SMARTReadData(smart_interface, (ATASMARTData *)out);
-    if (kr != kIOReturnSuccess) {
-        IODestroyPlugInInterface(plugin);
-        return kr;
-    }
-    
-    kr = (*smart_interface)->SMARTValidateReadData(smart_interface, (const ATASMARTData *)out);
-    if (kr != kIOReturnSuccess) {
-        // Checksum invalid: return data anyway but the caller will detect it.
-        fprintf(stderr, "cdiskio: SMART data checksum invalid for %s\n", bsd_name);
-    }
-    
-    IODestroyPlugInInterface(plugin);
-    return 0;
+    IOReturn kr = (*h.smart)->SMARTReadData(h.smart, (ATASMARTData *)out);
+    close_handle(&h);
+    return kr == kIOReturnSuccess ? 0 : kr;
 }
-
 
 int cdiskio_read_ata_smart_thresholds(const char *bsd_name, unsigned char *out, int size) {
-    if (size < 512) return -1;
-    
-    IOCFPlugInInterface **plugin = NULL;
-    IOATASMARTInterface **smart_interface = NULL;
-    
-    int err = get_ata_smart_interface(bsd_name, &plugin, &smart_interface);
+    if (!out || size < 512) return -1;
+    ata_handle h;
+    int err = open_handle(bsd_name, &h);
     if (err != 0) return err;
-    
-    IOReturn kr = (*smart_interface)->SMARTReadDataThresholds(smart_interface, (ATASMARTDataThresholds *)out);
-    if (kr != kIOReturnSuccess) {
-        IODestroyPlugInInterface(plugin);
-        return kr;
-    }
-    
-    IODestroyPlugInInterface(plugin);
-    return 0;
+    IOReturn kr = (*h.smart)->SMARTReadDataThresholds(h.smart, (ATASMARTDataThresholds *)out);
+    close_handle(&h);
+    return kr == kIOReturnSuccess ? 0 : kr;
 }
 
-
 int cdiskio_read_ata_identify(const char *bsd_name, unsigned char *out, int size) {
-    if (size < 512) return -1;
-    
-    IOCFPlugInInterface **plugin = NULL;
-    IOATASMARTInterface **smart_interface = NULL;
-    
-    int err = get_ata_smart_interface(bsd_name, &plugin, &smart_interface);
+    if (!out || size < 512) return -1;
+    ata_handle h;
+    int err = open_handle(bsd_name, &h);
     if (err != 0) return err;
-    
     UInt32 outSize = 0;
-    IOReturn kr = (*smart_interface)->GetATAIdentifyData(smart_interface, out, (UInt32)size, &outSize);
-    if (kr != kIOReturnSuccess) {
-        IODestroyPlugInInterface(plugin);
-        return kr;
-    }
-    
-    IODestroyPlugInInterface(plugin);
-    return 0;
+    IOReturn kr = (*h.smart)->GetATAIdentifyData(h.smart, out, (UInt32)size, &outSize);
+    close_handle(&h);
+    return kr == kIOReturnSuccess ? 0 : kr;
 }
 
 int cdiskio_read_ata_smart_status(const char *bsd_name, int *threshold_exceeded) {
-    IOCFPlugInInterface **plugin = NULL;
-    IOATASMARTInterface **smart_interface = NULL;
-    
-    int err = get_ata_smart_interface(bsd_name, &plugin, &smart_interface);
+    if (!threshold_exceeded) return -1;
+    ata_handle h;
+    int err = open_handle(bsd_name, &h);
     if (err != 0) return err;
-    
     Boolean exceeded = false;
-    IOReturn kr = (*smart_interface)->SMARTReturnStatus(smart_interface, &exceeded);
-    if (kr != kIOReturnSuccess) {
-        IODestroyPlugInInterface(plugin);
-        return kr;
-    }
-    
-    if (threshold_exceeded) {
-        *threshold_exceeded = exceeded ? 1 : 0;
-    }
-    
-    IODestroyPlugInInterface(plugin);
+    IOReturn kr = (*h.smart)->SMARTReturnStatus(h.smart, &exceeded);
+    close_handle(&h);
+    if (kr != kIOReturnSuccess) return kr;
+    *threshold_exceeded = exceeded ? 1 : 0;
     return 0;
 }
-
-

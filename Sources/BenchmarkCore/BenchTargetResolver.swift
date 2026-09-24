@@ -11,12 +11,12 @@ public enum TargetRejectionReason: Equatable, CustomStringConvertible {
     
     public var description: String {
         switch self {
-        case .readOnly: return "Lecture seule"
-        case .network: return "Réseau"
-        case .diskImage: return "Image disque"
+        case .readOnly: return L("Read-only", "Lecture seule")
+        case .network: return L("Network", "Réseau")
+        case .diskImage: return L("Disk image", "Image disque")
         case .timeMachine: return "Time Machine"
-        case .accessDenied: return "Accès refusé"
-        case .insufficientFreeSpace(_): return "Espace insuffisant"
+        case .accessDenied: return L("Access denied", "Accès refusé")
+        case .insufficientFreeSpace(_): return L("Not enough space", "Espace insuffisant")
         }
     }
 }

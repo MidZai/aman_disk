@@ -36,8 +36,8 @@ final class SampleScheduler {
 
     private func tick() async {
         guard let appManager, !isSampling else { return }
-        // Suspendu pendant un benchmark (le TemperatureSampler prend le relais)
-        // et pendant un rechargement complet (une seule lecture à la fois).
+        // Suspendu pendant un test de performances (son échantillonneur prend le relais)
+        // et pendant le premier chargement.
         guard !appManager.isBenchmarkRunning, !appManager.isLoading else { return }
         isSampling = true
         defer { isSampling = false }
@@ -49,7 +49,7 @@ final class SampleScheduler {
         let now = Date()
         if let last = lastCompaction, now.timeIntervalSince(last) < Self.compactionInterval { return }
         lastCompaction = now
-        Task.detached(priority: .background) {
+        Task.detached(priority: .utility) {
             HistoryStore.shared.compactAll(now: now)
         }
     }

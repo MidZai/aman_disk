@@ -2,145 +2,90 @@ import SwiftUI
 import DiskHealthCore
 import BenchmarkCore
 
-enum BenchUnit {
-    case mbps
-    case iops
+enum BenchUnit: String {
+    case mbps, iops
 }
 
+/// Réglages et historique de l'onglet Performances pour un disque. Le test lui-même est porté
+/// par `BenchmarkController` (dans AppManager) et survit à la disparition de la vue.
 @MainActor
-class PerformanceViewModel: ObservableObject, BenchmarkRunnerDelegate {
+final class PerformanceViewModel: ObservableObject {
+    static let sizes: [UInt64] = [1 << 30, 4 << 30, 16 << 30]
+
     @Published var selectedTargetId: String = ""
-    @Published var targets: [BenchTarget] = []
+    @Published private(set) var targets: [BenchTarget] = []
+    @Published private(set) var isResolvingTargets = true
     @Published var selectedProfile: BenchProfile = .standard
-    @Published var selectedSize: UInt64 = 1073741824
+    @Published var selectedSize: UInt64 = 1 << 30
     @Published var selectedUnit: BenchUnit = .mbps
     @Published var showConfirm = false
-    
-    @Published var isRunning = false
-    @Published var currentState: BenchmarkState? = nil
-    @Published var lastResult: BenchmarkResult? = nil
-    
-    @Published var history: [BenchmarkResult] = []
-    @Published var isViewingHistory: Bool = false
-    
-    var maxWrittenGB: Double { return 10.0 }
-    var estTimeMin: Int { return 1 }
-    
-    var bottomStripText: String {
-        if let res = lastResult {
-            let tempStr = res.conditions.temperatureMaxC != nil ? "\(res.conditions.temperatureMaxC!) °C" : "N/A"
-            let batStr = res.conditions.onBattery == true ? "Sur batterie" : "Sur secteur"
-            var latStr = ""
-            if let rnd4k = res.tests.first(where: { $0.spec.id == "RND4K_QD1" && $0.direction == .read }), let p50 = rnd4k.latencyP50Micros, let p99 = rnd4k.latencyP99Micros {
-                latStr = " · Latence 4K QD1 : p50 \(Int(p50)) µs / p99 \(Int(p99)) µs"
-            }
-            return "Température \(tempStr) · Écrit : \(Formatters.bytes(res.conditions.bytesWritten))\(latStr) · \(batStr)"
-        } else if currentState != nil {
-            return "Test en cours..."
-        } else {
-            return "Prêt"
-        }
-    }
-    
+    @Published private(set) var history: [BenchmarkResult] = []
+    /// Résultat de l'historique choisi par l'utilisateur ; nil = dernier résultat.
+    @Published var viewedResult: BenchmarkResult?
+
     let disk: RealDisk
-    let appManager: AppManager
-    private var runner: BenchmarkRunner?
-    
+    private unowned let appManager: AppManager
+    private var resolveTask: Task<Void, Never>?
+
     init(disk: RealDisk, appManager: AppManager) {
         self.disk = disk
         self.appManager = appManager
-        refreshTargets()
-        loadHistory()
-        if let req = appManager.requestedVolumeToTest, let target = targets.first(where: { $0.id == req }) {
-            selectedTargetId = target.id
-            appManager.requestedVolumeToTest = nil
-        } else if let first = targets.first(where: { $0.rejectionReason == nil }) {
-            selectedTargetId = first.id
-        } else if let first = targets.first {
-            selectedTargetId = first.id
-        }
-    }
-    
-    public func refreshTargets() {
-        let myVols = appManager.volumes.filter { $0.physicalDiskBSDNames.contains(disk.physical.bsdName) }
-        let pDisks = appManager.disks.map { $0.physical }
-        targets = BenchTargetResolver.resolveTargets(volumes: myVols, disks: pDisks, fileSize: selectedSize)
-    }
-    
-    public func loadHistory() {
-        BenchmarkHistoryManager.shared.loadResults(forDiskKey: disk.physical.bsdName) { [weak self] res in
-            self?.history = res
-        }
-    }
-    
-    public func start() {
-        guard let t = targets.first(where: { $0.id == selectedTargetId }) else { return }
-        isViewingHistory = false
-        isRunning = true
-        appManager.runningBenchmarkDiskId = disk.id
-        lastResult = nil
-        currentState = nil
-        
-        let r = BenchmarkRunner(target: t, profile: selectedProfile, fileSize: selectedSize, physicalDisk: disk.physical)
-        r.delegate = self
-        self.runner = r
-        r.start()
-    }
-    
-    public func stop() {
-        runner?.cancel()
     }
 
-    public func startDemo() {
-        isRunning = true
-        currentState = .preparing(progress: 0.5)
-        
-        Task {
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            
-            var tests: [TestResult] = []
-            for spec in BenchTestSpec.defaultGrid {
-                let bytes = spec.blockSize == 1048576 ? 3000 * 1048576 : 100 * 1048576
-                tests.append(TestResult(spec: spec, direction: .read, passes: [PassResult(bytes: UInt64(bytes), ios: 100, seconds: 1.0)], latencyP50Micros: 100, latencyP99Micros: 200, latencyP999Micros: 400))
-                tests.append(TestResult(spec: spec, direction: .write, passes: [PassResult(bytes: UInt64(bytes * 3 / 4), ios: 100, seconds: 1.0)], latencyP50Micros: nil, latencyP99Micros: nil, latencyP999Micros: nil))
+    var selectedTarget: BenchTarget? { targets.first { $0.id == selectedTargetId } }
+    var canRun: Bool { selectedTarget != nil && selectedTarget?.rejectionReason == nil }
+
+    var estimatedMaxWritten: UInt64 {
+        BenchMath.maxBytesWritten(fileSize: selectedSize, profile: selectedProfile)
+    }
+
+    var estimatedDurationText: String {
+        let seconds = BenchMath.estimatedMaxDuration(fileSize: selectedSize, profile: selectedProfile)
+        let minutes = Int((seconds / 60).rounded(.up))
+        return minutes <= 1 ? L("about 1 min", "environ 1 min") : L("about \(minutes) min", "environ \(minutes) min")
+    }
+
+    func onAppear() {
+        resolveTargets()
+        Task { await loadHistory() }
+    }
+
+    /// Hors du fil principal : la vérification écrit un petit fichier sur chaque volume.
+    func resolveTargets() {
+        resolveTask?.cancel()
+        isResolvingTargets = true
+        let volumes = appManager.volumes(on: disk)
+            // « / » (volume système scellé) et « /System/Volumes/Data » partagent le même
+            // dossier de test : on ne propose que le second s'ils sont tous deux présents.
+            .sorted { $0.mountPoint.count > $1.mountPoint.count }
+        let physical = appManager.disks.map(\.physical)
+        let size = selectedSize
+        resolveTask = Task {
+            let resolved = await Task.detached(priority: .userInitiated) {
+                BenchTargetResolver.resolveTargets(volumes: volumes, disks: physical, fileSize: size)
+            }.value
+            guard !Task.isCancelled else { return }
+            var seenDirectories = Set<String>()
+            targets = resolved
+                .filter { seenDirectories.insert($0.testDirectoryURL.path).inserted }
+                .sorted { $0.volume.name < $1.volume.name }
+            if let requested = appManager.requestedVolumeToTest, targets.contains(where: { $0.id == requested }) {
+                selectedTargetId = requested
+                appManager.requestedVolumeToTest = nil
+            } else if selectedTarget == nil || selectedTarget?.rejectionReason != nil {
+                selectedTargetId = (targets.first { $0.rejectionReason == nil } ?? targets.first)?.id ?? ""
             }
-            
-            let fakeRes = BenchmarkResult(
-                id: UUID(),
-                date: Date(),
-                appVersion: "1.0",
-                diskKey: disk.physical.bsdName,
-                profile: selectedProfile,
-                fileSize: selectedSize,
-                conditions: BenchConditions(volumeName: "Macintosh HD", fileSystem: "APFS", encrypted: true, onBattery: false, lowPowerMode: false, thermalStateStart: "Nominal", temperatureStartC: 40, temperatureMaxC: 45, bytesWritten: 0),
-                tests: tests,
-                completed: true,
-                stopReason: nil
-            )
-            
-            DispatchQueue.main.async {
-                self.currentState = .done
-                self.lastResult = fakeRes
-                self.isRunning = false
-            }
+            isResolvingTargets = false
         }
     }
 
-    nonisolated public func benchmarkDidUpdateState(_ state: BenchmarkState) {
-        DispatchQueue.main.async {
-            self.currentState = state
-        }
+    func loadHistory() async {
+        history = await BenchmarkHistoryManager.shared.loadResults(for: disk)
     }
-    
-    nonisolated public func benchmarkDidFinish(result: BenchmarkResult) {
-        BenchmarkHistoryManager.shared.saveResult(result, forDiskKey: result.diskKey)
-        DispatchQueue.main.async {
-            self.lastResult = result
-            self.isRunning = false
-            self.appManager.runningBenchmarkDiskId = nil
-            self.runner = nil
-            self.isViewingHistory = false
-            self.loadHistory()
-        }
+
+    func start() {
+        guard let target = selectedTarget, target.rejectionReason == nil else { return }
+        viewedResult = nil
+        appManager.benchmark.start(target: target, profile: selectedProfile, fileSize: selectedSize, disk: disk)
     }
 }

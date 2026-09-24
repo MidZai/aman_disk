@@ -37,49 +37,23 @@ public struct HistorySample: Codable, Hashable {
 
 extension HistorySample {
     /// Convertit une lecture de santé en échantillon d'historique.
+    /// ATA : les volumes écrits et lus sont stockés en octets ; la conversion lisible se fait à l'affichage.
     public static func from(snapshot: DiskHealthSnapshot, date: Date = Date()) -> HistorySample {
+        let m = DiskMetrics(snapshot: snapshot)
         switch snapshot {
         case .nvme(let smartLog, _):
             return HistorySample(
                 date: date,
-                temperatureC: smartLog.temperatureCelsius,
-                percentageUsed: Int(smartLog.percentageUsed),
+                temperatureC: m.temperatureC,
+                percentageUsed: m.percentageUsed,
                 dataUnitsWritten: smartLog.dataUnitsWritten,
                 dataUnitsRead: smartLog.dataUnitsRead,
-                powerOnHours: smartLog.powerOnHours,
-                mediaErrors: smartLog.mediaErrors,
-                availableSpare: Int(smartLog.availableSpare)
+                powerOnHours: m.powerOnHours,
+                mediaErrors: m.mediaErrors,
+                availableSpare: m.availableSparePercent
             )
-        case .ata(let ataSnapshot):
-            let profile = ATACatalog.profile(for: ataSnapshot.model)
-            var temp: Int? = nil
-            // B6: valeurs stockées en octets ; la conversion lisible se fait à l'affichage.
-            var written: UInt64? = nil
-            var read: UInt64? = nil
-            var hours: UInt64? = nil
-            var used: Int? = nil
-            var errors: UInt64? = nil
-            for attr in ataSnapshot.attributes {
-                let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
-                switch info.role {
-                case .temperature:
-                    temp = attr.value(for: .temperature).map { Int($0) }
-                case .hostWritesBytes(let mult):
-                    written = attr.rawValue * mult
-                case .hostReadsBytes(let mult):
-                    read = attr.rawValue * mult
-                case .powerOnHours:
-                    hours = attr.value(for: .powerOnHours)
-                case .lifeRemainingPercentNormalized:
-                    used = 100 - Int(attr.current)
-                case .reallocated, .pending, .uncorrectable:
-                    errors = (errors ?? 0) + attr.rawValue
-                default:
-                    break
-                }
-            }
-            // ATA n'expose pas de réserve disponible.
-            return HistorySample(date: date, temperatureC: temp, percentageUsed: used, dataUnitsWritten: written, dataUnitsRead: read, powerOnHours: hours, mediaErrors: errors, availableSpare: nil)
+        case .ata:
+            return HistorySample(date: date, temperatureC: m.temperatureC, percentageUsed: m.percentageUsed, dataUnitsWritten: m.bytesWritten, dataUnitsRead: m.bytesRead, powerOnHours: m.powerOnHours, mediaErrors: m.badSectors, availableSpare: nil)
         }
     }
 }

@@ -5,6 +5,9 @@ import DiskHealthCore
 
 /// Phase 5 (0.9) : alertes testées avec une horloge et un fournisseur de notifications simulés.
 @Suite struct AlertEngineTests {
+    // Ces attentes sont en français ; l'anglais est la langue par défaut.
+    init() { Localization.language = .french }
+
     final class FakePoster: NotificationPosting {
         var posted: [AlertEvent] = []
         func post(_ event: AlertEvent) { posted.append(event) }

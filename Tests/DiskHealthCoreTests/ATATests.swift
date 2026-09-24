@@ -1,7 +1,8 @@
-import XCTest
+import Testing
+import Foundation
 @testable import DiskHealthCore
 
-final class ATATests: XCTestCase {
+@Suite final class ATATests {
     func makeATASmartData(attributes: [(id: UInt8, flags: UInt16, current: UInt8, worst: UInt8, raw: [UInt8])]) -> Data {
         var data = [UInt8](repeating: 0, count: 512)
         for (i, attr) in attributes.enumerated() {
@@ -59,7 +60,7 @@ final class ATATests: XCTestCase {
         return Data(data)
     }
 
-    func testRealFixtureParsing() throws {
+    @Test func testRealFixtureParsing() throws {
         let fixtureURL = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()
             .appendingPathComponent("Fixtures")
@@ -70,22 +71,22 @@ final class ATATests: XCTestCase {
         let identifyData = try Data(contentsOf: fixtureURL.appendingPathComponent("identify.bin"))
         
         let snapshot = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false)
-        XCTAssertNotNil(snapshot)
+        #expect(snapshot != nil)
         
         let snap = snapshot!
-        XCTAssertTrue(snap.checksumValid)
-        XCTAssertEqual(snap.model, "APPLE SSD SM0512G")
-        XCTAssertEqual(snap.rotationRate, 1)
+        #expect(snap.checksumValid)
+        #expect(snap.model == "APPLE SSD SM0512G")
+        #expect(snap.rotationRate == 1)
         
         // Assert a few attributes to match reference.json
         let attr9 = snap.attributes.first { $0.id == 9 }!
-        XCTAssertEqual(attr9.current, 93)
-        XCTAssertEqual(attr9.worst, 93)
-        XCTAssertEqual(attr9.threshold, 0)
-        XCTAssertEqual(attr9.rawValue, 31483)
+        #expect(attr9.current == 93)
+        #expect(attr9.worst == 93)
+        #expect(attr9.threshold == 0)
+        #expect(attr9.rawValue == 31483)
     }
 
-    func testHealthRules() {
+    @Test func testHealthRules() {
         let identifyData = makeATAIdentify(model: "Generic Model", rotationRate: 1) // SSD
         
         // Good disk
@@ -95,12 +96,12 @@ final class ATATests: XCTestCase {
         
         let snapGood = ATASmartParser.parse(smartData: smartGood, thresholdsData: threshGood, identifyData: identifyData, statusExceeded: false)!
         let evalGood = ATAHealthEvaluator.evaluate(snapshot: snapGood)
-        XCTAssertEqual(evalGood.status, .good)
+        #expect(evalGood.status == .good)
         
         // Threshold Exceeded -> Bad
         let snapBadExceeded = ATASmartParser.parse(smartData: smartGood, thresholdsData: threshGood, identifyData: identifyData, statusExceeded: true)!
         let evalBadExceeded = ATAHealthEvaluator.evaluate(snapshot: snapBadExceeded)
-        XCTAssertEqual(evalBadExceeded.status, .bad)
+        #expect(evalBadExceeded.status == .bad)
         
         // current <= threshold -> Bad
         let badAttr = [(id: UInt8(5), flags: UInt16(0), current: UInt8(10), worst: UInt8(10), raw: [UInt8](repeating: 0, count: 6))]
@@ -108,55 +109,57 @@ final class ATATests: XCTestCase {
         let threshBad = makeATAThresholds(thresholds: [(id: 5, threshold: 20)])
         let snapBadAttr = ATASmartParser.parse(smartData: smartBad, thresholdsData: threshBad, identifyData: identifyData, statusExceeded: false)!
         let evalBadAttr = ATAHealthEvaluator.evaluate(snapshot: snapBadAttr)
-        XCTAssertEqual(evalBadAttr.status, .bad)
+        #expect(evalBadAttr.status == .bad)
         
         // Reallocated > 0 -> Caution
         let cautionAttr = [(id: UInt8(5), flags: UInt16(0), current: UInt8(100), worst: UInt8(100), raw: [UInt8]([3, 0, 0, 0, 0, 0]))]
         let smartCaution = makeATASmartData(attributes: cautionAttr)
         let snapCautionAttr = ATASmartParser.parse(smartData: smartCaution, thresholdsData: threshGood, identifyData: identifyData, statusExceeded: false)!
         let evalCautionAttr = ATAHealthEvaluator.evaluate(snapshot: snapCautionAttr)
-        XCTAssertEqual(evalCautionAttr.status, HealthStatus.caution)
+        #expect(evalCautionAttr.status == HealthStatus.caution)
         
-        // Temperature >= 60 for SSD -> Caution
+        // Température élevée : indicateur et alerte à part, l'état de santé ne change pas
+        // (une chauffe passagère ne doit pas déclencher une alerte « changement d'état »).
         let tempAttr = [(id: UInt8(0xC2), flags: UInt16(0), current: UInt8(100), worst: UInt8(100), raw: [UInt8]([62, 0, 0, 0, 0, 0]))]
         let smartTemp = makeATASmartData(attributes: tempAttr)
         let snapTemp = ATASmartParser.parse(smartData: smartTemp, thresholdsData: threshGood, identifyData: identifyData, statusExceeded: false)!
         let evalTemp = ATAHealthEvaluator.evaluate(snapshot: snapTemp)
-        XCTAssertEqual(evalTemp.status, HealthStatus.caution)
+        #expect(evalTemp.status == HealthStatus.good)
+        #expect(DiskMetrics(snapshot: .ata(snapTemp)).temperatureC == 62)
         
         // Checksum invalid
         var badChecksumSmart = smartGood
         badChecksumSmart[511] = 0 // Break checksum
         let snapChecksum = ATASmartParser.parse(smartData: badChecksumSmart, thresholdsData: threshGood, identifyData: identifyData, statusExceeded: false)!
-        XCTAssertFalse(snapChecksum.checksumValid)
+        #expect(!(snapChecksum.checksumValid))
 
         var badChecksumThresh = threshGood
         badChecksumThresh[511] = 0 // Break checksum
         let snapThreshChecksum = ATASmartParser.parse(smartData: smartGood, thresholdsData: badChecksumThresh, identifyData: identifyData, statusExceeded: false)!
-        XCTAssertFalse(snapThreshChecksum.thresholdsChecksumValid)
-        XCTAssertTrue(snapThreshChecksum.checksumValid)
+        #expect(!(snapThreshChecksum.thresholdsChecksumValid))
+        #expect(snapThreshChecksum.checksumValid)
     }
 
-    func testProfiles() {
+    @Test func testProfiles() {
         let appleProfile = ATACatalog.profile(for: "APPLE SSD SM0512G")
-        XCTAssertEqual(appleProfile.name, "AppleSMFamily")
+        #expect(appleProfile.name == "AppleSMFamily")
         
         let attrAEInfo = ATACatalog.attributeInfo(id: 0xAE, profile: appleProfile)
-        XCTAssertEqual(attrAEInfo.role, .hostReadsBytes(multiplier: 1048576))
+        #expect(attrAEInfo.role == .hostReadsBytes(multiplier: 1048576))
         
         let samsungProfile = ATACatalog.profile(for: "Samsung SSD 870 EVO 1TB")
-        XCTAssertEqual(samsungProfile.name, "Samsung")   // I2: was wrongly "GenericATA" before fix
+        #expect(samsungProfile.name == "Samsung")   // I2: was wrongly "GenericATA" before fix
         
         let attrB1Info = ATACatalog.attributeInfo(id: 0xB1, profile: samsungProfile)
-        XCTAssertEqual(attrB1Info.role, .lifeRemainingPercentNormalized)
+        #expect(attrB1Info.role == .lifeRemainingPercentNormalized)
     }
 
-    func testDiskHealthSnapshotCodable() throws {
+    @Test func testDiskHealthSnapshotCodable() throws {
         let snap = ATASmartSnapshot(attributes: [], model: "TestModel", firmware: "FW", serialNumber: "SN", rotationRate: 0, thresholdExceeded: false, checksumValid: true, thresholdsChecksumValid: true)
         let diskSnap = DiskHealthSnapshot.ata(snap)
         let encoded = try JSONEncoder().encode(diskSnap)
         let decoded = try JSONDecoder().decode(DiskHealthSnapshot.self, from: encoded)
-        XCTAssertEqual(diskSnap, decoded)
+        #expect(diskSnap == decoded)
 
         let legacyJSON = """
         {
@@ -172,21 +175,21 @@ final class ATATests: XCTestCase {
         """.data(using: .utf8)!
         let legacyDecoded = try JSONDecoder().decode(DiskHealthSnapshot.self, from: legacyJSON)
         if case .ata(let ata) = legacyDecoded {
-            XCTAssertEqual(ata.model, "LegacyModel")
-            XCTAssertTrue(ata.checksumValid)
-            XCTAssertTrue(ata.thresholdsChecksumValid)
+            #expect(ata.model == "LegacyModel")
+            #expect(ata.checksumValid)
+            #expect(ata.thresholdsChecksumValid)
         } else {
-            XCTFail("Expected .ata snapshot")
+            Issue.record("Expected .ata snapshot")
         }
     }
 }
 
 
 extension ATATests {
-    func testNoUnderscoresInAttributeNames() {
+    @Test func testNoUnderscoresInAttributeNames() {
         for profile in ATACatalog.profiles {
             for (id, attr) in profile.attributes {
-                XCTAssertFalse(attr.name.contains("_"), "Attribute name '\\(attr.name)' for ID \\(id) in profile '\\(profile.name)' contains an underscore.")
+                #expect(!(attr.name.contains("_")), "Attribute name '\\(attr.name)' for ID \\(id) in profile '\\(profile.name)' contains an underscore.")
             }
         }
     }

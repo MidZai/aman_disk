@@ -1,22 +1,21 @@
-import XCTest
+import Testing
+import Foundation
 @testable import DiskHealthCore
 
-final class HistoryTests: XCTestCase {
+@Suite final class HistoryTests {
     var store: HistoryStore!
     var testKey: String = "TESTKEY"
     
-    override func setUp() {
-        super.setUp()
+    init() {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         store = HistoryStore(baseURL: tempDir)
     }
     
-    override func tearDown() {
+    deinit {
         try? FileManager.default.removeItem(atPath: store.folderPath())
-        super.tearDown()
     }
     
-    func testAppendAndRejectDuplicates() {
+    @Test func testAppendAndRejectDuplicates() {
         let baseDate = Date()
         
         // Initial sample
@@ -36,11 +35,11 @@ final class HistoryTests: XCTestCase {
         store.append(s4, for: testKey)
         
         let samples = store.samples(for: testKey, since: Date.distantPast)
-        XCTAssertEqual(samples.count, 3)
-        XCTAssertEqual(samples.last?.temperatureC, 34)
+        #expect(samples.count == 3)
+        #expect(samples.last?.temperatureC == 34)
     }
     
-    func testPurgeOldSamples() {
+    @Test func testPurgeOldSamples() {
         let baseDate = Date()
         let oldDate = baseDate.addingTimeInterval(-91 * 24 * 3600)
         
@@ -51,12 +50,13 @@ final class HistoryTests: XCTestCase {
         store.append(new, for: testKey)
         
         let samples = store.samples(for: testKey, since: Date.distantPast)
-        XCTAssertEqual(samples.count, 1)
-        XCTAssertEqual(samples[0].date, baseDate)
+        #expect(samples.count == 1)
+        #expect(samples[0].date == baseDate)
     }
     
-    func testAggregation() {
-        let baseDate = Date()
+    @Test func testAggregation() {
+        // Date alignée sur l'heure : les tranches de regroupement sont alignées sur l'horloge.
+        let baseDate = Date(timeIntervalSince1970: 1_800_000_000)
         var samples: [HistorySample] = []
         
         // 1st hour: 12 samples (5 mins apart), temps = 30 to 41
@@ -73,18 +73,18 @@ final class HistoryTests: XCTestCase {
         }
         
         let result1h = HistoryAggregation.aggregate(samples: samples, range: .oneHour)
-        XCTAssertEqual(result1h.points.count, 24)
-        XCTAssertEqual(result1h.points.first?.segment, 0)
-        XCTAssertEqual(result1h.points.last?.segment, 1) // Should detect break
+        #expect(result1h.points.count == 24)
+        #expect(result1h.points.first?.segment == 0)
+        #expect(result1h.points.last?.segment == 1) // Should detect break
         
         let result7d = HistoryAggregation.aggregate(samples: samples, range: .sevenDays)
         // Aggregated per hour chunk -> 2 points
-        XCTAssertEqual(result7d.points.count, 2)
-        XCTAssertEqual(result7d.points[0].segment, 0)
-        XCTAssertEqual(result7d.points[1].segment, 1) // Should detect segment break
+        #expect(result7d.points.count == 2)
+        #expect(result7d.points[0].segment == 0)
+        #expect(result7d.points[1].segment == 1) // Should detect segment break
         
-        XCTAssertEqual(result7d.min, 20)
-        XCTAssertEqual(result7d.max, 41)
-        XCTAssertEqual(result7d.average, 31) // Avg of 20...41 is about 30.5 -> 31
+        #expect(result7d.min == 20)
+        #expect(result7d.max == 41)
+        #expect(result7d.average == 31) // Avg of 20...41 is about 30.5 -> 31
     }
 }

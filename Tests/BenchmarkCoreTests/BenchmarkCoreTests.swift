@@ -1,27 +1,28 @@
-import XCTest
+import Testing
+import Foundation
 @testable import BenchmarkCore
 
-final class BenchmarkCoreTests: XCTestCase {
+@Suite final class BenchmarkCoreTests {
     
-    func testMegabytesPerSecond() {
+    @Test func testMegabytesPerSecond() {
         let mbps = BenchMath.megabytesPerSecond(bytes: 1_073_741_824, seconds: 0.5)
-        XCTAssertEqual(mbps, 2147.48, accuracy: 0.01)
+        #expect(abs((mbps) - (2147.48)) <= 0.01)
     }
     
-    func testIOPS() {
+    @Test func testIOPS() {
         let iops = BenchMath.iops(ios: 10_000, seconds: 2.0)
-        XCTAssertEqual(iops, 5000.0, accuracy: 0.01)
+        #expect(abs((iops) - (5000.0)) <= 0.01)
     }
     
-    func testPercentile() {
+    @Test func testPercentile() {
         let array = (1...100).map { UInt64($0 * 1000) } // 1 to 100 microseconds (in nanos)
-        XCTAssertEqual(BenchMath.percentile(array, 50.0)!, 50.0, accuracy: 0.1)
-        XCTAssertEqual(BenchMath.percentile(array, 99.0)!, 99.0, accuracy: 0.1)
-        XCTAssertEqual(BenchMath.percentile(array, 99.9)!, 100.0, accuracy: 0.1)
-        XCTAssertNil(BenchMath.percentile([], 50.0))
+        #expect(abs((BenchMath.percentile(array, 50.0)!) - (50.0)) <= 0.1)
+        #expect(abs((BenchMath.percentile(array, 99.0)!) - (99.0)) <= 0.1)
+        #expect(abs((BenchMath.percentile(array, 99.9)!) - (100.0)) <= 0.1)
+        #expect(BenchMath.percentile([], 50.0) == nil)
     }
     
-    func testMedianAndBest() {
+    @Test func testMedianAndBest() {
         let passes4 = [
             PassResult(bytes: 10_000_000, ios: 10, seconds: 1.0), // 10 MB/s
             PassResult(bytes: 40_000_000, ios: 40, seconds: 1.0), // 40 MB/s
@@ -30,31 +31,31 @@ final class BenchmarkCoreTests: XCTestCase {
         ]
         
         let median4 = BenchMath.median(passes4)
-        XCTAssertEqual(median4!, 25.0, accuracy: 0.1)
+        #expect(abs((median4!) - (25.0)) <= 0.1)
         
         let passes5 = passes4 + [PassResult(bytes: 50_000_000, ios: 50, seconds: 1.0)] // 50 MB/s
         let median5 = BenchMath.median(passes5)
-        XCTAssertEqual(median5!, 30.0, accuracy: 0.1)
+        #expect(abs((median5!) - (30.0)) <= 0.1)
         
         let best = BenchMath.best(passes5)
-        XCTAssertEqual(best?.bytes, 50_000_000)
+        #expect(best?.bytes == 50_000_000)
     }
     
-    func testMaxBytesWritten() {
+    @Test func testMaxBytesWritten() {
         let gio = UInt64(1073741824)
-        XCTAssertEqual(BenchMath.maxBytesWritten(fileSize: gio, profile: .standard), 21 * gio)
-        XCTAssertEqual(BenchMath.maxBytesWritten(fileSize: gio, profile: .quick), 13 * gio)
-        XCTAssertEqual(BenchMath.maxBytesWritten(fileSize: gio, profile: .readOnly), gio)
+        #expect(BenchMath.maxBytesWritten(fileSize: gio, profile: .standard) == 21 * gio)
+        #expect(BenchMath.maxBytesWritten(fileSize: gio, profile: .quick) == 13 * gio)
+        #expect(BenchMath.maxBytesWritten(fileSize: gio, profile: .readOnly) == gio)
     }
     
-    func testCheckFreeSpace() {
+    @Test func testCheckFreeSpace() {
         let gio = UInt64(1073741824)
-        XCTAssertEqual(BenchMath.checkFreeSpace(fileSize: gio, available: 100 * gio), .ok)
-        XCTAssertEqual(BenchMath.checkFreeSpace(fileSize: 4 * gio, available: 12 * gio), .tooLargeForFreeSpace)
-        XCTAssertEqual(BenchMath.checkFreeSpace(fileSize: gio, available: UInt64(5.5 * Double(gio))), .wouldLeaveTooLittle)
+        #expect(BenchMath.checkFreeSpace(fileSize: gio, available: 100 * gio) == .ok)
+        #expect(BenchMath.checkFreeSpace(fileSize: 4 * gio, available: 12 * gio) == .tooLargeForFreeSpace)
+        #expect(BenchMath.checkFreeSpace(fileSize: gio, available: UInt64(5.5 * Double(gio))) == .wouldLeaveTooLittle)
     }
     
-    func testCodableBenchmarkResult() throws {
+    @Test func testCodableBenchmarkResult() throws {
         let result = BenchmarkResult(
             id: UUID(),
             date: Date(),
@@ -93,6 +94,6 @@ final class BenchmarkCoreTests: XCTestCase {
         let decoder = JSONDecoder()
         let decoded = try decoder.decode(BenchmarkResult.self, from: data)
         
-        XCTAssertEqual(result, decoded)
+        #expect(result == decoded)
     }
 }

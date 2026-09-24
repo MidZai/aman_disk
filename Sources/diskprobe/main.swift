@@ -2,6 +2,9 @@ import Foundation
 import DiskHealthCore
 import BenchmarkCore
 
+// L'outil en ligne de commande est encore entièrement en français : on y garde les textes du cœur en français.
+Localization.language = .french
+
 let args = CommandLine.arguments
 
 func printHexDump(data: Data, limit: Int? = nil) {

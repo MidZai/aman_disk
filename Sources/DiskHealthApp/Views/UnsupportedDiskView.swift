@@ -77,19 +77,7 @@ struct UnsupportedDiskView: View {
                         Text(physical.model)
                             .font(.system(size: 24, weight: .semibold))
                         
-                        let sizeStr = Formatters.bytes(physical.sizeBytes)
-                        let locStr = physical.isInternal ? "Interne" : "Externe"
-                        let connStr: String = {
-                            if physical.protocolType == .pcieAhci { return "PCIe AHCI" }
-                            switch physical.connection {
-                            case .nvmeInternal, .nvmeExternal: return "NVMe"
-                            case .sata: return "SATA"
-                            case .usb: return "USB"
-                            case .other: return physical.protocolType == .unknown ? "Autre" : physical.protocolType.rawValue
-                            }
-                        }()
-                        
-                        Text("\(sizeStr) · \(connStr) · \(locStr)")
+                        Text("\(Formatters.bytes(physical.sizeBytes)) · \(physical.interfaceLabel) · \(physical.locationLabel)")
                             .font(.body)
                             .foregroundColor(.secondary)
                     }
@@ -117,7 +105,7 @@ struct UnsupportedDiskView: View {
                         
                         if reason == .smartDisabled {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Commande pour activer S.M.A.R.T. (Terminal) :")
+                                Text(L("Command to turn on S.M.A.R.T. (Terminal):", "Commande pour activer S.M.A.R.T. (Terminal) :"))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 HStack {
@@ -130,11 +118,12 @@ struct UnsupportedDiskView: View {
                                     Button {
                                         NSPasteboard.general.clearContents()
                                         NSPasteboard.general.setString("smartctl -s on /dev/\(physical.bsdName)", forType: .string)
+                                        ToastCenter.shared.show(message: L("Command copied", "Commande copiée"), systemImage: "doc.on.doc")
                                     } label: {
                                         Image(systemName: "doc.on.doc")
                                     }
                                     .buttonStyle(.borderless)
-                                    .help("Copier la commande")
+                                    .help(L("Copy command", "Copier la commande"))
                                 }
                             }
                             .padding(.top, 4)
@@ -175,15 +164,15 @@ struct UnsupportedDiskView: View {
         guard let data = try? encoder.encode(diag) else { return }
         
         let panel = NSSavePanel()
-        panel.title = "Enregistrer le diagnostic DiskHealth"
+        panel.title = L("Save Aman Disk Diagnostic", "Enregistrer le diagnostic Aman Disk")
         
         let filename: String
         if let vid = physical.usbVendorID, let pid = physical.usbProductID {
             let vidStr = String(format: "0x%04X", vid)
             let pidStr = String(format: "0x%04X", pid)
-            filename = "DiskHealth_Diagnostic_\(vidStr)_\(pidStr).json"
+            filename = "Aman-Disk-diagnostic_\(vidStr)_\(pidStr).json"
         } else {
-            filename = "DiskHealth_Diagnostic_\(physical.bsdName).json"
+            filename = "Aman-Disk-diagnostic_\(physical.bsdName).json"
         }
         
         panel.nameFieldStringValue = filename
@@ -192,10 +181,10 @@ struct UnsupportedDiskView: View {
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 try data.write(to: url)
-                ToastCenter.shared.show(message: "Diagnostic exporté", systemImage: "checkmark.circle")
+                ToastCenter.shared.show(message: L("Diagnostic exported", "Diagnostic exporté"), systemImage: "checkmark.circle")
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } catch {
-                ToastCenter.shared.show(message: "L'export a échoué", systemImage: "xmark.octagon")
+                ToastCenter.shared.show(message: L("Export failed", "L'export a échoué"), systemImage: "xmark.octagon")
             }
         }
     }

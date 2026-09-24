@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="${VERSION:-0.9.0}"
+VERSION="${VERSION:-0.9.1}"
 UNIVERSAL="${UNIVERSAL:-0}"
 BUILT_BINARY=".build/AmanDisk-bundle-binary"
 
@@ -71,10 +71,12 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <!-- App résidente (barre des menus) : macOS ne doit ni la fermer d'office quand la fenêtre
+         est fermée (fin de la surveillance), ni la tuer sans prévenir pendant un test. -->
     <key>NSSupportsAutomaticTermination</key>
-    <true/>
+    <false/>
     <key>NSSupportsSuddenTermination</key>
-    <true/>
+    <false/>
 </dict>
 </plist>
 PLIST

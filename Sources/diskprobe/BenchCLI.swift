@@ -8,6 +8,7 @@ enum BenchCLI {
         let disks = DiskDiscovery.listPhysicalDisks()
         
         BenchCleanup.run(volumes: volumes)
+        BenchInflight.cleanUpLeftovers()
         
         if args.contains("--list-targets") {
             let targets = BenchTargetResolver.resolveTargets(volumes: volumes, disks: disks)
@@ -74,13 +75,12 @@ enum BenchCLI {
             exit(1)
         }
         
-        let maxWrites = size * UInt64(1 + (profile.includesWrites ? profile.passes * 4 : 0))
-        let maxWritesGB = Double(maxWrites) / 1073741824.0
+        let maxWrites = BenchMath.maxBytesWritten(fileSize: size, profile: profile)
         if !args.contains("--json") {
-            print(String(format: "Écrira au plus : %.1f Gio\n", maxWritesGB))
+            print("Écrira au plus : \(Formatters.bytes(maxWrites))\n")
         }
         
-        let runner = BenchmarkRunner(target: target, profile: profile, fileSize: size, physicalDisk: disk)
+        let runner = BenchmarkRunner(target: target, profile: profile, fileSize: size, physicalDisk: disk, appVersion: DiskProbeInfo.version)
         
         let handler = BenchHandler(profile: profile, sizeStr: sizeStr, isJSON: args.contains("--json"))
         runner.delegate = handler
@@ -88,7 +88,7 @@ enum BenchCLI {
         signal(SIGINT, SIG_IGN)
         let sigSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
         sigSource.setEventHandler {
-            print("\nAnnulation...")
+            print("\nAnnulation…")
             runner.cancel()
         }
         sigSource.resume()
@@ -118,19 +118,19 @@ class BenchHandler: BenchmarkRunnerDelegate {
         case .preparing(let p):
             let perc = Int(p * 100)
             if perc != lastPrintedProg {
-                print("\rPréparation du fichier... \(perc)%", terminator: "")
+                print("\rPréparation du fichier… \(perc) %", terminator: "")
                 fflush(stdout)
                 lastPrintedProg = perc
             }
-        case .pass(let id, let pass, let tot, let prog, let speed):
-            let spd = speed ?? 0
+        case .pass(let specId, let direction, let pass, let tot, let prog, let speed):
+            let label = BenchTestSpec.defaultGrid.first { $0.id == specId }?.label ?? specId
+            let dir = direction == .read ? "lecture" : "écriture"
             let p = Int(prog * 100)
-            let spdStr = String(format: "%.1f", spd)
-            print("\rTest : \(id) | Passe \(pass)/\(tot) | \(p)% | \(spdStr) Mo/s       ", terminator: "")
+            print("\rTest : \(label) \(dir) | Passe \(pass)/\(tot) | \(p) % | \(Formatters.speed(speed ?? 0))       ", terminator: "")
             fflush(stdout)
         case .paused(let rem):
             let remStr = String(format: "%.1f", rem)
-            print("\rPause... \(remStr)s restantes       ", terminator: "")
+            print("\rPause… \(remStr) s restantes       ", terminator: "")
             fflush(stdout)
         default:
             break
@@ -149,7 +149,7 @@ class BenchHandler: BenchmarkRunnerDelegate {
                 print(s)
             }
         } else {
-            print("Aman Disk 0.9.0 — Test de performances")
+            print("Aman Disk \(result.appVersion) — Test de performances")
             let profName = profile == .quick ? "Rapide (3 passes)" : (profile == .readOnly ? "Lecture seule (5 passes)" : "Standard (5 passes)")
             print("Volume : \(result.conditions.volumeName) (\(result.conditions.fileSystem)) · Fichier : \(sizeStr) · Profil : \(profName)")
             print("")
@@ -166,18 +166,18 @@ class BenchHandler: BenchmarkRunnerDelegate {
                 
                 if let readRes = result.tests.first(where: { $0.spec == spec && $0.direction == .read }) {
                     let maxMBps = readRes.passes.isEmpty ? 0 : BenchMath.megabytesPerSecond(bytes: BenchMath.best(readRes.passes)!.bytes, seconds: BenchMath.best(readRes.passes)!.seconds)
-                    if maxMBps > 0 { rStr = String(format: "%.1f Mo/s", maxMBps) }
+                    if maxMBps > 0 { rStr = Formatters.speed(maxMBps) }
                     
                     if spec.recordsLatency && spec.queueDepth == 1 {
                         if let p50 = readRes.latencyP50Micros, let p99 = readRes.latencyP99Micros {
-                            lats = "      (latence p50 \(p50) µs · p99 \(p99) µs)"
+                            lats = "      (latence médiane \(Formatters.integer(UInt64(p50))) µs · 99 % \(Formatters.integer(UInt64(p99))) µs)"
                         }
                     }
                 }
                 
                 if let writeRes = result.tests.first(where: { $0.spec == spec && $0.direction == .write }) {
                     let maxMBps = writeRes.passes.isEmpty ? 0 : BenchMath.megabytesPerSecond(bytes: BenchMath.best(writeRes.passes)!.bytes, seconds: BenchMath.best(writeRes.passes)!.seconds)
-                    if maxMBps > 0 { wStr = String(format: "%.1f Mo/s", maxMBps) }
+                    if maxMBps > 0 { wStr = Formatters.speed(maxMBps) }
                 }
                 
                                 let rIdPadded = rId.padding(toLength: 14, withPad: " ", startingAt: 0)
@@ -194,11 +194,8 @@ class BenchHandler: BenchmarkRunnerDelegate {
                 tempStr = "Inconnue"
             }
             
-            let writtenGB = Double(result.conditions.bytesWritten) / 1073741824.0
             let pwr = result.conditions.onBattery == true ? "batterie" : "secteur"
-            
-            let wrStr = String(format: "%.1f", writtenGB)
-            print("\nTempérature : \(tempStr) · Écrit : \(wrStr) Gio · Alimentation : \(pwr)")
+            print("\nTempérature : \(tempStr) · Écrit : \(Formatters.bytes(result.conditions.bytesWritten)) · Alimentation : \(pwr)")
             
             if !result.completed {
                 let r = result.stopReason ?? "inconnu"
@@ -208,4 +205,9 @@ class BenchHandler: BenchmarkRunnerDelegate {
         
         exit(result.completed ? 0 : 1)
     }
+}
+
+enum DiskProbeInfo {
+    /// Même version que l'app (voir build_app.sh).
+    static let version = "0.9.1"
 }

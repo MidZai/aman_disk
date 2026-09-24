@@ -42,11 +42,24 @@ public enum BenchMath {
         return Double(sortedNanos[index]) / 1000.0
     }
     
-    public static func maxBytesWritten(fileSize: UInt64, profile: BenchProfile) -> UInt64 {
+    /// Volume maximal écrit par un test : le fichier de test, puis au plus une fois sa taille
+    /// par passe d'écriture (les passes séquentielles s'arrêtent à la fin du fichier, les passes
+    /// aléatoires à `max_bytes` = taille du fichier).
+    public static func maxBytesWritten(fileSize: UInt64, profile: BenchProfile, testsPerDirection: Int = BenchTestSpec.defaultGrid.count) -> UInt64 {
         if !profile.includesWrites {
             return fileSize
         }
-        return fileSize * UInt64(1 + 4 * profile.passes)
+        return fileSize.saturatingMultiplied(by: UInt64(1 + testsPerDirection * profile.passes))
+    }
+
+    /// Durée maximale estimée d'un test, en secondes : création du fichier (400 Mo/s, prudent pour
+    /// un SSD SATA), passes plafonnées à `timedPassSeconds`, pauses entre les tests.
+    public static func estimatedMaxDuration(fileSize: UInt64, profile: BenchProfile, testsPerDirection: Int = BenchTestSpec.defaultGrid.count) -> TimeInterval {
+        let tests = testsPerDirection * (profile.includesWrites ? 2 : 1)
+        let prepare = Double(fileSize) / 400_000_000
+        let passes = Double(tests * profile.passes) * (profile.timedPassSeconds + 0.2)
+        let pauses = Double(max(0, tests - 1)) * profile.pauseSeconds
+        return prepare + passes + pauses
     }
     
     public static func checkFreeSpace(fileSize: UInt64, available: UInt64) -> FreeSpaceVerdict {

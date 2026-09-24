@@ -1,4 +1,5 @@
-import XCTest
+import Testing
+import Foundation
 @testable import DiskHealthCore
 
 final class MockRegistryNode: IORegistryNode {
@@ -27,8 +28,8 @@ final class MockRegistryNode: IORegistryNode {
     }
 }
 
-final class PhysicalDiskResolverTests: XCTestCase {
-    func testSingleStoreContainer() {
+@Suite final class PhysicalDiskResolverTests {
+    @Test func testSingleStoreContainer() {
         // Physical disk 0
         let disk0 = MockRegistryNode(
             bsdName: "disk0",
@@ -74,10 +75,10 @@ final class PhysicalDiskResolverTests: XCTestCase {
         )
         
         let physicalDisks = PhysicalDiskResolver.resolvePhysicalDisks(from: volume)
-        XCTAssertEqual(physicalDisks, ["disk0"])
+        #expect(physicalDisks == ["disk0"])
     }
     
-    func testFusionDriveTwoStoresContainer() {
+    @Test func testFusionDriveTwoStoresContainer() {
         // Store 1: SSD (disk0)
         let ssd = MockRegistryNode(
             bsdName: "disk0",
@@ -136,10 +137,10 @@ final class PhysicalDiskResolverTests: XCTestCase {
         )
         
         let physicalDisks = PhysicalDiskResolver.resolvePhysicalDisks(from: volume)
-        XCTAssertEqual(physicalDisks, ["disk0", "disk1"])
+        #expect(physicalDisks == ["disk0", "disk1"])
     }
     
-    func testAppleRAIDTwoMembers() {
+    @Test func testAppleRAIDTwoMembers() {
         let member1Disk = MockRegistryNode(
             bsdName: "disk2",
             isWhole: true,
@@ -180,10 +181,10 @@ final class PhysicalDiskResolverTests: XCTestCase {
         )
         
         let physicalDisks = PhysicalDiskResolver.resolvePhysicalDisks(from: raidVolume)
-        XCTAssertEqual(physicalDisks, ["disk2", "disk3"])
+        #expect(physicalDisks == ["disk2", "disk3"])
     }
     
-    func testVolumeBackwardCompatibility() throws {
+    @Test func testVolumeBackwardCompatibility() throws {
         // Decode legacy JSON with single physicalDiskBSDName
         let legacyJson = """
         {
@@ -198,8 +199,8 @@ final class PhysicalDiskResolverTests: XCTestCase {
         """.data(using: .utf8)!
         
         let decodedLegacy = try JSONDecoder().decode(Volume.self, from: legacyJson)
-        XCTAssertEqual(decodedLegacy.physicalDiskBSDNames, ["disk0"])
-        XCTAssertEqual(decodedLegacy.physicalDiskBSDName, "disk0")
+        #expect(decodedLegacy.physicalDiskBSDNames == ["disk0"])
+        #expect(decodedLegacy.physicalDiskBSDName == "disk0")
         
         // Decode modern JSON with multiple physicalDiskBSDNames
         let modernJson = """
@@ -215,7 +216,7 @@ final class PhysicalDiskResolverTests: XCTestCase {
         """.data(using: .utf8)!
         
         let decodedModern = try JSONDecoder().decode(Volume.self, from: modernJson)
-        XCTAssertEqual(decodedModern.physicalDiskBSDNames, ["disk0", "disk1"])
-        XCTAssertEqual(decodedModern.physicalDiskBSDName, "disk0")
+        #expect(decodedModern.physicalDiskBSDNames == ["disk0", "disk1"])
+        #expect(decodedModern.physicalDiskBSDName == "disk0")
     }
 }

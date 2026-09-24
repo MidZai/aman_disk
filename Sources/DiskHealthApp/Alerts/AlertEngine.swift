@@ -88,7 +88,7 @@ final class AlertEngine {
         // Premier relevé : sert de référence, pas d'alerte.
         guard let previous = state.status, previous != r.status else { return [] }
         guard r.status == .caution || r.status == .bad else { return [] }
-        var message = "\(r.name) : \(r.status.localizedLabel)."
+        var message = L("\(r.name): \(r.status.localizedLabel).", "\(r.name) : \(r.status.localizedLabel).")
         if let reason = r.firstReason?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty {
             message += " \(reason)"
             if !reason.hasSuffix(".") { message += "." }
@@ -112,7 +112,7 @@ final class AlertEngine {
         state.hotSince = since
         guard !state.overheatNotified, now.timeIntervalSince(since) >= Self.overheatDuration else { return [] }
         state.overheatNotified = true
-        return [AlertEvent(diskId: r.diskId, kind: .overheat, message: "\(r.name) chauffe : \(t) °C depuis 5 minutes.")]
+        return [AlertEvent(diskId: r.diskId, kind: .overheat, message: L("\(r.name) is running hot: \(t) °C for 5 minutes.", "\(r.name) chauffe : \(t) °C depuis 5 minutes."))]
     }
 
     private func lifeEvents(_ r: AlertReading, _ state: inout DiskState) -> [AlertEvent] {
@@ -126,6 +126,6 @@ final class AlertEngine {
         let crossed = Self.lifeThresholds.filter { previous > $0 && life <= $0 && !state.notifiedLifeThresholds.contains($0) }
         guard let lowest = crossed.min() else { return [] }
         state.notifiedLifeThresholds.formUnion(crossed)
-        return [AlertEvent(diskId: r.diskId, kind: .lifeThreshold(lowest), message: "\(r.name) : durée de vie restante passée sous \(lowest) % (\(life) %).")]
+        return [AlertEvent(diskId: r.diskId, kind: .lifeThreshold(lowest), message: L("\(r.name): remaining life dropped below \(lowest)% (\(life)%).", "\(r.name) : durée de vie restante passée sous \(lowest) % (\(life) %)."))]
     }
 }

@@ -118,6 +118,19 @@ struct MiniRingView: View {
 
 /// Icône *template* de la barre des menus, dessinée en code (piste noire à 25 %).
 enum MenuBarIconRenderer {
+    /// Le libellé de la barre des menus est redessiné à chaque relevé : on ne recrée l'image
+    /// que si la jauge change (au pour cent près).
+    @MainActor private static var cache: (percent: Int, image: NSImage)?
+
+    @MainActor
+    static func cachedImage(fraction: Double) -> NSImage {
+        let percent = Int((fraction * 100).rounded())
+        if let cache, cache.percent == percent { return cache.image }
+        let image = image(fraction: Double(percent) / 100)
+        cache = (percent, image)
+        return image
+    }
+
     static func image(fraction: Double, pointSize: CGFloat = 18) -> NSImage {
         let size = NSSize(width: pointSize, height: pointSize)
         let image = NSImage(size: size, flipped: false) { rect in
@@ -145,5 +158,21 @@ enum MenuBarIconRenderer {
         image.isTemplate = true
         image.accessibilityDescription = "Aman Disk"
         return image
+    }
+}
+
+extension Color {
+    /// Couleur de la charte, en sRGB : « #RRGGBB » ou « #AARRGGBB ».
+    init(hex: String) {
+        let digits = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var value: UInt64 = 0
+        Scanner(string: digits).scanHexInt64(&value)
+        let a, r, g, b: UInt64
+        switch digits.count {
+        case 6: (a, r, g, b) = (255, value >> 16, value >> 8 & 0xFF, value & 0xFF)
+        case 8: (a, r, g, b) = (value >> 24, value >> 16 & 0xFF, value >> 8 & 0xFF, value & 0xFF)
+        default: (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
 }
