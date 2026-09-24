@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.4 — 2026-09-24
+
+- **External drives architecture**: added data models (`DriveConnection`, `SmartAvailability`) classifying internal drives (`internalNVMe`, `internalAHCI`, `internalSATA`) and external drives (`thunderboltNVMe`, `usb`, `other`).
+- **Sidebar groups**: partitioned the drive list into distinct "Internal drives" and "External drives" sections (external section automatically hidden when no external drive is connected), with discrete connection badges ("USB", "Thunderbolt").
+- **Hot-plug detection & safety**: robust DiskArbitration monitoring with 1-second debouncing to coalesce multi-event hot-plug bursts when plugging in external enclosures; disconnecting a selected external drive safely reverts selection to the startup boot disk without crash or stale IOKit references.
+- **Safety filtering (Rule 0.1-8)**: strictly filters out disk images (`Location == "File"`), virtual interfaces (`"Virtual Interface"`), RAM disks (`"RAM Disk"` or `ram*` BSD names), network disks, and synthesized APFS containers.
+- **Demo mode**: added simulated external drive states including a healthy Thunderbolt NVMe SSD (`OWC Envoy Pro FX`), a healthy USB HDD (`Seagate Backup Plus`), an unsupported USB SSD enclosure (`Crucial X8 Portable SSD`), and a USB flash thumb drive (`SanDisk Ultra Flair`).
+- **Unit test suite**: added `DriveConnectionTests` covering simulated `Protocol Characteristics` permutations, missing keys, unknown interconnects, and strict exclusion of virtual/DMG/RAM devices.
+
 ## 0.9.3 — 2026-09-24
 
 - **Internationalization (i18n)**: added support for 16 new languages: Korean (`ko`), Japanese (`ja`), Simplified Chinese (`zh-Hans`), Traditional Chinese (`zh-Hant`), German (`de`), Spanish (`es`), Brazilian Portuguese (`pt-BR`), Russian (`ru`), Arabic (`ar`), Italian (`it`), Dutch (`nl`), Polish (`pl`), Turkish (`tr`), Hindi (`hi`), Vietnamese (`vi`), Ukrainian (`uk`).

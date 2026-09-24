@@ -162,7 +162,8 @@ final class AppManager: ObservableObject {
         loadTask?.cancel()
         loadTask = Task { [weak self] in
             // Coalesces bursts of DiskArbitration events (plugging in, startup).
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            let delayNs: UInt64 = (self?.isLoading == true) ? 50_000_000 : 1_000_000_000
+            try? await Task.sleep(nanoseconds: delayNs)
             guard !Task.isCancelled, let self else { return }
             self.isRefreshing = true
             defer { self.isRefreshing = false }
@@ -181,6 +182,7 @@ final class AppManager: ObservableObject {
             self.apply(disks: finalDisks, announceChanges: !self.disks.isEmpty)
             self.updateSmartNotices(results)
             self.volumes = finalVolumes
+            self.ensureValidSelection(disks: finalDisks, volumes: finalVolumes)
             self.isLoading = false
         }
     }
@@ -290,7 +292,7 @@ final class AppManager: ObservableObject {
             for (id, disk) in oldById where !newIds.contains(id) {
                 ToastCenter.shared.show(message: L("\(disk.physical.model) disconnected", "\(disk.physical.model) déconnecté"), systemImage: "externaldrive.badge.minus")
                 if selection == .physicalDisk(id) {
-                    selection = newDisks.first(where: { $0.physical.isInternal }).map { .physicalDisk($0.id) }
+                    selection = (bootDisk ?? newDisks.first).map { .physicalDisk($0.id) }
                 }
             }
             for disk in newDisks {
@@ -300,6 +302,24 @@ final class AppManager: ObservableObject {
             }
         }
         disks = newDisks
+        if case .physicalDisk(let id) = selection, !newDisks.contains(where: { $0.id == id }) {
+            selection = (bootDisk ?? newDisks.first).map { .physicalDisk($0.id) }
+        }
+    }
+
+    private func ensureValidSelection(disks: [RealDisk], volumes: [Volume]) {
+        switch selection {
+        case .physicalDisk(let id):
+            if !disks.contains(where: { $0.id == id }) {
+                selection = (bootDisk ?? disks.first).map { .physicalDisk($0.id) }
+            }
+        case .volume(let id):
+            if !volumes.contains(where: { $0.id == id }) {
+                selection = (bootDisk ?? disks.first).map { .physicalDisk($0.id) }
+            }
+        case nil:
+            break
+        }
     }
 
     nonisolated static func evaluate(_ snapshot: DiskHealthSnapshot) -> HealthAssessment {

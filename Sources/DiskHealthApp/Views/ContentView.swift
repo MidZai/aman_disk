@@ -121,26 +121,33 @@ private struct SidebarView: View {
     @EnvironmentObject var appManager: AppManager
     @Binding var exportRequest: ExportRequest?
 
+    private var internalDisks: [RealDisk] {
+        appManager.disks.filter { $0.physical.isInternal }
+    }
+
+    private var externalDisks: [RealDisk] {
+        appManager.disks.filter { $0.physical.isExternal }
+    }
+
     var body: some View {
         List(selection: $appManager.selection) {
-            if !appManager.disks.isEmpty {
-                Section(AppManager.isDemo ? L("Drives (demo)", "Disques (démo)") : L("Internal drives", "Disques internes")) {
-                    ForEach(appManager.disks) { disk in
-                        DiskRowView(disk: disk, isFusionMember: appManager.isFusionDriveMember(disk),
-                                    isBenchmarking: appManager.benchmark.runningDiskId == disk.id)
-                            .tag(SidebarItem.physicalDisk(disk.id))
-                            .contextMenu { contextMenu(for: disk) }
+            Section(L("Internal drives", "Disques internes")) {
+                if !internalDisks.isEmpty {
+                    ForEach(internalDisks) { disk in
+                        diskRows(for: disk)
+                    }
+                } else if !appManager.isLoading {
+                    Text(L("No internal drive found", "Aucun disque interne détecté"))
+                        .foregroundStyle(.secondary)
+                }
+            }
 
-                        ForEach(appManager.volumes(on: disk)) { volume in
-                            VolumeRowView(volume: volume)
-                                .padding(.leading, 16)
-                                .tag(SidebarItem.volume(volume.id))
-                        }
+            if !externalDisks.isEmpty {
+                Section(L("External drives", "Disques externes")) {
+                    ForEach(externalDisks) { disk in
+                        diskRows(for: disk)
                     }
                 }
-            } else if !appManager.isLoading {
-                Text(L("No internal drive found", "Aucun disque interne détecté"))
-                    .foregroundStyle(.secondary)
             }
         }
         .listStyle(.sidebar)
@@ -148,6 +155,20 @@ private struct SidebarView: View {
             SupportButton()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
+        }
+    }
+
+    @ViewBuilder
+    private func diskRows(for disk: RealDisk) -> some View {
+        DiskRowView(disk: disk, isFusionMember: appManager.isFusionDriveMember(disk),
+                    isBenchmarking: appManager.benchmark.runningDiskId == disk.id)
+            .tag(SidebarItem.physicalDisk(disk.id))
+            .contextMenu { contextMenu(for: disk) }
+
+        ForEach(appManager.volumes(on: disk)) { volume in
+            VolumeRowView(volume: volume)
+                .padding(.leading, 16)
+                .tag(SidebarItem.volume(volume.id))
         }
     }
 
@@ -309,6 +330,20 @@ struct DiskRowView: View {
     let isFusionMember: Bool
     let isBenchmarking: Bool
 
+    private var connectionBadgeText: String? {
+        guard disk.physical.isExternal else { return nil }
+        switch disk.physical.driveConnection {
+        case .thunderboltNVMe:
+            return "Thunderbolt"
+        case .usb:
+            return "USB"
+        case .other(let name):
+            return name.isEmpty ? L("External", "Externe") : name
+        default:
+            return L("External", "Externe")
+        }
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             DiskIconProvider.icon(for: disk)
@@ -316,10 +351,20 @@ struct DiskRowView: View {
                 .frame(width: 26, height: 26)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(disk.physical.model)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                HStack(spacing: 6) {
+                    Text(disk.physical.model)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    if let badge = connectionBadgeText {
+                        Text(badge)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
+                    }
+                }
                 Text("\(Formatters.bytes(disk.physical.sizeBytes)) · \(disk.physical.interfaceLabel)")
                     .font(.caption)
                     .foregroundStyle(.secondary)

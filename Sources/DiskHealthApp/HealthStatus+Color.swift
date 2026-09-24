@@ -88,11 +88,12 @@ extension PhysicalDisk {
         case .virtualDisk: return L("Virtual", "Virtuel")
         case .unknown: break
         }
-        switch connection {
-        case .nvmeInternal, .nvmeExternal: return "NVMe"
-        case .sata: return "SATA"
+        switch driveConnection {
+        case .internalNVMe, .thunderboltNVMe: return "NVMe"
+        case .internalAHCI: return "PCIe AHCI"
+        case .internalSATA: return "SATA"
         case .usb: return "USB"
-        case .other: return L("Other", "Autre")
+        case .other(let name): return name.isEmpty ? L("Other", "Autre") : name
         }
     }
 

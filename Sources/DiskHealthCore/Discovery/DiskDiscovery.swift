@@ -26,32 +26,84 @@ public enum DiskDiscovery {
                 
                 let isWhole = descDict[kDADiskDescriptionMediaWholeKey as String] as? Bool ?? false
                 let protocolName = descDict[kDADiskDescriptionDeviceProtocolKey as String] as? String ?? ""
+                let bsdName = descDict[kDADiskDescriptionMediaBSDNameKey as String] as? String ?? ""
+
+                let protocolChars = IORegistryEntrySearchCFProperty(
+                    serviceToProcess,
+                    kIOServicePlane,
+                    "Protocol Characteristics" as CFString,
+                    kCFAllocatorDefault,
+                    IOOptionBits(kIORegistryIterateParents | kIORegistryIterateRecursively)
+                ) as? [String: Any]
+
+                let isPhysical = DriveClassifier.isPhysicalDrive(
+                    protocolCharacteristics: protocolChars,
+                    deviceProtocol: protocolName,
+                    bsdName: bsdName
+                )
                 
-                if isWhole && !isSynthetic(service: serviceToProcess, protocolName: protocolName) {
-                    let bsdName = descDict[kDADiskDescriptionMediaBSDNameKey as String] as? String ?? ""
+                if isWhole && isPhysical && !isSynthetic(service: serviceToProcess, protocolName: protocolName) {
                     let model = descDict[kDADiskDescriptionDeviceModelKey as String] as? String ?? "Unknown Model"
                     let sizeBytes = descDict[kDADiskDescriptionMediaSizeKey as String] as? UInt64 ?? 0
-                    let isInternal = descDict[kDADiskDescriptionDeviceInternalKey as String] as? Bool ?? false
+                    let daIsInternal = descDict[kDADiskDescriptionDeviceInternalKey as String] as? Bool ?? false
+
+                    let locationStr = (protocolChars?["Physical Interconnect Location"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let isInternal: Bool
+                    if let loc = locationStr, !loc.isEmpty {
+                        isInternal = loc.caseInsensitiveCompare("Internal") == .orderedSame
+                    } else {
+                        isInternal = daIsInternal
+                    }
                     
                     let volumeNames = getVolumeNames(for: bsdName, session: session)
                     let (protocolType, mediumType, healthCapability) = ProtocolDetector.detect(bsdName: bsdName)
                     
-                    var connection: Connection = .other
+                    let driveConnection = DriveClassifier.classify(
+                        protocolCharacteristics: protocolChars,
+                        deviceProtocol: protocolName,
+                        isInternalHint: isInternal,
+                        protocolType: protocolType
+                    )
+
                     var usbVendorID: UInt16? = nil
                     var usbProductID: UInt16? = nil
-                    
-                    if protocolName == "USB" || protocolName == "USB-C" || protocolName == "USB (Attached SCSI)" {
-                        connection = .usb
+                    if driveConnection == .usb || protocolName.contains("USB") {
                         let ids = getUSBIDs(service: serviceToProcess)
                         usbVendorID = ids.vid
                         usbProductID = ids.pid
-                    } else if protocolType == .pcieAhci {
-                        connection = .other
-                    } else if protocolName.contains("NVMe") || protocolName.contains("Apple Fabric") || protocolName.contains("PCI") {
-                        connection = isInternal ? .nvmeInternal : .nvmeExternal
-                    } else if protocolName.contains("SATA") {
-                        connection = .sata
                     }
+
+                    let connection: Connection
+                    switch driveConnection {
+                    case .internalNVMe: connection = .nvmeInternal
+                    case .internalAHCI: connection = .other
+                    case .internalSATA: connection = .sata
+                    case .thunderboltNVMe: connection = .nvmeExternal
+                    case .usb: connection = .usb
+                    case .other: connection = .other
+                    }
+
+                    let smartAvailability: SmartAvailability
+                    switch healthCapability {
+                    case .supported:
+                        smartAvailability = .available
+                    case .unsupported(let reason):
+                        switch reason {
+                        case .smartDisabled:
+                            smartAvailability = .disabledOnDrive
+                        case .usbBridge:
+                            smartAvailability = .notSupportedByEnclosure
+                        case .readFailed(let code):
+                            let intCode = Int32(code) ?? -1
+                            smartAvailability = .error(code: intCode)
+                        default:
+                            smartAvailability = .notSupportedByEnclosure
+                        }
+                    }
+
+                    let interconnectStr = (protocolChars?["Physical Interconnect"] as? String) ?? ""
+                    let isVirtual = protocolName == "Virtual Interface" || interconnectStr == "Virtual Interface"
+                    let isDiskImage = protocolName == "Disk Image" || locationStr == "File"
                     
                     disks.append(PhysicalDisk(
                         bsdName: bsdName,
@@ -59,14 +111,16 @@ public enum DiskDiscovery {
                         sizeBytes: sizeBytes,
                         isInternal: isInternal,
                         connection: connection,
+                        driveConnection: driveConnection,
                         volumeNames: volumeNames,
                         usbVendorID: usbVendorID,
                         usbProductID: usbProductID,
                         protocolType: protocolType,
                         mediumType: mediumType,
                         healthCapability: healthCapability,
-                        isVirtual: protocolName == "Virtual Interface",
-                        isDiskImage: protocolName == "Disk Image"
+                        smartAvailability: smartAvailability,
+                        isVirtual: isVirtual,
+                        isDiskImage: isDiskImage
                     ))
                 }
             }
@@ -101,7 +155,7 @@ public enum DiskDiscovery {
             }
         }
         if isAPFSContainer { return true }
-        if protocolName == "Virtual Interface" || protocolName == "Disk Image" { return false }
+        if protocolName == "Virtual Interface" || protocolName == "Disk Image" { return true }
         return !hasBlockStorage
     }
     
@@ -111,7 +165,6 @@ public enum DiskDiscovery {
         guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOMedia"), &iterator) == kIOReturnSuccess else { return [] }
         defer { IOObjectRelease(iterator) }
 
-        
         var service = IOIteratorNext(iterator)
         while service != 0 {
             let current = service

@@ -32,4 +32,57 @@ import DiskHealthCore
         #expect(filteredVols.count == 1)
         #expect(filteredVols[0].bsdName == "disk0s1")
     }
+
+    @Test func testExternalDrivesMonitoredWhileVirtualExcluded() {
+        let externalUSB = PhysicalDisk(
+            bsdName: "disk4",
+            model: "Samsung T7",
+            sizeBytes: 1_000_000_000_000,
+            isInternal: false,
+            driveConnection: .usb,
+            volumeNames: ["T7 Data"],
+            protocolType: .usb,
+            mediumType: .solidState,
+            healthCapability: .unsupported(reason: .usbBridge)
+        )
+        let externalThunderbolt = PhysicalDisk(
+            bsdName: "disk5",
+            model: "OWC Envoy Pro FX",
+            sizeBytes: 2_000_000_000_000,
+            isInternal: false,
+            driveConnection: .thunderboltNVMe,
+            volumeNames: ["Thunderbolt Drive"],
+            protocolType: .nvme,
+            mediumType: .solidState,
+            healthCapability: .supported
+        )
+        let ramDisk = PhysicalDisk(
+            bsdName: "disk6",
+            model: "RAM Disk",
+            sizeBytes: 2_000_000_000,
+            isInternal: true,
+            driveConnection: .other("RAM Disk"),
+            volumeNames: ["RAMDisk"],
+            protocolType: .unknown,
+            mediumType: .solidState,
+            healthCapability: .unsupported(reason: .noSmartInterface)
+        )
+        let dmgDisk = PhysicalDisk(
+            bsdName: "disk7",
+            model: "Mounted Installer",
+            sizeBytes: 5_000_000_000,
+            isInternal: false,
+            driveConnection: .other("File"),
+            volumeNames: ["Installer"],
+            protocolType: .unknown,
+            mediumType: .unknown,
+            healthCapability: .unsupported(reason: .noSmartInterface),
+            isDiskImage: true
+        )
+
+        #expect(DiskFilter.isMonitored(externalUSB))
+        #expect(DiskFilter.isMonitored(externalThunderbolt))
+        #expect(!DiskFilter.isMonitored(ramDisk))
+        #expect(!DiskFilter.isMonitored(dmgDisk))
+    }
 }

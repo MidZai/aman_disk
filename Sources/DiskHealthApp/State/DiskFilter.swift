@@ -1,12 +1,20 @@
 import Foundation
 import DiskHealthCore
 
-/// Drives shown by the app (0.9: internal drives only).
+/// Drives shown by the app (internal and external physical drives).
 enum DiskFilter {
-    /// Monitored drive: internal, not USB, not virtual, not a disk image.
+    /// Monitored drive: physical drive (internal or external), not virtual, not a disk image, not RAM disk.
     static func isMonitored(_ disk: PhysicalDisk) -> Bool {
-        disk.isInternal && disk.connection != .usb && !disk.isVirtual && !disk.isDiskImage
-            && disk.protocolType != .virtualDisk
+        if disk.isVirtual || disk.isDiskImage || disk.protocolType == .virtualDisk {
+            return false
+        }
+        if case .other(let name) = disk.driveConnection {
+            let lower = name.lowercased()
+            if lower.contains("file") || lower.contains("virtual") || lower.contains("ram") || lower.contains("network") {
+                return false
+            }
+        }
+        return true
     }
 
     static func filter(disks: [RealDisk], volumes: [Volume]) -> (disks: [RealDisk], volumes: [Volume]) {

@@ -134,6 +134,7 @@ extension ExtraTranslations {
         "Interface downshifts": "انخفاضات سرعة الواجهة",
         "Internal": "Internal",
         "Internal drives": "الأقراص الداخلية",
+        "External drives": "الأقراص الخارجية",
         "Interrupted": "تمت المقاطعة",
         "Its USB enclosure doesn't pass S.M.A.R.T. commands through to macOS. The drive works normally; only wear and temperature can't be seen.": "لا تمرر حاوية USB أوامر S.M.A.R.T. إلى macOS. القرص يعمل بشكل طبيعي، ولكن لا يمكن رؤية التآكل ودرجة الحرارة.",
         "Key indicators": "Key indicators",

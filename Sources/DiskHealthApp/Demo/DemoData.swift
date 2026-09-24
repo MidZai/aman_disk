@@ -15,7 +15,10 @@ public enum DemoData {
         makeDisk3(),
         makeDisk5(),
         makeDisk6(),
-        makeDisk4(),
+        makeDiskThunderboltNVMe(),
+        makeDiskUSBHDDWithSmart(),
+        makeDiskUSBSSDNotSupported(),
+        makeDiskUSBThumbDrive(),
         makeDiskSD(),
         makeDiskSmartDisabled(),
         makeDiskVirtual(),
@@ -25,7 +28,10 @@ public enum DemoData {
     public static let volumes: [Volume] = [
         Volume(bsdName: "disk1s1", name: "Macintosh HD", mountPoint: "/", format: "APFS", totalBytes: 2_000_000_000_000, availableBytes: 1_200_000_000_000, physicalDiskBSDNames: ["disk0"]),
         Volume(bsdName: "disk2s1", name: "Fusion HD", mountPoint: "/Volumes/Fusion HD", format: "APFS", totalBytes: 1_500_000_000_000, availableBytes: 900_000_000_000, physicalDiskBSDNames: ["disk4", "disk5"]),
-        Volume(bsdName: "disk3s1", name: "Sauvegardes", mountPoint: "/Volumes/Sauvegardes", format: "ExFAT", totalBytes: 1_000_000_000_000, availableBytes: 400_000_000_000, physicalDiskBSDNames: ["disk3"])
+        Volume(bsdName: "disk10s1", name: "Thunderbolt Fast", mountPoint: "/Volumes/Thunderbolt Fast", format: "APFS", totalBytes: 1_000_000_000_000, availableBytes: 650_000_000_000, physicalDiskBSDNames: ["disk10"]),
+        Volume(bsdName: "disk11s1", name: "Seagate Backup", mountPoint: "/Volumes/Seagate Backup", format: "ExFAT", totalBytes: 2_000_000_000_000, availableBytes: 1_100_000_000_000, physicalDiskBSDNames: ["disk11"]),
+        Volume(bsdName: "disk12s1", name: "Crucial X8", mountPoint: "/Volumes/Crucial X8", format: "APFS", totalBytes: 1_000_000_000_000, availableBytes: 420_000_000_000, physicalDiskBSDNames: ["disk12"]),
+        Volume(bsdName: "disk13s1", name: "USB DRIVE", mountPoint: "/Volumes/USB DRIVE", format: "FAT32", totalBytes: 64_000_000_000, availableBytes: 32_000_000_000, physicalDiskBSDNames: ["disk13"])
     ]
     
     private static func makeDisk1() -> DemoDisk {
@@ -277,9 +283,147 @@ public enum DemoData {
         return DemoDisk(physical: physical, snapshot: .ata(parsedSmart!), health: health)
     }
 
-    private static func makeDisk4() -> DemoDisk {
-        let physical = PhysicalDisk(bsdName: "disk3", model: "External SSD", sizeBytes: 1_000_000_000_000, isInternal: false, connection: .usb, volumeNames: ["Sauvegardes"], usbVendorID: 0x0BDA, usbProductID: 0x9210, protocolType: .usb, mediumType: .solidState, healthCapability: .unsupported(reason: .usbBridge))
-        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [L("Health unreadable", "Santé non lisible")])
+    private static func makeDiskThunderboltNVMe() -> DemoDisk {
+        let physical = PhysicalDisk(
+            bsdName: "disk10",
+            model: "OWC Envoy Pro FX",
+            sizeBytes: 1_000_000_000_000,
+            isInternal: false,
+            connection: .nvmeExternal,
+            driveConnection: .thunderboltNVMe,
+            volumeNames: ["Thunderbolt Fast"],
+            usbVendorID: nil,
+            usbProductID: nil,
+            protocolType: .nvme,
+            mediumType: .solidState,
+            healthCapability: .supported,
+            smartAvailability: .available
+        )
+        let smart = NVMeSmartLog(
+            criticalWarning: 0,
+            compositeTemperatureKelvin: 308,
+            availableSpare: 100,
+            availableSpareThreshold: 10,
+            percentageUsed: 3,
+            dataUnitsRead: 45_000_000,
+            dataUnitsWritten: 38_000_000,
+            hostReadCommands: 0,
+            hostWriteCommands: 0,
+            controllerBusyTimeMinutes: 0,
+            powerCycles: 120,
+            powerOnHours: 350,
+            unsafeShutdowns: 1,
+            mediaErrors: 0,
+            errorLogEntries: 0
+        )
+        let identify = NVMeIdentify(
+            serialNumber: "TB-NVME-8842",
+            modelNumber: "OWC Envoy Pro FX",
+            firmwareRevision: "1.0",
+            warningTempKelvin: 0,
+            criticalTempKelvin: 0,
+            totalCapacityBytes: 1_000_000_000_000
+        )
+        let health = HealthEngine.evaluate(smart: smart, identify: identify)
+        let key = DiskIdentity.key(model: identify.modelNumber, serial: identify.serialNumber)
+        let store = HistoryStore.shared
+        var current = Date().addingTimeInterval(-7 * 24 * 3600)
+        let end = Date()
+        while current < end {
+            let hour = Calendar.current.component(.hour, from: current)
+            var baseTemp = 31.0
+            if hour >= 13 && hour <= 17 { baseTemp = 36.0 }
+            let noise = Double(Int(current.timeIntervalSince1970) % 5) - 2.0
+            let tempC = Int(baseTemp + noise)
+            let sample = HistorySample(
+                date: current,
+                temperatureC: tempC,
+                percentageUsed: 3,
+                dataUnitsWritten: 38_000_000,
+                dataUnitsRead: 45_000_000,
+                powerOnHours: 350,
+                mediaErrors: 0,
+                availableSpare: 100
+            )
+            store.append(sample, for: key)
+            current = current.addingTimeInterval(15 * 60)
+        }
+        return DemoDisk(physical: physical, snapshot: .nvme(smart, identify), health: health)
+    }
+
+    private static func makeDiskUSBHDDWithSmart() -> DemoDisk {
+        let physical = PhysicalDisk(
+            bsdName: "disk11",
+            model: "Seagate Backup Plus",
+            sizeBytes: 2_000_000_000_000,
+            isInternal: false,
+            connection: .usb,
+            driveConnection: .usb,
+            volumeNames: ["Seagate Backup"],
+            usbVendorID: 0x0BC2,
+            usbProductID: 0xAB30,
+            protocolType: .ata,
+            mediumType: .rotational,
+            healthCapability: .supported,
+            smartAvailability: .available
+        )
+        let smartData = makeATASmartData(attributes: [
+            (1, 0, 100, 100, [0, 0, 0, 0, 0, 0]),
+            (3, 0, 95, 95, [0, 0, 0, 0, 0, 0]),
+            (4, 0, 100, 100, [150, 0, 0, 0, 0, 0]),
+            (5, 0, 100, 100, [0, 0, 0, 0, 0, 0]),
+            (9, 0, 98, 98, [180, 5, 0, 0, 0, 0]),
+            (12, 0, 100, 100, [120, 0, 0, 0, 0, 0]),
+            (194, 0, 115, 100, [32, 0, 0, 0, 0, 0]),
+            (197, 0, 100, 100, [0, 0, 0, 0, 0, 0]),
+            (198, 0, 100, 100, [0, 0, 0, 0, 0, 0])
+        ])
+        let thresholdsData = makeATAThresholds(thresholds: [
+            (1, 6), (3, 0), (4, 20), (5, 36), (9, 0), (12, 0), (194, 0), (197, 0), (198, 0)
+        ])
+        let identifyData = makeATAIdentify(model: "Seagate Backup Plus", rotationRate: 5400)
+        let parsedSmart = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false)
+        let health = ATAHealthEvaluator.evaluate(snapshot: parsedSmart!)
+        return DemoDisk(physical: physical, snapshot: .ata(parsedSmart!), health: health)
+    }
+
+    private static func makeDiskUSBSSDNotSupported() -> DemoDisk {
+        let physical = PhysicalDisk(
+            bsdName: "disk12",
+            model: "Crucial X8 Portable SSD",
+            sizeBytes: 1_000_000_000_000,
+            isInternal: false,
+            connection: .usb,
+            driveConnection: .usb,
+            volumeNames: ["Crucial X8"],
+            usbVendorID: 0x0634,
+            usbProductID: 0x5600,
+            protocolType: .usb,
+            mediumType: .solidState,
+            healthCapability: .unsupported(reason: .usbBridge),
+            smartAvailability: .notSupportedByEnclosure
+        )
+        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [Strings.unsupportedTitle])
+        return DemoDisk(physical: physical, snapshot: nil, health: health)
+    }
+
+    private static func makeDiskUSBThumbDrive() -> DemoDisk {
+        let physical = PhysicalDisk(
+            bsdName: "disk13",
+            model: "SanDisk Ultra Flair",
+            sizeBytes: 64_000_000_000,
+            isInternal: false,
+            connection: .usb,
+            driveConnection: .usb,
+            volumeNames: ["USB DRIVE"],
+            usbVendorID: 0x0781,
+            usbProductID: 0x5583,
+            protocolType: .usb,
+            mediumType: .solidState,
+            healthCapability: .unsupported(reason: .usbBridge),
+            smartAvailability: .notSupportedByEnclosure
+        )
+        let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [L("Flash drive: S.M.A.R.T. not supported", "Clé USB : S.M.A.R.T. non pris en charge")])
         return DemoDisk(physical: physical, snapshot: nil, health: health)
     }
 
