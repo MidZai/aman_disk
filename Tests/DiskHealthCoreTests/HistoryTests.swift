@@ -55,7 +55,7 @@ import Foundation
     }
     
     @Test func testAggregation() {
-        // Date alignée sur l'heure : les tranches de regroupement sont alignées sur l'horloge.
+        // Date aligned on the hour: the aggregation buckets are aligned on the clock.
         let baseDate = Date(timeIntervalSince1970: 1_800_000_000)
         var samples: [HistorySample] = []
         

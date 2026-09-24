@@ -9,7 +9,7 @@ public enum ATAHealthEvaluator {
         var reasons = [String]()
         var status = HealthStatus.good
 
-        // Défaillance.
+        // Failing.
         if snapshot.thresholdExceeded {
             status = .bad
             reasons.append(L("The drive itself reports an imminent failure (S.M.A.R.T. status).", "Le disque signale lui-même une défaillance imminente (statut S.M.A.R.T.)."))
@@ -20,7 +20,7 @@ public enum ATAHealthEvaluator {
             reasons.append(L("The “\(info.name)” attribute has dropped below its failure threshold.", "L'attribut « \(info.name) » est passé sous son seuil de défaillance."))
         }
 
-        // À surveiller (listé même si l'état est déjà « Défaillance probable »).
+        // Needs attention (listed even if the status is already “Likely failing”).
         var cautionReasons: [String] = []
         for attr in snapshot.attributes {
             let info = ATACatalog.attributeInfo(id: attr.id, profile: profile)
@@ -30,7 +30,7 @@ public enum ATAHealthEvaluator {
                     cautionReasons.append(L("\(info.name): \(Formatters.integer(raw)).", "\(info.name) : \(Formatters.integer(raw))."))
                 }
             default:
-                // Seuil franchi par le passé, mais plus maintenant (sinon : déjà « défaillance »).
+                // Threshold crossed in the past, but not anymore (otherwise it's already “failing”).
                 if attr.threshold > 0 && attr.worst <= attr.threshold && attr.current > attr.threshold {
                     cautionReasons.append(L("The “\(info.name)” attribute crossed its threshold in the past.", "L'attribut « \(info.name) » a déjà franchi son seuil par le passé."))
                 }
@@ -44,7 +44,7 @@ public enum ATAHealthEvaluator {
             reasons += cautionReasons
         }
 
-        // La température n'entre pas dans l'état de santé (voir HealthEngine).
+        // Temperature doesn't count toward the health status (see HealthEngine).
 
         if status == .good {
             reasons.append(L("No problems detected.", "Aucune anomalie détectée."))

@@ -16,16 +16,16 @@ enum BenchCLI {
                 if let reason = target.rejectionReason {
                     var rStr = ""
                     switch reason {
-                    case .readOnly: rStr = "Lecture seule"
-                    case .network: rStr = "Réseau"
-                    case .diskImage: rStr = "Image disque"
-                    case .timeMachine: rStr = "Sauvegarde Time Machine"
-                    case .accessDenied: rStr = "Accès refusé"
-                    case .insufficientFreeSpace(let v): rStr = "Espace insuffisant (\(v))"
+                    case .readOnly: rStr = "Read-only"
+                    case .network: rStr = "Network volume"
+                    case .diskImage: rStr = "Disk image"
+                    case .timeMachine: rStr = "Time Machine backup"
+                    case .accessDenied: rStr = "Access denied"
+                    case .insufficientFreeSpace(let v): rStr = "Not enough free space (\(v))"
                     }
-                    print("\(target.volume.mountPoint) : NON (\(rStr))")
+                    print("\(target.volume.mountPoint): NO (\(rStr))")
                 } else {
-                    print("\(target.volume.mountPoint) : OUI")
+                    print("\(target.volume.mountPoint): YES")
                 }
             }
             exit(0)
@@ -40,12 +40,12 @@ enum BenchCLI {
         }
         
         var size: UInt64 = 1073741824
-        var sizeStr = "1 Gio"
+        var sizeStr = "1 GiB"
         let sIdx = args.firstIndex(of: "--size") ?? -1
         if sIdx >= 0, sIdx + 1 < args.count {
             let sStr = args[sIdx + 1]
-            if sStr == "256M" { size = 268435456; sizeStr = "256 Mio" }
-            else if sStr == "4G" { size = 4294967296; sizeStr = "4 Gio" }
+            if sStr == "256M" { size = 268435456; sizeStr = "256 MiB" }
+            else if sStr == "4G" { size = 4294967296; sizeStr = "4 GiB" }
         }
         
         var targetPath = "/System/Volumes/Data"
@@ -61,23 +61,23 @@ enum BenchCLI {
         
         let targets = BenchTargetResolver.resolveTargets(volumes: volumes, disks: disks, fileSize: size)
         guard let target = targets.first(where: { $0.volume.mountPoint == targetPath || ($0.volume.mountPoint == "/" && targetPath == "/System/Volumes/Data") }) else {
-            print("Volume non trouvé ou test impossible sur \(targetPath). Utilisez --list-targets pour vérifier.")
+            print("Volume not found, or it can't be tested: \(targetPath). Use --list-targets to check.")
             exit(1)
         }
         
         if let reason = target.rejectionReason {
-            print("Test impossible sur ce volume : \(reason)")
+            print("This volume can't be tested: \(reason)")
             exit(1)
         }
         
         guard let bsd = target.volume.physicalDiskBSDNames.first, let disk = disks.first(where: { $0.bsdName == bsd }) else {
-            print("Impossible de trouver le disque physique.")
+            print("Couldn't find the physical disk.")
             exit(1)
         }
         
         let maxWrites = BenchMath.maxBytesWritten(fileSize: size, profile: profile)
         if !args.contains("--json") {
-            print("Écrira au plus : \(Formatters.bytes(maxWrites))\n")
+            print("Will write at most: \(Formatters.bytes(maxWrites))\n")
         }
         
         let runner = BenchmarkRunner(target: target, profile: profile, fileSize: size, physicalDisk: disk, appVersion: DiskProbeInfo.version)
@@ -88,7 +88,7 @@ enum BenchCLI {
         signal(SIGINT, SIG_IGN)
         let sigSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
         sigSource.setEventHandler {
-            print("\nAnnulation…")
+            print("\nCancelling…")
             runner.cancel()
         }
         sigSource.resume()
@@ -118,19 +118,19 @@ class BenchHandler: BenchmarkRunnerDelegate {
         case .preparing(let p):
             let perc = Int(p * 100)
             if perc != lastPrintedProg {
-                print("\rPréparation du fichier… \(perc) %", terminator: "")
+                print("\rPreparing the test file… \(perc)%", terminator: "")
                 fflush(stdout)
                 lastPrintedProg = perc
             }
         case .pass(let specId, let direction, let pass, let tot, let prog, let speed):
             let label = BenchTestSpec.defaultGrid.first { $0.id == specId }?.label ?? specId
-            let dir = direction == .read ? "lecture" : "écriture"
+            let dir = direction == .read ? "read" : "write"
             let p = Int(prog * 100)
-            print("\rTest : \(label) \(dir) | Passe \(pass)/\(tot) | \(p) % | \(Formatters.speed(speed ?? 0))       ", terminator: "")
+            print("\rTest: \(label) \(dir) | Pass \(pass)/\(tot) | \(p)% | \(Formatters.speed(speed ?? 0))       ", terminator: "")
             fflush(stdout)
         case .paused(let rem):
             let remStr = String(format: "%.1f", rem)
-            print("\rPause… \(remStr) s restantes       ", terminator: "")
+            print("\rPaused… \(remStr) s left       ", terminator: "")
             fflush(stdout)
         default:
             break
@@ -149,11 +149,11 @@ class BenchHandler: BenchmarkRunnerDelegate {
                 print(s)
             }
         } else {
-            print("Aman Disk \(result.appVersion) — Test de performances")
-            let profName = profile == .quick ? "Rapide (3 passes)" : (profile == .readOnly ? "Lecture seule (5 passes)" : "Standard (5 passes)")
-            print("Volume : \(result.conditions.volumeName) (\(result.conditions.fileSystem)) · Fichier : \(sizeStr) · Profil : \(profName)")
+            print("Aman Disk \(result.appVersion) — Performance test")
+            let profName = profile == .quick ? "Quick (3 passes)" : (profile == .readOnly ? "Read-only (5 passes)" : "Standard (5 passes)")
+            print("Volume: \(result.conditions.volumeName) (\(result.conditions.fileSystem)) · File: \(sizeStr) · Profile: \(profName)")
             print("")
-            print("                 Lecture         Écriture")
+            print("                 Read            Write")
             
             for spec in BenchTestSpec.defaultGrid {
                 let patStr = spec.pattern == .sequential ? "SEQ" : "RND"
@@ -170,7 +170,7 @@ class BenchHandler: BenchmarkRunnerDelegate {
                     
                     if spec.recordsLatency && spec.queueDepth == 1 {
                         if let p50 = readRes.latencyP50Micros, let p99 = readRes.latencyP99Micros {
-                            lats = "      (latence médiane \(Formatters.integer(UInt64(p50))) µs · 99 % \(Formatters.integer(UInt64(p99))) µs)"
+                            lats = "      (median latency \(Formatters.integer(UInt64(p50))) µs · 99th percentile \(Formatters.integer(UInt64(p99))) µs)"
                         }
                     }
                 }
@@ -180,7 +180,7 @@ class BenchHandler: BenchmarkRunnerDelegate {
                     if maxMBps > 0 { wStr = Formatters.speed(maxMBps) }
                 }
                 
-                                let rIdPadded = rId.padding(toLength: 14, withPad: " ", startingAt: 0)
+                let rIdPadded = rId.padding(toLength: 14, withPad: " ", startingAt: 0)
                 let rStrPadded = rStr.padding(toLength: 15, withPad: " ", startingAt: 0)
                 let wStrPadded = wStr.padding(toLength: 15, withPad: " ", startingAt: 0)
                 print("\(rIdPadded) \(rStrPadded) \(wStrPadded)\(lats)")
@@ -191,15 +191,15 @@ class BenchHandler: BenchmarkRunnerDelegate {
                 let tMax = result.conditions.temperatureMaxC ?? tStart
                 tempStr = "\(tStart) → \(tMax) °C"
             } else {
-                tempStr = "Inconnue"
+                tempStr = "Unknown"
             }
             
-            let pwr = result.conditions.onBattery == true ? "batterie" : "secteur"
-            print("\nTempérature : \(tempStr) · Écrit : \(Formatters.bytes(result.conditions.bytesWritten)) · Alimentation : \(pwr)")
+            let pwr = result.conditions.onBattery == true ? "battery" : "power adapter"
+            print("\nTemperature: \(tempStr) · Written: \(Formatters.bytes(result.conditions.bytesWritten)) · Power: \(pwr)")
             
             if !result.completed {
-                let r = result.stopReason ?? "inconnu"
-                print("\n[!] Test interrompu : \(r)")
+                let r = result.stopReason ?? "unknown"
+                print("\n[!] Test stopped: \(r)")
             }
         }
         
@@ -208,6 +208,6 @@ class BenchHandler: BenchmarkRunnerDelegate {
 }
 
 enum DiskProbeInfo {
-    /// Même version que l'app (voir build_app.sh).
-    static let version = "0.9.1"
+    /// Same version as the app (see build_app.sh).
+    static let version = "0.9.2"
 }

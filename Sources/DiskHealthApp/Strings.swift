@@ -1,7 +1,7 @@
 import Foundation
 import DiskHealthCore
 
-/// Textes partagés entre plusieurs vues (les autres restent au plus près de leur vue).
+/// Texts shared by several views (the others stay as close as possible to their view).
 enum Strings {
     static let statusGood = L("Healthy", "En bonne santé")
     static let statusCaution = L("Needs attention", "À surveiller")
@@ -10,7 +10,7 @@ enum Strings {
 
     static let fusionDriveMember = L("Part of a Fusion Drive", "Fait partie d'un Fusion Drive")
 
-    // Disques sans données de santé
+    // Drives without health data
     static let unsupportedTitle = L("This drive's health data isn't accessible", "Les données de santé de ce disque ne sont pas accessibles")
     static let unsupportedText1 = L("Its USB enclosure doesn't pass S.M.A.R.T. commands through to macOS. The drive works normally; only wear and temperature can't be seen.", "Son boîtier USB ne transmet pas les commandes S.M.A.R.T. à macOS. Le disque fonctionne normalement : seules l'usure et la température restent invisibles.")
     static let exportDiagnostic = L("Export Diagnostic…", "Exporter le diagnostic…")
@@ -41,7 +41,7 @@ enum Strings {
         L("Reading health data failed (\(code)). Try again; if the problem persists, export a diagnostic.", "La lecture des données de santé a échoué (\(code)). Réessayez ; si le problème persiste, exportez un diagnostic.")
     }
 
-    // Test de performances
+    // Performance test
     static func benchConfirmMessage(volume: String, size: String, duration: String, maxWritten: String) -> String {
         L("Aman Disk will create a \(size) test file on “\(volume)”, read and write it, then delete it. Duration: \(duration). Data written: up to \(maxWritten). Quit apps that use the disk heavily for reliable results.", "Aman Disk va créer un fichier de test de \(size) sur « \(volume) », le lire et l'écrire, puis le supprimer. Durée : \(duration). Données écrites : \(maxWritten) au plus. Fermez les applications qui utilisent beaucoup le disque pour des résultats fiables.")
     }

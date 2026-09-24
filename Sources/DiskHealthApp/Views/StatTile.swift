@@ -1,7 +1,7 @@
 import SwiftUI
 import DiskHealthCore
 
-/// Tuile d'indicateur : valeur, libellé (toujours affiché) et précision éventuelle.
+/// Indicator tile: value, label (always shown) and an optional detail.
 struct StatTile: View {
     let label: String
     let value: String?
@@ -36,8 +36,8 @@ struct StatTile: View {
     }
 }
 
-/// Indicateurs clés, communs au NVMe et à l'ATA. Une ligne de cinq tuiles quand la place le
-/// permet, sinon deux lignes (fenêtre étroite, inspecteur ouvert) au lieu d'écraser les valeurs.
+/// Key indicators, shared by NVMe and ATA. One row of five tiles when there's room,
+/// otherwise two rows (narrow window, inspector open) instead of squeezing the values.
 struct StatTilesGrid: View {
     let disk: RealDisk
     let metrics: DiskMetrics

@@ -15,8 +15,8 @@ public enum TemperatureStatus: String, Codable {
         }
     }
 
-    /// Seuils génériques (utilisés quand le disque n'annonce pas les siens) :
-    /// SSD 60 / 70 °C, disque dur 55 / 65 °C. Mêmes valeurs que les alertes et l'arrêt du test.
+    /// Generic thresholds (used when the drive doesn't report its own):
+    /// SSD 60 / 70 °C, hard drive 55 / 65 °C. Same values as the alerts and the test's safety stop.
     public static func genericThresholds(isRotational: Bool) -> (warning: Int, critical: Int) {
         isRotational ? (55, 65) : (60, 70)
     }

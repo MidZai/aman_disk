@@ -37,7 +37,7 @@ public enum UnsupportedReason: Codable, Equatable, Hashable {
     }
     
     public init(from decoder: Decoder) throws {
-        // P2: Try legacy single-value format first for backwards compatibility,
+        // Try the legacy single-value format first for backwards compatibility,
         // then fall back to the canonical keyed format.
         if let singleContainer = try? decoder.singleValueContainer(),
            let str = try? singleContainer.decode(String.self) {
@@ -71,7 +71,7 @@ public enum UnsupportedReason: Codable, Equatable, Hashable {
     }
     
     public func encode(to encoder: Encoder) throws {
-        // P2: Always use a keyed container for a stable, unambiguous format.
+        // Always use a keyed container for a stable, unambiguous format.
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case .usbBridge:

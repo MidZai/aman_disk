@@ -43,7 +43,7 @@ public enum DemoData {
         while current < end {
             let hour = Calendar.current.component(.hour, from: current)
             
-            // Coupure d'une nuit il y a 3 jours (entre minuit et 8h)
+            // Overnight gap 3 days ago (between midnight and 8 am)
             let daysAgo = end.timeIntervalSince(current) / (24 * 3600)
             if daysAgo > 2.5 && daysAgo < 3.5 && hour >= 0 && hour < 8 {
                 current = current.addingTimeInterval(5 * 60)
@@ -91,7 +91,7 @@ public enum DemoData {
         while current < end {
             let hour = Calendar.current.component(.hour, from: current)
             
-            // Coupure d'une nuit il y a 3 jours (entre minuit et 8h)
+            // Overnight gap 3 days ago (between midnight and 8 am)
             let daysAgo = end.timeIntervalSince(current) / (24 * 3600)
             if daysAgo > 2.5 && daysAgo < 3.5 && hour >= 0 && hour < 8 {
                 current = current.addingTimeInterval(5 * 60)
@@ -137,7 +137,7 @@ public enum DemoData {
         while current < end {
             let hour = Calendar.current.component(.hour, from: current)
             
-            // Coupure d'une nuit il y a 3 jours (entre minuit et 8h)
+            // Overnight gap 3 days ago (between midnight and 8 am)
             let daysAgo = end.timeIntervalSince(current) / (24 * 3600)
             if daysAgo > 2.5 && daysAgo < 3.5 && hour >= 0 && hour < 8 {
                 current = current.addingTimeInterval(5 * 60)
@@ -290,7 +290,7 @@ public enum DemoData {
     }
 
     private static func makeDiskSmartDisabled() -> DemoDisk {
-        let physical = PhysicalDisk(bsdName: "disk7", model: "ST3500418AS (SMART Désactivé)", sizeBytes: 500_000_000_000, isInternal: true, connection: .sata, volumeNames: ["OldData"], usbVendorID: nil, usbProductID: nil, protocolType: .ata, mediumType: .rotational, healthCapability: .unsupported(reason: .smartDisabled))
+        let physical = PhysicalDisk(bsdName: "disk7", model: "ST3500418AS (SMART disabled)", sizeBytes: 500_000_000_000, isInternal: true, connection: .sata, volumeNames: ["OldData"], usbVendorID: nil, usbProductID: nil, protocolType: .ata, mediumType: .rotational, healthCapability: .unsupported(reason: .smartDisabled))
         let health = HealthAssessment(status: .unknown, healthPercent: nil, reasons: [Strings.smartDisabledText])
         return DemoDisk(physical: physical, snapshot: nil, health: health)
     }

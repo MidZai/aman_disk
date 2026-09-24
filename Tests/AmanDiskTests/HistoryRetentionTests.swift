@@ -2,16 +2,16 @@ import Foundation
 import Testing
 @testable import DiskHealthCore
 
-/// Phase 4 (0.9) : conservation, compactage et coupures de l'historique de température.
+/// Retention, compaction and gaps of the temperature history.
 @Suite struct HistoryRetentionTests {
-    // Multiple de 300 s : les tranches de 5 min tombent juste.
+    // Multiple of 300 s: the 5-minute buckets line up exactly.
     let now = Date(timeIntervalSince1970: 1_800_000_000)
     
     func sample(_ date: Date, _ temp: Int) -> HistorySample {
         HistorySample(date: date, temperatureC: temp, percentageUsed: 1, dataUnitsWritten: nil, dataUnitsRead: nil, powerOnHours: nil, mediaErrors: nil, availableSpare: nil)
     }
     
-    /// 48 h de mesures toutes les 30 s.
+    /// 48 h of readings every 30 s.
     func fortyEightHours() -> [HistorySample] {
         (0..<5760).map { i in
             sample(now.addingTimeInterval(-48 * 3600 + Double(i) * 30), 30 + (i % 10))
@@ -24,17 +24,17 @@ import Testing
         let recent = result.filter { $0.date >= cutoff }
         let old = result.filter { $0.date < cutoff }
         
-        // 24 h à 30 s = 2 880 mesures brutes ; 24 h de tranches de 5 min = 288 points.
+        // 24 h at 30 s = 2,880 raw readings; 24 h of 5-minute buckets = 288 points.
         #expect(recent.count == 2880)
         #expect(old.count == 288)
         #expect(result.count == 3168)
         #expect(recent.allSatisfy { !$0.isCompacted })
         
-        // Chaque tranche : 10 mesures (30..39 °C), min, moyenne et max conservés.
+        // Each bucket: 10 readings (30..39 °C), min, average and max kept.
         #expect(old.allSatisfy { $0.sampleCount == 10 })
         #expect(old.allSatisfy { $0.temperatureMinC == 30 && $0.temperatureMaxC == 39 })
-        #expect(old.allSatisfy { $0.temperatureC == 35 }) // 34,5 arrondi
-        // Le nombre total de mesures est préservé.
+        #expect(old.allSatisfy { $0.temperatureC == 35 }) // 34.5 rounded
+        // The total number of readings is preserved.
         #expect(result.reduce(0) { $0 + $1.measurementCount } == 5760)
     }
     
@@ -42,7 +42,7 @@ import Testing
         let once = HistoryStore.compact(fortyEightHours(), now: now)
         let twice = HistoryStore.compact(once, now: now)
         #expect(once == twice)
-        // Une heure plus tard, une heure de mesures brutes de plus passe en tranches.
+        // An hour later, one more hour of raw readings is turned into buckets.
         let later = HistoryStore.compact(once, now: now.addingTimeInterval(3600))
         #expect(later.count == 3168 - 120 + 12)
     }
@@ -66,7 +66,7 @@ import Testing
         for i in 0..<10 {
             store.record(sample(base.addingTimeInterval(Double(i) * 30), 40), for: "K")
         }
-        store.record(sample(base.addingTimeInterval(9 * 30 + 5), 40), for: "K") // doublon
+        store.record(sample(base.addingTimeInterval(9 * 30 + 5), 40), for: "K") // duplicate
         #expect(store.samples(for: "K", since: .distantPast).count == 10)
     }
     
@@ -75,7 +75,7 @@ import Testing
         defer { try? FileManager.default.removeItem(at: dir) }
         let historyDir = dir.appendingPathComponent("History")
         try FileManager.default.createDirectory(at: historyDir, withIntermediateDirectories: true)
-        // Format v0.2 : pas de champs min/max/sampleCount.
+        // v0.2 format: no min/max/sampleCount fields.
         let date = Date().addingTimeInterval(-3600).timeIntervalSinceReferenceDate
         let legacy = """
         [{"date": \(date), "temperatureC": 35, "percentageUsed": 2, "dataUnitsWritten": 1, "dataUnitsRead": 2, "powerOnHours": 100, "mediaErrors": 0, "availableSpare": 100},
@@ -96,10 +96,10 @@ import Testing
         var samples: [HistorySample] = []
         let start = now.addingTimeInterval(-3600)
         for i in 0..<20 { samples.append(sample(start.addingTimeInterval(Double(i) * 30), 40)) }
-        // Coupure de 10 min, puis reprise.
+        // 10-minute gap, then readings resume.
         let resume = start.addingTimeInterval(19 * 30 + 600)
         for i in 0..<20 { samples.append(sample(resume.addingTimeInterval(Double(i) * 30), 41)) }
-        // Un écart de 60 s (< 3 × 30 s) ne coupe pas.
+        // A 60 s gap (< 3 × 30 s) doesn't split the curve.
         samples.append(sample(resume.addingTimeInterval(19 * 30 + 60), 41))
         
         let agg = HistoryAggregation.aggregate(samples: samples, range: .oneHour)

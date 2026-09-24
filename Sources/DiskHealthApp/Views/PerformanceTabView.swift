@@ -20,7 +20,7 @@ struct PerformanceTabView: View {
     }
 }
 
-/// Séparé pour observer à la fois le modèle de la vue et le test en cours.
+/// Separate so it can observe both the view model and the test in progress.
 private struct PerformanceContent: View {
     let disk: RealDisk
     @ObservedObject var vm: PerformanceViewModel
@@ -29,7 +29,7 @@ private struct PerformanceContent: View {
     private var isRunningHere: Bool { benchmark.runningDiskId == disk.id }
     private var isRunningElsewhere: Bool { benchmark.isRunning && !isRunningHere }
 
-    /// Résultat affiché : test en cours, résultat choisi dans l'historique, ou dernier résultat.
+    /// Result shown: test in progress, result picked in the history, or latest result.
     private var displayedResult: BenchmarkResult? {
         vm.viewedResult ?? benchmark.lastResults[disk.id] ?? vm.history.first
     }
@@ -67,7 +67,7 @@ private struct PerformanceContent: View {
         }
     }
 
-    // MARK: Réglages
+    // MARK: Settings
 
     private var settingsBar: some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
@@ -179,7 +179,7 @@ private struct PerformanceContent: View {
         }
     }
 
-    // MARK: Historique
+    // MARK: History
 
     @ViewBuilder
     private var historySection: some View {
@@ -240,7 +240,7 @@ private struct PerformanceContent: View {
     }
 }
 
-/// Conditions du test affiché, et retour au dernier résultat quand on consulte l'historique.
+/// Conditions of the displayed test, and a way back to the latest result when browsing the history.
 private struct ResultSummary: View {
     let result: BenchmarkResult
     let isFromHistory: Bool

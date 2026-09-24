@@ -10,8 +10,8 @@ public struct NVMeBackend: HealthBackend {
         try read(bsdName: bsdName, knownIdentify: nil)
     }
 
-    /// `knownIdentify` : données Identify d'une lecture précédente. Elles ne changent pas
-    /// (modèle, numéro de série, seuils) : seule la lecture du journal SMART est alors refaite.
+    /// `knownIdentify`: Identify data from a previous read. It doesn't change
+    /// (model, serial number, thresholds), so only the SMART log is read again.
     public static func read(bsdName: String, knownIdentify: NVMeIdentify?) throws -> DiskHealthSnapshot {
         if let identify = knownIdentify {
             guard let smartLog = NVMeSmartParser.parse(try NVMeReader.readSmartLog(bsdName: bsdName)) else {

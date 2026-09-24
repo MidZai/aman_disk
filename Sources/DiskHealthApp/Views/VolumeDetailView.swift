@@ -51,7 +51,7 @@ struct VolumeDetailView: View {
     }
 
     private var spaceCard: some View {
-        // Soustraction protégée : certains systèmes de fichiers annoncent plus d'espace libre que de capacité.
+        // Guarded subtraction: some file systems report more free space than capacity.
         let available = min(volume.availableBytes, volume.totalBytes)
         let used = volume.totalBytes - available
         let ratio = volume.totalBytes > 0 ? Double(used) / Double(volume.totalBytes) : 0

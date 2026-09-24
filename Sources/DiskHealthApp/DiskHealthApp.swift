@@ -7,8 +7,8 @@ enum AppScene {
     static let mainWindowID = "main"
 }
 
-/// Mode résident : fermer la fenêtre principale garde l'app dans la barre des menus
-/// (sans icône dans le Dock) si l'option est active ; sinon l'app quitte.
+/// Resident mode: closing the main window keeps the app in the menu bar
+/// (with no Dock icon) if the option is on; otherwise the app quits.
 @MainActor
 enum MainWindowLifecycle {
     static func windowDidOpen() {
@@ -31,7 +31,7 @@ enum MainWindowLifecycle {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    // La fermeture de la dernière fenêtre est gérée par MainWindowLifecycle.
+    // Closing the last window is handled by MainWindowLifecycle.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: L("Continue Test", "Continuer le test"))
         alert.addButton(withTitle: L("Stop and Quit", "Arrêter et quitter"))
         guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
-        // Réponse différée : l'app se ferme une fois le fichier de test supprimé.
+        // Deferred reply: the app quits once the test file has been deleted.
         benchmark.cancelForTermination()
         return .terminateLater
     }
@@ -63,12 +63,12 @@ struct DiskHealthApp: App {
         MigrationService.mergeLegacyHistoryIfNeeded()
         MigrationService.removeForeignPreferences()
         if AppManager.isDemo {
-            // Le mode démo n'écrit jamais dans le vrai historique.
+            // Demo mode never writes to the real history.
             let demoDir = FileManager.default.temporaryDirectory.appendingPathComponent("AmanDiskDemo-\(ProcessInfo.processInfo.processIdentifier)")
             HistoryStore.shared = HistoryStore(baseURL: demoDir)
             DiskEventLog.shared = DiskEventLog(baseURL: demoDir)
         } else {
-            // Fichiers de test laissés par un test interrompu (plantage, arrêt forcé).
+            // Test files left behind by an interrupted test (crash, force quit).
             BenchInflight.cleanUpLeftovers()
         }
         _appManager = StateObject(wrappedValue: AppManager())

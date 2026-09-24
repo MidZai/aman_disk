@@ -2,8 +2,8 @@ import SwiftUI
 import AppKit
 import DiskHealthCore
 
-/// Couleurs de marque de l'anneau-jauge.
-/// Réservées à l'anneau : le reste de l'interface garde les couleurs système.
+/// Brand colors of the ring gauge.
+/// Reserved for the ring: the rest of the interface keeps the system colors.
 enum AmanPalette {
     enum Level: Int, Comparable {
         case red = 0, orange = 1, water = 2
@@ -20,13 +20,13 @@ enum AmanPalette {
 
     static let ink = Color(hex: "#0B2230")
 
-    /// Pourcentage de durée de vie affichable, uniquement s'il est fourni par le disque.
+    /// Life percentage that can be shown, only if the drive reports it.
     static func knownPercent(health: HealthAssessment, capability: HealthCapability) -> Int? {
         guard capability == .supported, let hp = health.healthPercent else { return nil }
         return hp
     }
 
-    /// La plus grave entre la couleur du pourcentage (arrondi au 5 % inférieur) et celle de l'état.
+    /// The more severe of the percentage color (rounded down to 5%) and the status color.
     static func level(health: HealthAssessment, capability: HealthCapability) -> Level {
         var percentLevel = Level.water
         if let hp = knownPercent(health: health, capability: capability) {
@@ -47,7 +47,7 @@ enum AmanPalette {
         level(health: health, capability: capability).color
     }
 
-    /// Fraction de l'arc : proportionnelle si connue, cercle complet sinon (jamais de pourcentage inventé).
+    /// Fraction of the arc: proportional if known, a full circle otherwise (never a made-up percentage).
     static func fraction(health: HealthAssessment, capability: HealthCapability) -> Double {
         if let hp = knownPercent(health: health, capability: capability) {
             return Double(hp) / 100.0
@@ -56,21 +56,21 @@ enum AmanPalette {
     }
 }
 
-/// Géométrie de l'anneau dans un repère 100 × 100.
+/// Geometry of the ring in a 100 × 100 coordinate space.
 enum AmanRingGeometry {
     static let center = CGPoint(x: 50, y: 50)
     static let radius: CGFloat = 26
     static let lineWidth: CGFloat = 10
     
-    /// Angle balayé par l'arc : longueur = p × 2π × 26 − 10 (compense les bouts arrondis) ; cercle complet à 100 %.
+    /// Angle swept by the arc: length = p × 2π × 26 − 10 (compensates for the round caps); full circle at 100%.
     static func sweep(fraction: Double) -> CGFloat {
         let f = CGFloat(max(0, min(1, fraction)))
         if f >= 1 { return 2 * .pi }
         return max(0.001, f * 2 * .pi * radius - lineWidth) / radius
     }
 
-    /// Goutte : `M50 37 C50 37 43.5 45.5 43.5 50 A6.5 6.5 0 0 0 56.5 50 C56.5 45.5 50 37 50 37 Z`.
-    /// `flipped` : repère AppKit (origine en bas), pour le dessin en NSImage.
+    /// Drop: `M50 37 C50 37 43.5 45.5 43.5 50 A6.5 6.5 0 0 0 56.5 50 C56.5 45.5 50 37 50 37 Z`.
+    /// `flipped`: AppKit coordinates (origin at the bottom), for drawing into an NSImage.
     static func dropPath(in rect: CGRect, flipped: Bool = false) -> CGPath {
         let s = min(rect.width, rect.height) / 100
         func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
@@ -79,7 +79,7 @@ enum AmanRingGeometry {
         let path = CGMutablePath()
         path.move(to: p(50, 37))
         path.addCurve(to: p(43.5, 50), control1: p(50, 37), control2: p(43.5, 45.5))
-        // Demi-cercle inférieur de rayon 6,5 (arc SVG, balayage 0) de (43,5 ; 50) à (56,5 ; 50).
+        // Lower half-circle of radius 6.5 (SVG arc, sweep 0) from (43.5, 50) to (56.5, 50).
         path.addArc(center: p(50, 50), radius: 6.5 * s, startAngle: .pi, endAngle: 0, clockwise: !flipped)
         path.addCurve(to: p(50, 37), control1: p(56.5, 45.5), control2: p(50, 37))
         path.closeSubpath()
@@ -87,7 +87,7 @@ enum AmanRingGeometry {
     }
 }
 
-/// Anneau-jauge compact (panneau de la barre des menus), sans fond.
+/// Compact ring gauge (menu bar panel), without a background.
 struct MiniRingView: View {
     let health: HealthAssessment
     let capability: HealthCapability
@@ -116,10 +116,10 @@ struct MiniRingView: View {
     }
 }
 
-/// Icône *template* de la barre des menus, dessinée en code (piste noire à 25 %).
+/// *Template* menu bar icon, drawn in code (black track at 25%).
 enum MenuBarIconRenderer {
-    /// Le libellé de la barre des menus est redessiné à chaque relevé : on ne recrée l'image
-    /// que si la jauge change (au pour cent près).
+    /// The menu bar label is redrawn on every reading: the image is only recreated
+    /// when the gauge changes (to the nearest percent).
     @MainActor private static var cache: (percent: Int, image: NSImage)?
 
     @MainActor
@@ -144,7 +144,7 @@ enum MenuBarIconRenderer {
             ctx.addEllipse(in: CGRect(x: center.x - r, y: center.y - r, width: 2 * r, height: 2 * r))
             ctx.strokePath()
 
-            // Départ en haut (12 h), sens horaire ; repère AppKit : angles trigonométriques.
+            // Starts at the top (12 o'clock), clockwise; AppKit coordinates: trigonometric angles.
             ctx.setStrokeColor(NSColor.black.cgColor)
             ctx.setLineCap(.round)
             ctx.addArc(center: center, radius: r, startAngle: .pi / 2, endAngle: .pi / 2 - AmanRingGeometry.sweep(fraction: fraction), clockwise: true)
@@ -162,7 +162,7 @@ enum MenuBarIconRenderer {
 }
 
 extension Color {
-    /// Couleur de la charte, en sRGB : « #RRGGBB » ou « #AARRGGBB ».
+    /// Brand color, in sRGB: “#RRGGBB” or “#AARRGGBB”.
     init(hex: String) {
         let digits = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var value: UInt64 = 0

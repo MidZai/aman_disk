@@ -1,7 +1,7 @@
 import Foundation
 import DiskHealthCore
 
-/// Point de l'historique de température exporté (moyenne horaire).
+/// Exported temperature history point (hourly average).
 public struct ExportedTemperaturePoint: Codable, Equatable {
     public let date: Date
     public let averageC: Double
@@ -16,7 +16,7 @@ public struct ExportedTemperaturePoint: Codable, Equatable {
     }
 }
 
-/// Rapport JSON. Les champs ajoutés après la v2 sont optionnels : les anciens rapports se relisent.
+/// JSON report. Fields added after v2 are optional, so older reports can still be read.
 public struct ExportFormat: Codable {
     public static let currentSchemaVersion = 4
 

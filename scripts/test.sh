@@ -1,11 +1,11 @@
 #!/bin/bash
-# Lance toute la suite de tests (Swift Testing).
+# Runs the whole test suite (Swift Testing).
 #
-# Avec Xcode : `swift test` suffit.
-# Avec les seuls Command Line Tools : le module Testing n'est pas dans le chemin de recherche,
-# et depuis macOS 26 l'assistant de SwiftPM (signé par Apple, validation des bibliothèques)
-# refuse de charger le paquet de tests compilé localement. On compile donc les tests, puis on
-# les lance avec un petit lanceur local (scripts/TestRunner.swift).
+# With Xcode: `swift test` is enough.
+# With the Command Line Tools alone, the Testing module isn't in the search path,
+# and since macOS 26 SwiftPM's helper (signed by Apple, library validation)
+# refuses to load the locally built test bundle. So the tests are built, then
+# run with a small local runner (scripts/TestRunner.swift).
 set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/.."

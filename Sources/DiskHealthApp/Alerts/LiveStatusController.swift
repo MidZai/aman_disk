@@ -4,8 +4,8 @@ import SwiftUI
 import UserNotifications
 import DiskHealthCore
 
-/// Ouvre la fenêtre principale depuis du code AppKit (clic sur une notification).
-/// L'action est capturée par le libellé de la barre des menus, toujours présent.
+/// Opens the main window from AppKit code (click on a notification).
+/// The action is captured by the menu bar label, which is always present.
 @MainActor
 enum WindowOpener {
     static var openMain: (() -> Void)?
@@ -17,11 +17,11 @@ enum WindowOpener {
     }
 }
 
-/// Notifications système réelles.
+/// Real system notifications.
 final class SystemNotificationPoster: NSObject, NotificationPosting, UNUserNotificationCenterDelegate {
     static let diskIdKey = "diskId"
     
-    /// `UNUserNotificationCenter` exige un vrai bundle `.app` (plantage sous `swift run`).
+    /// `UNUserNotificationCenter` requires a real `.app` bundle (it crashes under `swift run`).
     static var isAvailable: Bool {
         Bundle.main.bundleIdentifier != nil && Bundle.main.bundleURL.pathExtension == "app"
     }
@@ -33,7 +33,7 @@ final class SystemNotificationPoster: NSObject, NotificationPosting, UNUserNotif
         }
     }
     
-    /// Demande l'autorisation (uniquement quand l'utilisateur active les alertes).
+    /// Asks for permission (only when the user turns alerts on).
     func requestAuthorization() async -> Bool {
         guard Self.isAvailable else { return false }
         return (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
@@ -54,7 +54,7 @@ final class SystemNotificationPoster: NSObject, NotificationPosting, UNUserNotif
         [.banner, .sound]
     }
     
-    // Un clic sur la notification ouvre la page du disque concerné.
+    // Clicking the notification opens the page of the drive it's about.
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let diskId = response.notification.request.content.userInfo[Self.diskIdKey] as? String
         await MainActor.run {
@@ -67,7 +67,7 @@ final class SystemNotificationPoster: NSObject, NotificationPosting, UNUserNotif
     }
 }
 
-/// Relie les relevés de disques à l'icône du Dock et aux alertes.
+/// Connects drive readings to the Dock icon and the alerts.
 @MainActor
 final class LiveStatusController {
     static let shared = LiveStatusController()
@@ -124,7 +124,7 @@ final class LiveStatusController {
         }
     }
     
-    /// Met à jour l'icône du Dock seulement si le pourcentage, l'état ou le réglage change.
+    /// Updates the Dock icon only if the percentage, the status or the setting changes.
     func refreshDockIcon() {
         let enabled = Self.dockShowsHealth
         let state = appManager?.bootDisk.map {
@@ -137,7 +137,7 @@ final class LiveStatusController {
         if enabled, let state, !state.isOfficialIcon {
             NSApp.applicationIconImage = DockIconRenderer.image(state: state)
         } else {
-            // Icône officielle du bundle.
+            // The bundle's official icon.
             NSApp.applicationIconImage = nil
         }
     }

@@ -2,14 +2,14 @@ import SwiftUI
 import Charts
 import DiskHealthCore
 
-/// Historique de température d'un disque : sélecteur de plage, courbe, coupures et légende.
+/// Temperature history of a drive: range picker, curve, gaps and legend.
 ///
-/// Performances : les mesures sont lues hors du fil principal et agrégées une seule fois par
-/// chargement (et non à chaque rendu). Le survol est isolé dans `ChartHoverOverlay` : bouger la
-/// souris ne redessine que le repère et l'info-bulle, pas les centaines de points de la courbe.
+/// Performance: readings are loaded off the main thread and aggregated once per
+/// load (not on every render). Hovering is isolated in `ChartHoverOverlay`: moving the
+/// mouse only redraws the marker and the tooltip, not the hundreds of points of the curve.
 struct TemperatureHistoryView: View {
     let historyKey: String?
-    /// Change à chaque nouvelle mesure : déclenche le rechargement.
+    /// Changes with every new reading: triggers the reload.
     let lastRead: Date
 
     @AppStorage("temperatureHistoryRange") private var range: HistoryRange = .oneHour
@@ -34,7 +34,7 @@ struct TemperatureHistoryView: View {
                 .fixedSize()
             }
 
-            // Moins de 3 mesures : pas de courbe exploitable.
+            // Fewer than 3 readings: no usable curve.
             if aggregation.points.count < 2 || aggregation.measurementCount < 3 {
                 emptyState
             } else {
@@ -113,7 +113,7 @@ extension HistoryRange {
     }
 }
 
-/// La courbe elle-même : ne dépend que des données agrégées, jamais de la position de la souris.
+/// The curve itself: only depends on the aggregated data, never on the mouse position.
 private struct TemperatureChart: View {
     let aggregation: AggregationResult
     let range: HistoryRange
@@ -181,7 +181,7 @@ private struct TemperatureChart: View {
     }
 }
 
-/// Coupures : bande hachurée très discrète, sans ligne ni remplissage.
+/// Gaps: very subtle hatched band, with no line or fill.
 private struct GapHatching: View {
     let proxy: ChartProxy
     let gaps: [DateInterval]
@@ -204,7 +204,7 @@ private struct GapHatching: View {
     }
 }
 
-/// Repère vertical et info-bulle. Seule cette vue dépend de la position de la souris.
+/// Vertical marker and tooltip. Only this view depends on the mouse position.
 private struct ChartHoverOverlay: View {
     let proxy: ChartProxy
     let aggregation: AggregationResult
@@ -262,7 +262,7 @@ private struct ChartHoverOverlay: View {
     }
 
     private func nearestPoint(to date: Date) -> AggregatedPoint? {
-        // Points triés par date : recherche dichotomique plutôt qu'un parcours complet à chaque mouvement.
+        // Points sorted by date: binary search rather than a full scan on every move.
         let points = aggregation.points
         guard !points.isEmpty else { return nil }
         var lo = 0, hi = points.count - 1
@@ -316,7 +316,7 @@ private struct ChartHoverOverlay: View {
     }
 }
 
-/// Hachures diagonales qui remplissent le cadre.
+/// Diagonal hatching that fills the frame.
 private struct HatchPattern: Shape {
     var spacing: CGFloat = 6
 

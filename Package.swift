@@ -65,7 +65,7 @@ let package = Package(
             name: "DiskHealthAppTests",
             dependencies: ["DiskHealthApp"]
         ),
-        // Tous les tests utilisent Swift Testing. Sans Xcode : scripts/test.sh.
+        // All tests use Swift Testing. Without Xcode: scripts/test.sh.
         .testTarget(
             name: "AmanDiskTests",
             dependencies: ["DiskHealthCore", "BenchmarkCore", "DiskHealthApp"]

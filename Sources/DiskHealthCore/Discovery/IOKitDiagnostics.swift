@@ -2,18 +2,18 @@ import Foundation
 import IOKit
 
 public enum IOKitDiagnostics {
-    /// Clés dont la valeur identifie l'appareil ou l'utilisateur.
+    /// Keys whose value identifies the device or the user.
     static func isSensitive(_ key: String) -> Bool {
         let k = key.lowercased()
         return k.contains("serial") || k.contains("uuid") || k.contains("guid") || k.contains("wwn")
             || k.contains("mac address") || k.contains("macaddress")
     }
 
-    /// Valeur lisible et masquée. Récursive : IOKit range le numéro de série dans des dictionnaires
-    /// imbriqués (« Device Characteristics » › « Serial Number »), qui étaient recopiés tels quels.
+    /// Readable, masked value. Recursive: IOKit stores the serial number in nested
+    /// dictionaries (“Device Characteristics” › “Serial Number”), which used to be copied as is.
     public static func maskValue(key: String, value: Any) -> String {
         if isSensitive(key) {
-            return "<masqué>"
+            return "<masked>"
         }
         if let dict = value as? [String: Any] {
             let inner = dict.keys.sorted().map { "\($0)=\(maskValue(key: $0, value: dict[$0]!))" }
@@ -23,9 +23,9 @@ public enum IOKitDiagnostics {
             return "(" + array.map { maskValue(key: key, value: $0) }.joined(separator: ", ") + ")"
         }
         if let s = value as? String {
-            // Format UUID (8-4-4-4-12 hexadécimal).
+            // UUID format (8-4-4-4-12 hexadecimal).
             if s.count == 36 && s.filter({ $0 == "-" }).count == 4 {
-                return "<masqué>"
+                return "<masked>"
             }
             return s
         }

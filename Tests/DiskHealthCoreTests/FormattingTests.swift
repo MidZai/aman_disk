@@ -3,40 +3,38 @@ import Foundation
 @testable import DiskHealthCore
 
 @Suite struct FormattingTests {
-    /// Typographie française : espace fine insécable entre les milliers, espace insécable avant l'unité.
-    let thin = "\u{202F}"
+    /// No-break space between a number and its unit, so “36 °C” never wraps.
     let nbsp = "\u{00A0}"
 
-    // Ces attentes sont en français ; l'anglais est la langue par défaut.
-    init() { Localization.language = .french }
+    init() { Localization.language = .english }
 
     @Test func bytes() {
-        #expect(Formatters.bytes(500_300_000_000) == "500,3\(nbsp)Go")
-        #expect(Formatters.bytes(48_300_000_000_000) == "48,3\(nbsp)To")
-        #expect(Formatters.bytes(2_000_000_000_000) == "2\(nbsp)To")
-        #expect(Formatters.bytes(512_000_000_000) == "512\(nbsp)Go")
-        #expect(Formatters.bytes(1_500_000_000) == "1,5\(nbsp)Go")
-        // 999,96 Go s'arrondit à 1 To, pas à « 1 000 Go ».
-        #expect(Formatters.bytes(999_960_000_000) == "1\(nbsp)To")
-        #expect(Formatters.bytes(512) == "512\(nbsp)octets")
+        #expect(Formatters.bytes(500_300_000_000) == "500.3\(nbsp)GB")
+        #expect(Formatters.bytes(48_300_000_000_000) == "48.3\(nbsp)TB")
+        #expect(Formatters.bytes(2_000_000_000_000) == "2\(nbsp)TB")
+        #expect(Formatters.bytes(512_000_000_000) == "512\(nbsp)GB")
+        #expect(Formatters.bytes(1_500_000_000) == "1.5\(nbsp)GB")
+        // 999.96 GB rounds to 1 TB, not to “1,000 GB”.
+        #expect(Formatters.bytes(999_960_000_000) == "1\(nbsp)TB")
+        #expect(Formatters.bytes(512) == "512\(nbsp)bytes")
     }
 
     @Test func integer() {
-        #expect(Formatters.integer(UInt64(1207)) == "1\(thin)207")
+        #expect(Formatters.integer(UInt64(1207)) == "1,207")
         #expect(Formatters.integer(UInt64(0)) == "0")
-        #expect(Formatters.integer(2814) == "2\(thin)814")
+        #expect(Formatters.integer(2814) == "2,814")
     }
 
     @Test func hoursAndTemperature() {
-        #expect(Formatters.hours(2814) == "2\(thin)814\(nbsp)h")
+        #expect(Formatters.hours(2814) == "2,814\(nbsp)h")
         #expect(Formatters.temperature(38) == "38\(nbsp)°C")
     }
 
     @Test func approximateDuration() {
-        #expect(Formatters.approximateDuration(hours: 10) == "moins d'un jour")
-        #expect(Formatters.approximateDuration(hours: 24 * 40) == "40\(nbsp)jours")
-        #expect(Formatters.approximateDuration(hours: 3440) == "5\(nbsp)mois")
-        #expect(Formatters.approximateDuration(hours: 31_482) == "3,6\(nbsp)ans")
+        #expect(Formatters.approximateDuration(hours: 10) == "less than a day")
+        #expect(Formatters.approximateDuration(hours: 24 * 40) == "40\(nbsp)days")
+        #expect(Formatters.approximateDuration(hours: 3440) == "5\(nbsp)months")
+        #expect(Formatters.approximateDuration(hours: 31_482) == "3.6\(nbsp)years")
     }
 
     @Test func dataUnitsNeverOverflow() {
@@ -47,7 +45,7 @@ import Foundation
 
     @Test func ageLabel() {
         let now = Date()
-        #expect(Formatters.age(since: now.addingTimeInterval(-12), now: now) == "il y a 12\(nbsp)s")
-        #expect(Formatters.age(since: now.addingTimeInterval(-600), now: now) == "il y a 10\(nbsp)min")
+        #expect(Formatters.age(since: now.addingTimeInterval(-12), now: now) == "12\(nbsp)s ago")
+        #expect(Formatters.age(since: now.addingTimeInterval(-600), now: now) == "10\(nbsp)min ago")
     }
 }

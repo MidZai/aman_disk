@@ -17,12 +17,12 @@ public enum HistoryRange: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Au-delà de 24 h, le graphique montre la moyenne et la plage min–max.
+    /// Beyond 24 h, the chart shows the average and the min–max range.
     public var showsMinMaxBand: Bool {
         self == .sevenDays || self == .thirtyDays
     }
 
-    /// Taille des regroupements ; nil = mesures brutes.
+    /// Size of the buckets; nil = raw readings.
     var chunkSize: TimeInterval? {
         switch self {
         case .oneHour: return nil
@@ -34,7 +34,7 @@ public enum HistoryRange: String, CaseIterable, Identifiable {
 }
 
 public struct AggregatedPoint: Identifiable, Equatable {
-    /// Identifiant stable (la date) : Swift Charts peut comparer deux rendus au lieu de tout redessiner.
+    /// Stable identifier (the date): Swift Charts can diff two renders instead of redrawing everything.
     public var id: Date { date }
     public let date: Date
     public let temperature: Double
@@ -58,14 +58,14 @@ public struct AggregationResult: Equatable {
     public let min: Int?
     public let max: Int?
     public let average: Int?
-    /// Nombre de mesures réelles couvertes (les tranches compactées comptent pour leurs mesures).
+    /// Number of real readings covered (compacted buckets count for their readings).
     public let measurementCount: Int
-    /// Périodes sans mesure (coupures) entre deux segments.
+    /// Periods without readings (gaps) between two segments.
     public let gaps: [DateInterval]
 }
 
 public enum HistoryAggregation {
-    /// Intervalle nominal de la surveillance continue.
+    /// Nominal interval of continuous monitoring.
     public static let nominalInterval: TimeInterval = 30
 
     public static func aggregate(samples: [HistorySample], range: HistoryRange) -> AggregationResult {
@@ -99,9 +99,9 @@ public enum HistoryAggregation {
         return AggregationResult(points: points, min: minTemp, max: maxTemp, average: avgTemp, measurementCount: count, gaps: gaps(in: points))
     }
 
-    /// Seuil de coupure : 3 × l'intervalle réel entre mesures (au moins 3 × 30 s).
-    /// L'intervalle réel est la médiane des écarts, ce qui garde les anciens historiques
-    /// (une mesure toutes les 5 min) lisibles sans les découper.
+    /// Gap threshold: 3 × the real interval between readings (at least 3 × 30 s).
+    /// The real interval is the median of the gaps, which keeps older histories
+    /// (one reading every 5 min) readable without splitting them up.
     public static func breakThreshold(for samples: [HistorySample]) -> TimeInterval {
         guard samples.count > 1 else { return 3 * nominalInterval }
         var diffs: [TimeInterval] = []
@@ -145,9 +145,9 @@ public enum HistoryAggregation {
         return result
     }
 
-    /// Regroupe les mesures en tranches alignées sur l'horloge (multiples de `chunkSize`) :
-    /// les tranches ne bougent pas d'un rechargement à l'autre, donc la courbe ne « tremble » pas
-    /// toutes les 30 s quand la fenêtre glisse.
+    /// Groups readings into buckets aligned on the clock (multiples of `chunkSize`):
+    /// the buckets don't move from one reload to the next, so the curve doesn't “shake”
+    /// every 30 s as the window slides.
     private static func groupAndAverage(samples: [HistorySample], chunkSize: TimeInterval) -> [AggregatedPoint] {
         var points: [AggregatedPoint] = []
         var chunk: [HistorySample] = []
@@ -173,7 +173,7 @@ public enum HistoryAggregation {
             if let lastStart = lastChunkStart, chunkStart - lastStart > 3 * chunkSize {
                 currentSegment += 1
             }
-            // Point placé au milieu de sa tranche.
+            // Point placed in the middle of its bucket.
             points.append(AggregatedPoint(date: Date(timeIntervalSince1970: chunkStart + chunkSize / 2), temperature: sum / Double(weight), segment: currentSegment, minTemperature: lo, maxTemperature: hi))
             lastChunkStart = chunkStart
         }

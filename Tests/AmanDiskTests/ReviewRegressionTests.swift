@@ -4,13 +4,11 @@ import Foundation
 @testable import DiskHealthCore
 @testable import BenchmarkCore
 
-/// Tests de non-régression des défauts corrigés lors de la revue 0.9.1.
+/// Regression tests for the defects fixed during the 0.9.1 review.
 @Suite struct ReviewRegressionTests {
-    // Ces attentes sont en français ; l'anglais est la langue par défaut.
-    init() { Localization.language = .french }
+    init() { Localization.language = .english }
 
-
-    // MARK: Données de test
+    // MARK: Test data
 
     static func nvmeLog(percentageUsed: UInt8 = 2, temperatureK: UInt16 = 309, mediaErrors: UInt64 = 0,
                         written: UInt64 = 215_208_576) -> NVMeSmartLog {
@@ -39,7 +37,7 @@ import Foundation
                      protocolType: proto, mediumType: .solidState, healthCapability: .supported)
     }
 
-    // MARK: Confidentialité des rapports
+    // MARK: Report privacy
 
     @Test @MainActor func serialIsMaskedInATAReports() throws {
         let snapshot = DiskHealthSnapshot.ata(Self.ataSnapshot([Self.ataAttribute(0xC2, raw: 40)]))
@@ -49,11 +47,11 @@ import Foundation
 
         let text = ExportService.reportText(report)
         #expect(!text.contains("EXAMPLE0003891"))
-        #expect(text.contains("Masqué"))
+        #expect(text.contains("Hidden"))
         let json = try #require(String(data: try ExportService.reportJSON(report), encoding: .utf8))
         #expect(!json.contains("EXAMPLE0003891"))
-        // ATA : les attributs figurent bien dans le rapport texte (ils manquaient avant).
-        #expect(text.contains("Température"))
+        // ATA: the attributes are in the text report (they used to be missing).
+        #expect(text.contains("Temperature"))
     }
 
     @Test @MainActor func serialIsMaskedInNVMeReportsAndKeptOnRequest() throws {
@@ -70,10 +68,10 @@ import Foundation
                             health: HealthAssessment(status: .good, healthPercent: 98, reasons: []))
         let summary = ExportService.summaryText(disk: disk)
         #expect(!summary.contains("0 °C") && !summary.contains("0\u{00A0}°C"))
-        #expect(summary.contains("Température : Non fournie"))
+        #expect(summary.contains("Temperature: Not reported"))
     }
 
-    // MARK: Indicateurs
+    // MARK: Key indicators
 
     @Test func metricsFromNVMe() {
         let m = DiskMetrics(snapshot: .nvme(Self.nvmeLog(), Self.identify))
@@ -87,9 +85,9 @@ import Foundation
     @Test func metricsFromATAPreferDriveTemperatureAndSurviveOverflow() {
         let snapshot = Self.ataSnapshot([
             Self.ataAttribute(0x05, raw: 2),
-            Self.ataAttribute(0xAF, raw: 0xFFFF_FFFF_FFFF), // Host_Writes_MiB : 48 bits × 1 Mio dépasse 64 bits
-            Self.ataAttribute(0xBE, raw: 30),              // flux d'air
-            Self.ataAttribute(0xC2, raw: 41),              // disque
+            Self.ataAttribute(0xAF, raw: 0xFFFF_FFFF_FFFF), // Host_Writes_MiB: 48 bits × 1 MiB overflows 64 bits
+            Self.ataAttribute(0xBE, raw: 30),              // airflow
+            Self.ataAttribute(0xC2, raw: 41),              // drive
             Self.ataAttribute(0xC5, raw: 1)
         ])
         let m = DiskMetrics(snapshot: .ata(snapshot))
@@ -98,7 +96,7 @@ import Foundation
         #expect(m.badSectors == 3)
     }
 
-    // MARK: Moteurs de santé
+    // MARK: Health engines
 
     @Test func lowLifeIsCautionLikeTheRedRing() {
         let health = HealthEngine.evaluate(smart: Self.nvmeLog(percentageUsed: 80), identify: Self.identify)
@@ -123,7 +121,7 @@ import Foundation
         #expect(ATAHealthEvaluator.evaluate(snapshot: snapshot).status == .caution)
     }
 
-    // MARK: Historique (ajout seul)
+    // MARK: History (append-only)
 
     @Test func historyIsAppendOnlyAndConvertsLegacyFiles() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -141,13 +139,13 @@ import Foundation
         let samples = await store.loadSamples(for: "K", since: .distantPast)
         #expect(samples.map(\.temperatureC) == [30, 31, 32, 33])
 
-        // Ancien fichier converti puis supprimé ; une ligne par mesure.
+        // Legacy file converted, then deleted; one line per reading.
         #expect(!FileManager.default.fileExists(atPath: historyDir.appendingPathComponent("K.json").path))
         let lines = try String(contentsOf: historyDir.appendingPathComponent("K.jsonl"), encoding: .utf8)
             .split(separator: "\n")
         #expect(lines.count == 4)
 
-        // Une ligne tronquée (coupure de courant) n'empêche pas la lecture du reste.
+        // A truncated line (power loss) doesn't prevent reading the rest.
         let handle = try FileHandle(forWritingTo: historyDir.appendingPathComponent("K.jsonl"))
         try handle.seekToEnd()
         try handle.write(contentsOf: Data("{\"date\": 12".utf8))
@@ -156,7 +154,7 @@ import Foundation
     }
 
     @Test func aggregationBucketsAreAlignedOnTheClock() {
-        let start = Date(timeIntervalSince1970: 1_800_000_000 + 17 * 60) // 17 min après une heure pile
+        let start = Date(timeIntervalSince1970: 1_800_000_000 + 17 * 60) // 17 min past the hour
         let samples = (0..<120).map { i in
             HistorySample(date: start.addingTimeInterval(Double(i) * 30), temperatureC: 40, percentageUsed: nil, dataUnitsWritten: nil, dataUnitsRead: nil, powerOnHours: nil, mediaErrors: nil, availableSpare: nil)
         }
@@ -165,11 +163,11 @@ import Foundation
         #expect(Set(points.map(\.id)).count == points.count)
     }
 
-    // MARK: Test de performances
+    // MARK: Performance test
 
     @Test func benchmarkEstimatesAreHonest() {
         let gib: UInt64 = 1 << 30
-        // Fichier + 4 tests d'écriture × 5 passes, chacun au plus de la taille du fichier.
+        // File + 4 write tests × 5 passes, each at most the size of the file.
         #expect(BenchMath.maxBytesWritten(fileSize: gib, profile: .standard) == 21 * gib)
         #expect(BenchMath.maxBytesWritten(fileSize: gib, profile: .readOnly) == gib)
         let standard = BenchMath.estimatedMaxDuration(fileSize: gib, profile: .standard)
@@ -191,9 +189,9 @@ import Foundation
                                                         temperatureMaxC: 40, bytesWritten: 1 << 30),
                             tests: [], completed: true, stopReason: nil)
         }
-        // 0.9 : enregistré sous le hachage du modèle seul.
+        // 0.9: saved under the hash of the model alone.
         manager.save(result(key: DiskIdentity.key(model: disk.physical.model, serial: ""), date: Date(timeIntervalSince1970: 1)))
-        // 0.9.1 : clé stable modèle + numéro de série.
+        // 0.9.1: stable key, model + serial number.
         manager.save(result(key: disk.benchmarkKey, date: Date(timeIntervalSince1970: 2)))
 
         let found = await manager.loadResults(for: disk)
@@ -201,11 +199,11 @@ import Foundation
         #expect(found.first?.date == Date(timeIntervalSince1970: 2))
     }
 
-    // MARK: Divers
+    // MARK: Miscellaneous
 
     @Test func diskFilterMatchesVolumesByPhysicalDisk() {
         let internalDisk = RealDisk(physical: Self.physical(.nvme), snapshot: nil, health: HealthAssessment(status: .unknown, healthPercent: nil, reasons: []))
-        // Même nom de volume sur un disque externe : il ne doit pas être rattaché.
+        // Same volume name on an external drive: it must not be attached to this one.
         let volumes = [
             Volume(bsdName: "disk3s1", name: "Macintosh HD", mountPoint: "/", format: "APFS", totalBytes: 1, availableBytes: 1, physicalDiskBSDNames: ["disk0"]),
             Volume(bsdName: "disk9s1", name: "Macintosh HD", mountPoint: "/Volumes/Macintosh HD 1", format: "APFS", totalBytes: 1, availableBytes: 1, physicalDiskBSDNames: ["disk9"])

@@ -10,7 +10,7 @@ struct ContentView: View {
         if appManager.isMainWindowVisible {
             mainContent
         } else {
-            // Fenêtre fermée : rien à mettre à jour (≈ 5 % de processeur économisés en continu).
+            // Window closed: nothing to update (saves ≈ 5% CPU continuously).
             Color.clear
         }
     }
@@ -58,7 +58,7 @@ struct ContentView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            // Les onglets n'ont de sens que pour un disque physique.
+            // Tabs only make sense for a physical drive.
             if appManager.selectedDisk != nil {
                 Picker(L("View", "Vue"), selection: $appManager.activeTab) {
                     Text(L("Health", "Santé")).tag(DetailTab.health)
@@ -115,7 +115,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Barre latérale
+// MARK: - Sidebar
 
 private struct SidebarView: View {
     @EnvironmentObject var appManager: AppManager
@@ -167,7 +167,7 @@ private struct SidebarView: View {
     }
 }
 
-// MARK: - Zone de détail
+// MARK: - Detail area
 
 private struct DetailView: View {
     @EnvironmentObject var appManager: AppManager
@@ -180,7 +180,7 @@ private struct DetailView: View {
             switch appManager.selection {
             case .physicalDisk(let id)?:
                 if let disk = appManager.disk(withId: id) {
-                    // `.id` : chaque disque a sa propre identité de vue (état local, animation de l'anneau).
+                    // `.id`: each drive has its own view identity (local state, ring animation).
                     if appManager.activeTab == .performance {
                         PerformanceTabView(disk: disk, appManager: appManager).id(disk.id)
                     } else if disk.snapshot == nil {
@@ -237,7 +237,7 @@ struct ExportRequest: Identifiable {
 }
 
 extension Notification.Name {
-    /// Demande d'export depuis le menu (⌘E) ; l'objet est le `ReportFormat`.
+    /// Export request from the menu (⌘E); the object is the `ReportFormat`.
     static let amanExportRequested = Notification.Name("AmanExportRequested")
 }
 
@@ -288,7 +288,7 @@ struct ExportSheet: View {
                     let chosen = format
                     let disk = disk
                     dismiss()
-                    // Le panneau d'enregistrement s'ouvre une fois la feuille refermée.
+                    // The save panel opens once the sheet has closed.
                     DispatchQueue.main.async {
                         ExportService.export(disk: disk, format: chosen, options: options)
                     }
@@ -302,7 +302,7 @@ struct ExportSheet: View {
     }
 }
 
-// MARK: - Lignes de la barre latérale
+// MARK: - Sidebar rows
 
 struct DiskRowView: View {
     let disk: RealDisk
@@ -369,7 +369,7 @@ struct VolumeRowView: View {
     }
 }
 
-/// Carte « Soutenir » en bas de la barre latérale : visible sans être envahissante.
+/// “Support” card at the bottom of the sidebar: visible without being intrusive.
 struct SupportButton: View {
     @State private var isHovered = false
 
@@ -412,7 +412,7 @@ struct SupportButton: View {
         .accessibilityLabel(L("Support Aman Disk on Ko-fi", "Soutenir Aman Disk sur Ko-fi"))
         .onHover { hovering in
             isHovered = hovering
-            // set() et non push()/pop() : un survol interrompu ne laisse pas le curseur main bloqué.
+            // set() rather than push()/pop(): an interrupted hover doesn't leave the pointing-hand cursor stuck.
             (hovering ? NSCursor.pointingHand : NSCursor.arrow).set()
         }
     }

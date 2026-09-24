@@ -1,21 +1,21 @@
 import SwiftUI
 import DiskHealthCore
 
-// MARK: - Modèle commun NVMe / ATA
+// MARK: - Shared NVMe / ATA model
 
 struct UnifiedAttribute: Identifiable {
     let id: UInt8
     let name: String
-    /// Nom technique, affiché dans la bulle d'aide.
+    /// Technical attribute name, shown in the help tooltip.
     let technicalName: String
     let explanation: String
-    /// Valeur normalisée (ATA seulement : 0 à 255, plus haut = mieux).
+    /// Normalized value (ATA only: 0 to 255, higher is better).
     let current: String?
     let worst: String?
     let threshold: String?
-    /// Valeur interprétée, avec son unité (« 40 °C », « 31 495 h », « 12,3 To »).
+    /// Interpreted value, with its unit (“40 °C”, “31,495 h”, “12.3 TB”).
     let value: String
-    /// Valeur brute en hexadécimal.
+    /// Raw value in hexadecimal.
     let rawHex: String
     let state: AttributeState
 
@@ -52,8 +52,8 @@ enum SmartRows {
         }
     }
 
-    /// Même règle que `ATAHealthEvaluator` : valeur sous le seuil = critique ; seuil franchi par le
-    /// passé ou secteurs défectueux = à surveiller.
+    /// Same rule as `ATAHealthEvaluator`: value below the threshold = critical; threshold crossed in the
+    /// past or bad sectors = needs attention.
     static func state(of attr: ATASmartAttribute, role: ATARole) -> AttributeState {
         if attr.threshold > 0 && attr.current <= attr.threshold { return .critical }
         if attr.threshold > 0 && attr.worst <= attr.threshold { return .warning }
@@ -82,7 +82,7 @@ enum SmartRows {
         }
     }
 
-    /// Le catalogue ajoute « Nom technique : … » à la fin de l'explication.
+    /// The catalog adds “Technical name: …” at the end of the explanation.
     private static func split(_ explanation: String) -> (String, String) {
         guard let range = explanation.range(of: L("\n\nTechnical name: ", "\n\nNom technique : ")) else { return (explanation, "") }
         return (String(explanation[..<range.lowerBound]),
@@ -90,10 +90,10 @@ enum SmartRows {
     }
 }
 
-// MARK: - Tableau
+// MARK: - Table
 
-/// Tableau S.M.A.R.T. en vues simples (≤ 30 lignes). Un `Table` SwiftUI (NSTableView) imbriqué
-/// dans la page défilante interceptait la molette et faisait saccader le défilement.
+/// S.M.A.R.T. table built from plain views (≤ 30 rows). A SwiftUI `Table` (NSTableView) nested
+/// in the scrolling page captured the scroll wheel and made scrolling stutter.
 struct SmartTableView: View {
     @EnvironmentObject var appManager: AppManager
     let disk: RealDisk

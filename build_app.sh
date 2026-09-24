@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
 
-VERSION="${VERSION:-0.9.1}"
+VERSION="${VERSION:-0.9.2}"
 UNIVERSAL="${UNIVERSAL:-0}"
 BUILT_BINARY=".build/AmanDisk-bundle-binary"
 
 if [ "$UNIVERSAL" == "1" ]; then
-    # Une compilation par architecture (--triple ne demande pas xcbuild, contrairement à
-    # « --arch arm64 --arch x86_64 »), puis assemblage avec lipo.
+    # One build per architecture (--triple doesn't need xcbuild, unlike
+    # “--arch arm64 --arch x86_64”), then combined with lipo.
     echo "Compiling DiskHealthApp (release, universal)..."
     SLICES=()
     for ARCH in arm64 x86_64; do
@@ -35,9 +35,9 @@ echo "Copying executable..."
 cp "$BUILT_BINARY" "$MACOS_DIR/AmanDisk"
 
 echo "Copying resources..."
-cp "Branding/Aman-Disk-brand/icone-app/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
-cp "Branding/Aman-Disk-brand/logo/aman-disk-logo-clair@2x.png" "$RESOURCES_DIR/"
-cp "Branding/Aman-Disk-brand/logo/aman-disk-logo-sombre@2x.png" "$RESOURCES_DIR/"
+cp "Branding/Aman-Disk-brand/app-icon/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+cp "Branding/Aman-Disk-brand/logo/aman-disk-logo-light@2x.png" "$RESOURCES_DIR/"
+cp "Branding/Aman-Disk-brand/logo/aman-disk-logo-dark@2x.png" "$RESOURCES_DIR/"
 
 echo "Creating Info.plist..."
 cat > "$CONTENTS_DIR/Info.plist" << PLIST
@@ -64,15 +64,15 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>NSHumanReadableCopyright</key>
-    <string>© 2026 Aman Disk contributors · Licence MIT</string>
+    <string>© 2026 MidZai · MIT License</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
     <true/>
-    <!-- App résidente (barre des menus) : macOS ne doit ni la fermer d'office quand la fenêtre
-         est fermée (fin de la surveillance), ni la tuer sans prévenir pendant un test. -->
+    <!-- Resident app (menu bar): macOS must not quit it on its own when the window is closed
+         (that would end monitoring), nor kill it without warning during a test. -->
     <key>NSSupportsAutomaticTermination</key>
     <false/>
     <key>NSSupportsSuddenTermination</key>
@@ -94,7 +94,7 @@ cat > "AmanDisk-entitlement.plist" << PLIST
 PLIST
 
 echo "Signing application..."
-# Signature ad hoc (pas de compte développeur : l'app n'est pas notariée).
+# Ad hoc signature (no developer account: the app isn't notarized).
 codesign --force --deep --sign - --entitlements AmanDisk-entitlement.plist "$APP_NAME"
 codesign --verify --deep --strict "$APP_NAME"
 

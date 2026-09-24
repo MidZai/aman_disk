@@ -13,7 +13,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
     public let isInternal: Bool
     public let connection: Connection
     public let volumeNames: [String]
-    public let usbVendorID: UInt16?     // uniquement si connection == .usb
+    public let usbVendorID: UInt16?     // only if connection == .usb
     public let usbProductID: UInt16?
     public let protocolType: StorageProtocol
     public let mediumType: MediumType

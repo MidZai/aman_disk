@@ -42,9 +42,9 @@ public enum BenchMath {
         return Double(sortedNanos[index]) / 1000.0
     }
     
-    /// Volume maximal écrit par un test : le fichier de test, puis au plus une fois sa taille
-    /// par passe d'écriture (les passes séquentielles s'arrêtent à la fin du fichier, les passes
-    /// aléatoires à `max_bytes` = taille du fichier).
+    /// Maximum amount written by a test: the test file, then at most its size once per write
+    /// pass (sequential passes stop at the end of the file, random passes at
+    /// `max_bytes` = file size).
     public static func maxBytesWritten(fileSize: UInt64, profile: BenchProfile, testsPerDirection: Int = BenchTestSpec.defaultGrid.count) -> UInt64 {
         if !profile.includesWrites {
             return fileSize
@@ -52,8 +52,8 @@ public enum BenchMath {
         return fileSize.saturatingMultiplied(by: UInt64(1 + testsPerDirection * profile.passes))
     }
 
-    /// Durée maximale estimée d'un test, en secondes : création du fichier (400 Mo/s, prudent pour
-    /// un SSD SATA), passes plafonnées à `timedPassSeconds`, pauses entre les tests.
+    /// Estimated maximum duration of a test, in seconds: file creation (400 MB/s, a safe figure
+    /// for a SATA SSD), passes capped at `timedPassSeconds`, pauses between tests.
     public static func estimatedMaxDuration(fileSize: UInt64, profile: BenchProfile, testsPerDirection: Int = BenchTestSpec.defaultGrid.count) -> TimeInterval {
         let tests = testsPerDirection * (profile.includesWrites ? 2 : 1)
         let prepare = Double(fileSize) / 400_000_000
@@ -66,7 +66,7 @@ public enum BenchMath {
         if fileSize > UInt64(Double(available) * 0.2) {
             return .tooLargeForFreeSpace
         }
-        if available < fileSize + 5_368_709_120 { // 5 Gio = 5 * 1024^3 = 5,368,709,120 bytes
+        if available < fileSize + 5_368_709_120 { // 5 GiB = 5 * 1024^3 = 5,368,709,120 bytes
             return .wouldLeaveTooLittle
         }
         return .ok

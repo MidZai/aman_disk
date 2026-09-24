@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import DiskHealthCore
 
-/// Disque ATA simulé : aucune commande n'est envoyée à un vrai disque.
+/// Fake ATA drive: no command is sent to a real drive.
 private final class SimulatedATADevice: ATASmartDevice {
     var smartEnabled: Bool
     var enableError: ATAReadError?
@@ -45,13 +45,13 @@ private final class SimulatedATADevice: ATASmartDevice {
         let activator = SmartActivator(device: device, memory: UserDefaultsActivationMemory(defaults: defaults))
 
         guard case .enabled(let snapshot) = try activator.read(bsdName: "disk2", autoEnable: true) else {
-            Issue.record("S.M.A.R.T. aurait dû être activé")
+            Issue.record("S.M.A.R.T. should have been turned on")
             return
         }
         #expect(device.enableCalls == 1)
         #expect(snapshot == (try device.read(bsdName: "disk2")))
 
-        // Lectures suivantes : S.M.A.R.T. actif, plus aucune commande envoyée.
+        // Later reads: S.M.A.R.T. is on, no more commands are sent.
         guard case .read = try activator.read(bsdName: "disk2", autoEnable: true) else {
             Issue.record("Lecture normale attendue")
             return
@@ -72,15 +72,15 @@ private final class SimulatedATADevice: ATASmartDevice {
         _ = try SmartActivator(device: device, memory: UserDefaultsActivationMemory(defaults: defaults))
             .read(bsdName: "disk2", autoEnable: true)
 
-        // Nouveau lancement : nouvelle instance, mêmes préférences, nom BSD différent.
+        // New launch: new instance, same preferences, different BSD name.
         let relaunched = SmartActivator(device: device, memory: UserDefaultsActivationMemory(defaults: defaults))
         #expect(try relaunched.read(bsdName: "disk3", autoEnable: true) == .enableFailed(code: -536870201))
         #expect(device.enableCalls == 1)
 
-        // Seul un geste de l'utilisateur (« Réessayer ») renvoie la commande.
+        // Only a user action (“Try Again”) sends the command again.
         device.enableError = nil
         guard case .enabled = try relaunched.enable(bsdName: "disk3") else {
-            Issue.record("La nouvelle tentative manuelle aurait dû réussir")
+            Issue.record("The manual retry should have succeeded")
             return
         }
         #expect(device.enableCalls == 2)

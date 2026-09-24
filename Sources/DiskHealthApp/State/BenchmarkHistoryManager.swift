@@ -2,7 +2,7 @@ import Foundation
 import DiskHealthCore
 import BenchmarkCore
 
-/// Résultats des tests de performances, un fichier JSON par disque (50 résultats au plus).
+/// Performance test results, one JSON file per drive (50 results at most).
 final class BenchmarkHistoryManager: @unchecked Sendable {
     static let shared = BenchmarkHistoryManager()
     static let maxResults = 50
@@ -21,7 +21,7 @@ final class BenchmarkHistoryManager: @unchecked Sendable {
         try? FileManager.default.createDirectory(at: self.directoryURL, withIntermediateDirectories: true)
     }
 
-    /// Enregistre un résultat sous `result.diskKey`.
+    /// Saves a result under `result.diskKey`.
     func save(_ result: BenchmarkResult) {
         queue.async {
             var results = self.read(key: result.diskKey)
@@ -30,10 +30,10 @@ final class BenchmarkHistoryManager: @unchecked Sendable {
         }
     }
 
-    /// Résultats d'un disque, du plus récent au plus ancien.
-    /// Jusqu'à la 0.9, les résultats étaient enregistrés sous un hachage du seul modèle et relus
-    /// sous le nom BSD (`disk0`) : l'historique restait donc toujours vide. Les deux anciennes clés
-    /// sont relues pour ne rien perdre.
+    /// A drive's results, newest first.
+    /// Up to 0.9, results were saved under a hash of the model alone and read back
+    /// under the BSD name (`disk0`), so the history always stayed empty. Both old keys
+    /// are read so nothing is lost.
     func results(for disk: RealDisk) -> [BenchmarkResult] {
         queue.sync { self.readAll(keys: Self.keys(for: disk)) }
     }

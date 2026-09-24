@@ -2,16 +2,16 @@ import AppKit
 import DiskHealthCore
 import BenchmarkCore
 
-/// Test de performances en cours. Appartient à `AppManager` (et non à la vue) : changer d'onglet,
-/// de disque ou fermer la fenêtre n'interrompt pas le test et ne perd pas son résultat.
+/// Performance test in progress. Owned by `AppManager` (not by the view): switching tabs
+/// or drives, or closing the window, doesn't interrupt the test or lose its result.
 @MainActor
 final class BenchmarkController: ObservableObject {
     @Published private(set) var runningDiskId: String?
     @Published private(set) var state: BenchmarkState?
-    /// Tests terminés du test en cours, affichés dans la grille au fur et à mesure.
+    /// Finished tests of the current run, shown in the grid as they come in.
     @Published private(set) var liveTests: [TestResult] = []
     @Published private(set) var liveProfile: BenchProfile = .standard
-    /// Dernier résultat terminé (par disque), pour l'afficher en revenant sur l'onglet.
+    /// Latest finished result (per drive), shown again when coming back to the tab.
     @Published private(set) var lastResults: [String: BenchmarkResult] = [:]
 
     weak var appManager: AppManager?
@@ -47,11 +47,11 @@ final class BenchmarkController: ObservableObject {
         runner?.cancel()
     }
 
-    /// Quitter pendant un test : l'app attend la suppression du fichier de test avant de se fermer.
+    /// Quitting during a test: the app waits for the test file to be deleted before quitting.
     func cancelForTermination() {
         terminationPending = true
         runner?.cancel()
-        // Filet de sécurité : ne jamais bloquer la fermeture plus de 5 s.
+        // Safety net: never block quitting for more than 5 s.
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             guard let self, self.terminationPending else { return }
             self.terminationPending = false
@@ -60,7 +60,7 @@ final class BenchmarkController: ObservableObject {
     }
 
     private func applySnapshot(_ snapshot: DiskHealthSnapshot, date: Date, diskId: String) {
-        // Relevé toutes les 2 s pendant le test ; l'interface n'a pas besoin de plus d'un toutes les 15 s.
+        // A reading every 2 s during the test; the interface doesn't need more than one every 15 s.
         guard date.timeIntervalSince(lastSnapshotApplied) >= 15 else { return }
         lastSnapshotApplied = date
         appManager?.recordBenchmarkSnapshot(snapshot, date: date, diskId: diskId)
@@ -104,7 +104,7 @@ final class BenchmarkController: ObservableObject {
     }
 }
 
-/// Le coureur appelle son délégué sur le fil principal ; ce pont le relaie à l'acteur principal.
+/// The runner calls its delegate on the main thread; this bridge relays it to the main actor.
 private final class DelegateBridge: BenchmarkRunnerDelegate {
     weak var owner: BenchmarkController?
     init(owner: BenchmarkController) { self.owner = owner }

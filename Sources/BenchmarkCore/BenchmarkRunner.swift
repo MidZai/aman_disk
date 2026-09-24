@@ -11,10 +11,10 @@ public enum BenchmarkState {
     case error(Error)
 }
 
-/// Toutes les méthodes sont appelées sur le fil principal.
+/// All methods are called on the main thread.
 public protocol BenchmarkRunnerDelegate: AnyObject {
     func benchmarkDidUpdateState(_ state: BenchmarkState)
-    /// Un test (motif × sens) vient de se terminer : la grille peut l'afficher sans attendre la fin.
+    /// A test (pattern × direction) just finished: the grid can show it without waiting for the end.
     func benchmarkDidComplete(test: TestResult)
     func benchmarkDidFinish(result: BenchmarkResult)
 }
@@ -23,7 +23,7 @@ public extension BenchmarkRunnerDelegate {
     func benchmarkDidComplete(test: TestResult) {}
 }
 
-/// Fichiers de test en cours : si l'app s'arrête brutalement, ils sont supprimés au lancement suivant.
+/// Test files in progress: if the app stops abruptly, they are deleted at the next launch.
 public enum BenchInflight {
     static var fileURL: URL? {
         guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
@@ -46,7 +46,7 @@ public enum BenchInflight {
         }
     }
 
-    /// Supprime les fichiers de test laissés par un test interrompu (plantage, arrêt forcé).
+    /// Deletes the test files left behind by an interrupted test (crash, force quit).
     public static func cleanUpLeftovers() {
         for path in read() {
             try? FileManager.default.removeItem(atPath: path)
@@ -56,7 +56,7 @@ public enum BenchInflight {
 }
 
 public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Sendable {
-    /// Au-delà, le test s'arrête pour protéger le disque.
+    /// Above this, the test stops to protect the drive.
     public static let temperatureLimitC = 70
 
     private let target: BenchTarget
@@ -68,12 +68,12 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
     private let appVersion: String
 
     public weak var delegate: BenchmarkRunnerDelegate?
-    /// Relevés pris pendant le test (pour l'historique de température).
+    /// Readings taken during the test (for the temperature history).
     public var onTemperatureSnapshot: ((DiskHealthSnapshot, Date) -> Void)?
 
     private let queue = DispatchQueue(label: "io.github.aman-disk.benchmark", qos: .userInitiated)
     private let lock = NSLock()
-    // Partagés entre la file du test, le fil principal et l'échantillonneur : protégés par `lock`.
+    // Shared between the test queue, the main thread and the sampler: protected by `lock`.
     private var _cancelled = false
     private var _stopReason: String?
     private var _ctx: OpaquePointer?
@@ -101,7 +101,7 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
     private var isCancelled: Bool { lock.withLock { _cancelled } }
 
     public func start() {
-        // État publié au plus 10 fois par seconde, seulement s'il a changé.
+        // State published at most 10 times per second, and only when it changed.
         let t = DispatchSource.makeTimerSource(queue: .main)
         t.schedule(deadline: .now() + 0.1, repeating: 0.1, leeway: .milliseconds(20))
         t.setEventHandler { [weak self] in
@@ -118,7 +118,7 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
         queue.async { self.run() }
     }
 
-    /// Sûr depuis n'importe quel fil.
+    /// Safe from any thread.
     public func cancel() {
         stop(reason: nil)
     }
@@ -185,14 +185,14 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
             lock.withLock { _ctx = nil }
             cbench_ctx_destroy(ctx)
         }
-        // Une annulation arrivée avant la création du contexte doit aussi arrêter le C.
+        // A cancellation that arrives before the context is created must also stop the C code.
         if isCancelled { cbench_ctx_cancel(ctx) }
 
         runTests(ctx: ctx, path: path)
         finish(path: path, activity: activity, startTemp: startTemp, thermalStart: thermalStart, onBattery: onBattery)
     }
 
-    /// Progression lue dans le contexte C pendant qu'il travaille, sans fil dédié.
+    /// Progress read from the C context while it works, without a dedicated thread.
     private func startProgressMonitor(ctx: OpaquePointer, _ makeState: @escaping (_ bytes: UInt64, _ elapsed: Double) -> BenchmarkState) -> DispatchSourceTimer {
         let started = DispatchTime.now()
         let t = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
@@ -229,7 +229,7 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
                 var passResults: [PassResult] = []
                 var allLatencies: [UInt64] = []
                 let useLat = spec.recordsLatency && spec.queueDepth == 1
-                // Tampon de latences alloué une fois par test, pas à chaque passe.
+                // Latency buffer allocated once per test, not on every pass.
                 var lats = useLat ? [UInt64](repeating: 0, count: 1_000_000) : []
 
                 for passNum in 1...profile.passes {
@@ -285,7 +285,7 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
                 testsResults.append(tr)
                 DispatchQueue.main.async { [weak self] in self?.delegate?.benchmarkDidComplete(test: tr) }
 
-                // Pause entre deux tests : laisse le contrôleur vider son cache et refroidir.
+                // Pause between two tests: lets the controller flush its cache and cool down.
                 if testIndex < totalTests {
                     var remaining = profile.pauseSeconds
                     while remaining > 0 && !isCancelled {
@@ -304,7 +304,7 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
         try? FileManager.default.removeItem(atPath: path)
         BenchInflight.write(BenchInflight.read().filter { $0 != path })
 
-        var bytesWritten: UInt64 = fileSize // fichier de test
+        var bytesWritten: UInt64 = fileSize // test file
         for r in testsResults where r.direction == .write {
             for p in r.passes { bytesWritten &+= p.bytes }
         }

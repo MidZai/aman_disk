@@ -5,8 +5,8 @@
 #include <IOKit/IOCFPlugIn.h>
 #include <string.h>
 
-// op_mask : 1 = journal SMART (512 octets), 2 = données Identify (4096 octets), 3 = les deux
-// avec une seule ouverture du plug-in.
+// op_mask: 1 = SMART log (512 bytes), 2 = Identify data (4096 bytes), 3 = both,
+// opening the plug-in only once.
 static int _cdiskio_do_nvme_operation(const char *bsd_name, unsigned char *smart_buffer, unsigned char *identify_buffer, int op_mask) {
     io_service_t service = MACH_PORT_NULL;
     io_service_t target_service = MACH_PORT_NULL;
@@ -16,7 +16,7 @@ static int _cdiskio_do_nvme_operation(const char *bsd_name, unsigned char *smart
     SInt32 score = 0;
     IOReturn err = kIOReturnSuccess;
 
-    // 1. IOMedia à partir du nom BSD (IOServiceGetMatchingService consomme le dictionnaire).
+    // 1. IOMedia from the BSD name (IOServiceGetMatchingService consumes the dictionary).
     CFMutableDictionaryRef matchingDict = IOBSDNameMatching(kIOMainPortDefault, 0, bsd_name);
     if (!matchingDict) {
         return -1;
@@ -26,7 +26,7 @@ static int _cdiskio_do_nvme_operation(const char *bsd_name, unsigned char *smart
         return -1;
     }
 
-    // 2. Remonte les parents jusqu'au contrôleur qui annonce « NVMe SMART Capable ».
+    // 2. Walk up the parents to the controller that reports “NVMe SMART Capable”.
     target_service = service;
     IOObjectRetain(target_service);
     bool found = false;
@@ -50,7 +50,7 @@ static int _cdiskio_do_nvme_operation(const char *bsd_name, unsigned char *smart
         goto cleanup;
     }
 
-    // 3. Plug-in et interface NVMe SMART.
+    // 3. NVMe SMART plug-in and interface.
     err = IOCreatePlugInInterfaceForService(target_service, kIONVMeSMARTUserClientTypeID, kIOCFPlugInInterfaceID, &plugin, &score);
     if (err != kIOReturnSuccess || !plugin) {
         result = -3;
@@ -63,7 +63,7 @@ static int _cdiskio_do_nvme_operation(const char *bsd_name, unsigned char *smart
         goto cleanup;
     }
 
-    // 4. Lectures.
+    // 4. Reads.
     result = 0;
     if (op_mask & 1) {
         memset(smart_buffer, 0, 512);
@@ -74,7 +74,7 @@ static int _cdiskio_do_nvme_operation(const char *bsd_name, unsigned char *smart
     }
     if (op_mask & 2) {
         memset(identify_buffer, 0, 4096);
-        // Espace de noms 0 : données Identify du contrôleur.
+        // Namespace 0: controller Identify data.
         if ((*smartIf)->GetIdentifyData(smartIf, identify_buffer, 0) != kIOReturnSuccess) {
             result = -4;
             goto cleanup;

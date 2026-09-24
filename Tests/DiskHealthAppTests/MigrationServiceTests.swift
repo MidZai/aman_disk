@@ -2,8 +2,8 @@ import Testing
 import Foundation
 @testable import DiskHealthApp
 
-/// Tout se passe dans un dossier temporaire : l'ancienne version de ce test supprimait le vrai
-/// dossier `Application Support/io.github.aman-disk.AmanDisk` de la machine.
+/// Everything happens in a temporary folder: the old version of this test deleted the machine's real
+/// `Application Support/io.github.aman-disk.AmanDisk` folder.
 @Suite struct MigrationServiceTests {
     @Test func oldFoldersAreCopiedOnce() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -12,7 +12,7 @@ import Foundation
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
-        let oldHistory = root.appendingPathComponent("io.github.aman-disk.DiskHealth/History")
+        let oldHistory = root.appendingPathComponent("DiskHealth/History")
         try FileManager.default.createDirectory(at: oldHistory, withIntermediateDirectories: true)
         try "dummy".write(to: oldHistory.appendingPathComponent("test.txt"), atomically: true, encoding: .utf8)
 
@@ -21,7 +21,7 @@ import Foundation
         let copied = root.appendingPathComponent("\(AppInfo.bundleIdentifier)/History/test.txt")
         #expect(FileManager.default.fileExists(atPath: copied.path))
         #expect(defaults.bool(forKey: "migratedFromDiskHealth"))
-        // Copie et non déplacement.
+        // Copied, not moved.
         #expect(FileManager.default.fileExists(atPath: oldHistory.appendingPathComponent("test.txt").path))
     }
 

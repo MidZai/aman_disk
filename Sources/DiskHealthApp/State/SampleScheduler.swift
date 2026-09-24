@@ -1,8 +1,8 @@
 import Foundation
 import DiskHealthCore
 
-/// Surveillance continue : une mesure de chaque disque interne toutes les 30 s,
-/// tant que le processus tourne (fenêtre ouverte ou non).
+/// Continuous monitoring: one reading of each internal drive every 30 s,
+/// as long as the process runs (window open or not).
 @MainActor
 final class SampleScheduler {
     nonisolated static let interval: TimeInterval = 30
@@ -22,7 +22,7 @@ final class SampleScheduler {
         let t = Timer(timeInterval: Self.interval, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.tick() }
         }
-        // Tolérance large : laisse macOS regrouper les réveils (consommation au repos).
+        // Wide tolerance: lets macOS coalesce wake-ups (idle power use).
         t.tolerance = 5
         RunLoop.main.add(t, forMode: .common)
         timer = t
@@ -36,8 +36,8 @@ final class SampleScheduler {
 
     private func tick() async {
         guard let appManager, !isSampling else { return }
-        // Suspendu pendant un test de performances (son échantillonneur prend le relais)
-        // et pendant le premier chargement.
+        // Suspended during a performance test (its sampler takes over)
+        // and during the first load.
         guard !appManager.isBenchmarkRunning, !appManager.isLoading else { return }
         isSampling = true
         defer { isSampling = false }

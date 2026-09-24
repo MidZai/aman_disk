@@ -10,21 +10,21 @@ struct ExportOptions {
     var includeHistory = true
 }
 
-/// Contenu d'un rapport, rassemblé une fois pour les trois formats.
+/// Contents of a report, gathered once for all three formats.
 struct ReportData {
     let disk: RealDisk
     let options: ExportOptions
     let benchmark: BenchmarkResult?
-    /// Historique sur 7 jours, en moyennes horaires (vide si non demandé).
+    /// 7-day history, as hourly averages (empty if not requested).
     let history: AggregationResult
     let generatedAt: Date
 
-    /// Numéro de série tel qu'il doit apparaître dans le rapport.
+    /// Serial number as it must appear in the report.
     var serialText: String {
         options.includeSerial ? (disk.serialNumber ?? L("Unknown", "Inconnu")) : L("Hidden", "Masqué")
     }
 
-    /// Relevé sans numéro de série quand il ne doit pas figurer dans le rapport (NVMe et ATA).
+    /// Reading without the serial number when it must not appear in the report (NVMe and ATA).
     var exportedSnapshot: DiskHealthSnapshot? {
         guard !options.includeSerial, let snapshot = disk.snapshot else { return disk.snapshot }
         switch snapshot {
@@ -54,7 +54,7 @@ struct ReportData {
 
 enum ExportService {
 
-    // MARK: - Point d'entrée
+    // MARK: - Entry point
 
     @MainActor
     static func export(disk: RealDisk, format: ReportFormat, options: ExportOptions) {
@@ -97,11 +97,11 @@ enum ExportService {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    // MARK: - Résumé (presse-papiers)
+    // MARK: - Summary (clipboard)
 
     static func summaryText(disk: RealDisk) -> String {
         var lines = ["Aman Disk — \(disk.physical.model)"]
-        lines.append("\(Formatters.bytes(disk.physical.sizeBytes)) · \(disk.physical.mediumLabel) \(disk.physical.locationLabel.lowercased()) · \(disk.physical.interfaceLabel)")
+        lines.append("\(Formatters.bytes(disk.physical.sizeBytes)) · \(disk.physical.mediumAndLocationLabel) · \(disk.physical.interfaceLabel)")
         let reason = disk.health.reasons.first ?? L("No problems detected.", "Aucune anomalie détectée.")
         lines.append(L("Status: \(disk.health.status.localizedLabel) — \(reason)", "État : \(disk.health.status.localizedLabel) — \(reason)"))
         if let life = disk.knownLifePercent {
@@ -118,7 +118,7 @@ enum ExportService {
         copy(summaryText(disk: disk))
     }
 
-    /// Indicateurs clés, dans l'ordre des tuiles. Valeur absente : « Non fourni ».
+    /// Key indicators, in the order of the tiles. Missing value: “Not reported”.
     static func keyIndicators(_ m: DiskMetrics, disk: RealDisk) -> [(String, String)] {
         var items: [(String, String)] = [
             (L("Temperature", "Température"), m.temperatureC.map(Formatters.temperature) ?? L("Not reported", "Non fournie")),
@@ -137,7 +137,7 @@ enum ExportService {
         return items
     }
 
-    // MARK: - Test de performances
+    // MARK: - Performance test
 
     static func benchmarkSummary(result: BenchmarkResult) -> String {
         var lines = [L("Aman Disk \(result.appVersion) — Performance test", "Aman Disk \(result.appVersion) — Test de performances")]
@@ -169,7 +169,7 @@ enum ExportService {
         return Formatters.speed(BenchMath.megabytesPerSecond(bytes: best.bytes, seconds: best.seconds))
     }
 
-    /// « Température 38 → 51 °C · écrit 21,5 Go · latence 4K QD1 : 85 µs (médiane), 190 µs (99 %) · sur secteur »
+    /// “Temperature 38 → 51 °C · wrote 21.5 GB · 4K QD1 latency: 85 µs (median), 190 µs (99th percentile) · on power adapter”
     static func benchmarkConditions(_ result: BenchmarkResult) -> String {
         var parts: [String] = []
         let c = result.conditions
@@ -188,7 +188,7 @@ enum ExportService {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: - Texte
+    // MARK: - Text
 
     static func reportText(_ r: ReportData) -> String {
         let disk = r.disk
@@ -342,7 +342,7 @@ enum ExportService {
         context.closePDF()
     }
 
-    // MARK: - Outils
+    // MARK: - Helpers
 
     private static func copy(_ text: String) {
         NSPasteboard.general.clearContents()

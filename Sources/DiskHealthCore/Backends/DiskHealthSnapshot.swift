@@ -28,7 +28,7 @@ public struct ATASmartSnapshot: Codable, Equatable, Hashable {
     public let rotationRate: Int
     public let thresholdExceeded: Bool
     public let checksumValid: Bool
-    // B3: also validate the thresholds block checksum
+    // Also validate the checksum of the thresholds block.
     public let thresholdsChecksumValid: Bool
     
     public init(
@@ -56,13 +56,13 @@ public enum DiskHealthSnapshot: Codable, Equatable, Hashable {
     case nvme(NVMeSmartLog, NVMeIdentify)
     case ata(ATASmartSnapshot)
 
-    // P1: Use a dedicated nested key for ATA instead of a flat layout.
+    // A dedicated nested key for ATA instead of a flat layout.
     // Backwards-compatible decode: tries the nested form first, falls back to the
     // legacy flat form (written by versions prior to this fix).
     enum CodingKeys: String, CodingKey {
         case protocolType = "protocol"
         case smart, identify
-        case ataSnapshot   // P1: new nested key
+        case ataSnapshot   // new nested key
         // Legacy flat keys (decode-only, kept for backwards compatibility)
         case attributes, model, firmware, serialNumber, rotationRate, thresholdExceeded, checksumValid
     }
@@ -76,7 +76,7 @@ public enum DiskHealthSnapshot: Codable, Equatable, Hashable {
             let id = try container.decode(NVMeIdentify.self, forKey: .identify)
             self = .nvme(smart, id)
         } else if type == "ata" {
-            // P1: Try the new nested form first.
+            // Try the new nested form first.
             if container.contains(.ataSnapshot) {
                 let snapshot = try container.decode(ATASmartSnapshot.self, forKey: .ataSnapshot)
                 self = .ata(snapshot)
@@ -115,7 +115,7 @@ public enum DiskHealthSnapshot: Codable, Equatable, Hashable {
             try container.encode(smart, forKey: .smart)
             try container.encode(id, forKey: .identify)
         case .ata(let snapshot):
-            // P1: Encode ATA as a proper nested object under "ataSnapshot".
+            // Encode ATA as a proper nested object under "ataSnapshot".
             try container.encode("ata", forKey: .protocolType)
             try container.encode(snapshot, forKey: .ataSnapshot)
         }

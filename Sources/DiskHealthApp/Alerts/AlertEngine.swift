@@ -1,7 +1,7 @@
 import Foundation
 import DiskHealthCore
 
-/// Relevé d'un disque, réduit à ce dont les alertes ont besoin.
+/// A drive reading, reduced to what the alerts need.
 struct AlertReading: Equatable {
     let diskId: String
     let name: String
@@ -9,7 +9,7 @@ struct AlertReading: Equatable {
     let firstReason: String?
     let temperatureC: Int?
     let isRotational: Bool
-    /// Durée de vie restante en %, seulement si le disque la fournit.
+    /// Remaining life in %, only if the drive reports it.
     let lifePercent: Int?
 }
 
@@ -24,20 +24,20 @@ struct AlertEvent: Equatable {
     let message: String
 }
 
-/// Envoie une notification système (remplacé par un faux dans les tests).
+/// Posts a system notification (replaced by a fake in the tests).
 protocol NotificationPosting: AnyObject {
     func post(_ event: AlertEvent)
 }
 
-/// Détecte les événements à notifier. Une notification par événement, jamais de répétition.
-/// L'état est `Codable` pour survivre à un redémarrage de l'app.
+/// Detects the events to notify. One notification per event, never repeated.
+/// The state is `Codable` so it survives an app restart.
 final class AlertEngine {
     static let overheatDuration: TimeInterval = 5 * 60
     static let ssdThreshold = 60
     static let hddThreshold = 55
     static let rearmMargin = 5
     static let lifeThresholds = [50, 25, 10]
-    /// Au-delà de cet écart sans relevé (app fermée, veille), la durée de chauffe repart de zéro.
+    /// Beyond this gap without a reading (app closed, sleep), the overheating timer starts over.
     static let maxReadingGap: TimeInterval = 3 * SampleScheduler.interval
 
     struct DiskState: Codable, Equatable {
@@ -52,7 +52,7 @@ final class AlertEngine {
     private(set) var states: [String: DiskState]
     private let clock: () -> Date
     private weak var poster: NotificationPosting?
-    /// Quand faux, l'état est suivi mais rien n'est envoyé (évite une rafale à l'activation).
+    /// When false, the state is tracked but nothing is posted (avoids a burst when alerts are turned on).
     var isEnabled: Bool
 
     init(poster: NotificationPosting?, clock: @escaping () -> Date = Date.init, states: [String: DiskState] = [:], isEnabled: Bool = true) {
@@ -85,7 +85,7 @@ final class AlertEngine {
 
     private func statusEvents(_ r: AlertReading, _ state: inout DiskState) -> [AlertEvent] {
         defer { state.status = r.status }
-        // Premier relevé : sert de référence, pas d'alerte.
+        // First reading: used as the baseline, no alert.
         guard let previous = state.status, previous != r.status else { return [] }
         guard r.status == .caution || r.status == .bad else { return [] }
         var message = L("\(r.name): \(r.status.localizedLabel).", "\(r.name) : \(r.status.localizedLabel).")
@@ -101,7 +101,7 @@ final class AlertEngine {
         let threshold = r.isRotational ? Self.hddThreshold : Self.ssdThreshold
 
         if t < threshold - Self.rearmMargin {
-            // Redescendu sous le seuil moins 5 °C : une nouvelle alerte redevient possible.
+            // Back below the threshold minus 5 °C: a new alert becomes possible again.
             state.overheatNotified = false
         }
         guard t > threshold else {
@@ -119,7 +119,7 @@ final class AlertEngine {
         guard let life = r.lifePercent else { return [] }
         defer { state.lastLifePercent = life }
         guard let previous = state.lastLifePercent else {
-            // Premier relevé : les seuils déjà franchis ne sont pas signalés.
+            // First reading: thresholds already crossed are not reported.
             state.notifiedLifeThresholds.formUnion(Self.lifeThresholds.filter { life <= $0 })
             return []
         }

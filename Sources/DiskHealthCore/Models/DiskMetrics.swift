@@ -1,8 +1,8 @@
 import Foundation
 
-/// Indicateurs clés d'un relevé, extraits une seule fois quel que soit le protocole.
-/// Source unique pour les tuiles, le panneau de la barre des menus, les rapports et l'historique :
-/// avant, chaque vue refaisait cette extraction à sa façon et les chiffres pouvaient diverger.
+/// Key indicators of a reading, extracted once whatever the protocol.
+/// Single source for the tiles, the menu bar panel, the reports and the history:
+/// before, each view did this extraction its own way and the numbers could differ.
 public struct DiskMetrics: Equatable, Codable {
     public let temperatureC: Int?
     public let powerOnHours: UInt64?
@@ -10,14 +10,14 @@ public struct DiskMetrics: Equatable, Codable {
     public let unsafeShutdowns: UInt64?
     public let bytesWritten: UInt64?
     public let bytesRead: UInt64?
-    /// Durée de vie restante déclarée par le disque (100 − « pourcentage utilisé » en NVMe).
+    /// Remaining life reported by the drive (100 − “percentage used” on NVMe).
     public let lifeRemainingPercent: Int?
-    /// Endurance consommée déclarée par le disque ; peut dépasser 100 % en NVMe.
+    /// Endurance used, as reported by the drive; can exceed 100% on NVMe.
     public let percentageUsed: Int?
     public let availableSparePercent: Int?
-    /// NVMe : erreurs de données non corrigées (« Media and Data Integrity Errors »).
+    /// NVMe: uncorrected data errors (“Media and Data Integrity Errors”).
     public let mediaErrors: UInt64?
-    /// ATA : secteurs réalloués + secteurs en attente de réallocation.
+    /// ATA: reallocated sectors + sectors pending reallocation.
     public let badSectors: UInt64?
 
     public init(snapshot: DiskHealthSnapshot) {
@@ -50,7 +50,7 @@ public struct DiskMetrics: Equatable, Codable {
                 let role = ATACatalog.attributeInfo(id: attr.id, profile: profile).role
                 switch role {
                 case .temperature:
-                    // 0xC2 (194) est la température du disque ; 0xBE (190), celle du flux d'air.
+                    // 0xC2 (194) is the drive temperature; 0xBE (190) is the airflow temperature.
                     guard let t = attr.value(for: role) else { break }
                     if attr.id == 0xC2 || !temperatureIsPrimary {
                         temperature = Int(t)

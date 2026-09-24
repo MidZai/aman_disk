@@ -13,7 +13,7 @@ public enum ATAReadError: Error, Equatable {
     case parseFailed
 }
 
-/// Données brutes d'une lecture ATA complète.
+/// Raw data from a full ATA read.
 public struct ATARawData {
     public let smart: Data
     public let thresholds: Data
@@ -34,7 +34,7 @@ public enum ATAReader {
         }
     }
     
-    /// Données S.M.A.R.T., seuils, Identify et statut, avec une seule ouverture du pilote.
+    /// S.M.A.R.T. data, thresholds, Identify and status, opening the driver only once.
     public static func readAll(bsdName: String) throws -> ATARawData {
         var smart = [UInt8](repeating: 0, count: 512)
         var thresholds = [UInt8](repeating: 0, count: 512)
@@ -99,8 +99,8 @@ public enum ATAReader {
         }
     }
 
-    /// Active S.M.A.R.T. (`SMARTEnableDisableOperations(true)`) : la seule commande de réglage
-    /// qu'Aman envoie à un disque. Jamais de désactivation.
+    /// Turns S.M.A.R.T. on (`SMARTEnableDisableOperations(true)`): the only configuration command
+    /// Aman sends to a drive. Never turns it off.
     public static func enableSmart(bsdName: String) throws {
         let result = bsdName.withCString { cdiskio_enable_ata_smart($0) }
         guard result == 0 else { throw mapError(result) }

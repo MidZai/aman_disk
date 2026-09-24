@@ -7,7 +7,7 @@ struct UnsupportedDiskView: View {
     let physical: PhysicalDisk
     @State private var confirmEnable = false
 
-    /// Échec d'une activation de S.M.A.R.T. (automatique ou manuelle).
+    /// Failure to turn on S.M.A.R.T. (automatically or manually).
     private var enableFailureCode: Int32? {
         if reason == .smartDisabled, case .failed(let code)? = appManager.smartNotices[physical.bsdName] { return code }
         return nil
@@ -144,7 +144,7 @@ struct UnsupportedDiskView: View {
         }
     }
     
-    /// « Réessayer » après un échec, sinon « Activer S.M.A.R.T.… » avec confirmation.
+    /// “Try Again” after a failure, otherwise “Turn On S.M.A.R.T.…” with a confirmation.
     @ViewBuilder
     private var smartActions: some View {
         let isEnabling = appManager.enablingSmart.contains(physical.bsdName)

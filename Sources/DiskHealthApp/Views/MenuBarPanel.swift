@@ -3,7 +3,7 @@ import Charts
 import AppKit
 import DiskHealthCore
 
-/// Libellé de l'élément de barre des menus : anneau *template* et, en option, la température.
+/// Label of the menu bar item: *template* ring and, optionally, the temperature.
 struct MenuBarLabel: View {
     @ObservedObject var appManager: AppManager
     @AppStorage(PreferenceKey.showMenuBarTemperature) private var showTemperature = false
@@ -20,13 +20,13 @@ struct MenuBarLabel: View {
             }
         }
         .onAppear {
-            // Toujours présent : sert à rouvrir la fenêtre depuis une notification.
+            // Always present: used to reopen the window from a notification.
             WindowOpener.openMain = { [openWindow] in openWindow(id: AppScene.mainWindowID) }
         }
     }
 }
 
-/// Panneau de la barre des menus (320 pt).
+/// Menu bar panel (320 pt).
 struct MenuBarPanel: View {
     @EnvironmentObject var appManager: AppManager
     @Environment(\.openWindow) private var openWindow
@@ -164,7 +164,7 @@ struct MenuBarPanel: View {
     }
 }
 
-/// Bouton pleine largeur au style des menus, surligné au survol.
+/// Full-width button styled like a menu item, highlighted on hover.
 private struct MenuRowButton: View {
     let title: String
     let action: () -> Void

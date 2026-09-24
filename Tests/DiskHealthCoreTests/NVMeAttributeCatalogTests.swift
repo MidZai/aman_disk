@@ -49,7 +49,7 @@ import Foundation
         #expect(critAttrs.first { $0.id == 0x01 }?.state == .critical)
         #expect(critAttrs.first { $0.id == 0x02 }?.state == .critical)
         #expect(critAttrs.first { $0.id == 0x03 }?.state == .critical)
-        // Endurance dépassée et erreurs de données : « À surveiller », comme l'état de santé global.
+        // Endurance exceeded and data errors: “Needs attention”, like the overall health status.
         #expect(critAttrs.first { $0.id == 0x05 }?.state == .warning)
         #expect(critAttrs.first { $0.id == 0x0E }?.state == .warning)
         

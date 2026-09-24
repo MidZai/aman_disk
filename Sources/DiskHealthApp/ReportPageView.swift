@@ -3,7 +3,7 @@ import Charts
 import DiskHealthCore
 import BenchmarkCore
 
-/// Page A4 du rapport PDF. Toujours en clair (le PDF est imprimé ou partagé, quel que soit le thème du Mac).
+/// A4 page of the PDF report. Always light (the PDF is printed or shared, whatever the Mac's theme).
 struct ReportPageView: View {
     enum Page { case summary, details }
 
@@ -80,7 +80,7 @@ struct ReportPageView: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(disk.physical.model).font(.system(size: 18, weight: .bold))
-                Text("\(Formatters.bytes(disk.physical.sizeBytes)) · \(disk.physical.mediumLabel) \(disk.physical.locationLabel.lowercased()) · \(disk.physical.interfaceLabel)")
+                Text("\(Formatters.bytes(disk.physical.sizeBytes)) · \(disk.physical.mediumAndLocationLabel) · \(disk.physical.interfaceLabel)")
                     .font(.system(size: 10))
                     .foregroundStyle(Palette.secondary)
             }
@@ -272,7 +272,7 @@ struct ReportPageView: View {
         }
     }
 
-    // MARK: Outils
+    // MARK: Helpers
 
     private func sectionHeader(_ title: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {

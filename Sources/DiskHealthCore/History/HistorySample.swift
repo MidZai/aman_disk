@@ -2,7 +2,7 @@ import Foundation
 
 public struct HistorySample: Codable, Hashable {
     public let date: Date
-    /// Température mesurée ; pour un échantillon compacté, moyenne arrondie de la tranche.
+    /// Measured temperature; for a compacted sample, the rounded average of the bucket.
     public let temperatureC: Int?
     public let percentageUsed: Int?
     public let dataUnitsWritten: UInt64?
@@ -10,11 +10,11 @@ public struct HistorySample: Codable, Hashable {
     public let powerOnHours: UInt64?
     public let mediaErrors: UInt64?
     public let availableSpare: Int?
-    // v0.9 : présents uniquement sur les échantillons compactés (tranches de 5 min).
-    // Optionnels, donc les anciens fichiers d'historique se relisent sans conversion.
+    // v0.9: only present on compacted samples (5-minute buckets).
+    // Optional, so older history files can be read without conversion.
     public let temperatureMinC: Int?
     public let temperatureMaxC: Int?
-    /// Nombre de mesures réelles représentées par cet échantillon (nil = 1).
+    /// Number of real readings represented by this sample (nil = 1).
     public let sampleCount: Int?
 
     public init(date: Date, temperatureC: Int?, percentageUsed: Int?, dataUnitsWritten: UInt64?, dataUnitsRead: UInt64?, powerOnHours: UInt64?, mediaErrors: UInt64?, availableSpare: Int?, temperatureMinC: Int? = nil, temperatureMaxC: Int? = nil, sampleCount: Int? = nil) {
@@ -36,8 +36,8 @@ public struct HistorySample: Codable, Hashable {
 }
 
 extension HistorySample {
-    /// Convertit une lecture de santé en échantillon d'historique.
-    /// ATA : les volumes écrits et lus sont stockés en octets ; la conversion lisible se fait à l'affichage.
+    /// Converts a health reading into a history sample.
+    /// ATA: amounts written and read are stored in bytes; the readable conversion happens at display time.
     public static func from(snapshot: DiskHealthSnapshot, date: Date = Date()) -> HistorySample {
         let m = DiskMetrics(snapshot: snapshot)
         switch snapshot {
@@ -59,7 +59,7 @@ extension HistorySample {
 }
 
 extension DiskIdentity {
-    /// Clé d'historique d'un disque, dérivée du modèle et du numéro de série.
+    /// History key of a drive, derived from the model and the serial number.
     public static func key(for snapshot: DiskHealthSnapshot) -> String {
         switch snapshot {
         case .nvme(_, let id): return key(model: id.modelNumber, serial: id.serialNumber)

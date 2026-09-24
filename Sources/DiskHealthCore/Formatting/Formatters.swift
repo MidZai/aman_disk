@@ -1,18 +1,18 @@
 import Foundation
 
-/// Mise en forme des nombres, tailles, durées et dates.
+/// Formatting of numbers, sizes, durations and dates.
 ///
-/// Les nombres suivent la langue de l'interface (`Localization.language`), pas celle du système :
-/// sinon « 500.3 Go » côtoierait des libellés français, ou « 500,3 GB » des libellés anglais.
+/// Numbers follow the interface language (`Localization.language`), not the system's:
+/// otherwise “500.3 Go” would sit next to French labels, or “500,3 GB” next to English ones.
 ///
-/// Les formateurs sont créés une seule fois : `NumberFormatter` et `DateFormatter` coûtent cher
-/// à instancier, et ces fonctions sont appelées à chaque rendu des vues.
+/// The formatters are created only once: `NumberFormatter` and `DateFormatter` are expensive
+/// to create, and these functions are called on every view render.
 public enum Formatters {
     public static var locale: Locale = Localization.language.locale {
         didSet { cache = Cache(locale: locale) }
     }
 
-    /// Espace insécable entre un nombre et son unité : « 36 °C » ne se coupe jamais en fin de ligne.
+    /// No-break space between a number and its unit: “36 °C” never wraps at the end of a line.
     public static let unitSpace = "\u{00A0}"
 
     private final class Cache {
@@ -55,22 +55,22 @@ public enum Formatters {
 
     // MARK: - Dates
 
-    /// « 23 sept. 2026 à 14:05 »
+    /// “Sep 23, 2026 at 2:05 PM”
     public static func date(_ date: Date) -> String {
         cache.dateMedium.string(from: date)
     }
 
-    /// « 23 septembre 2026 à 14:05 »
+    /// “September 23, 2026 at 2:05 PM”
     public static func longDate(_ date: Date) -> String {
         cache.dateLong.string(from: date)
     }
 
-    /// « 14:05 »
+    /// “2:05 PM”
     public static func time(_ date: Date) -> String {
         cache.time.string(from: date)
     }
 
-    /// « il y a 12 s », « il y a 3 min », « il y a 2 h », puis la date.
+    /// “12 s ago”, “3 min ago”, “2 h ago”, then the date.
     public static func age(since date: Date, now: Date = Date()) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(date)))
         if seconds < 60 { return L("\(seconds)\(unitSpace)s ago", "il y a \(seconds)\(unitSpace)s") }
@@ -79,7 +79,7 @@ public enum Formatters {
         return Self.date(date)
     }
 
-    // MARK: - Nombres
+    // MARK: - Numbers
 
     public static func integer(_ value: UInt64) -> String {
         cache.integer.string(from: NSNumber(value: value)) ?? "\(value)"
@@ -89,7 +89,7 @@ public enum Formatters {
         cache.integer.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
-    /// Nombre à une décimale au plus : « 3 012,4 », « 2 ».
+    /// Number with at most one decimal: “3,012.4”, “2”.
     public static func decimal(_ value: Double) -> String {
         cache.decimal1.string(from: NSNumber(value: value)) ?? String(format: "%.1f", value)
     }
@@ -98,9 +98,9 @@ public enum Formatters {
         "\(cache.percent.string(from: NSNumber(value: value)) ?? "\(value)")\(unitSpace)%"
     }
 
-    // MARK: - Tailles
+    // MARK: - Sizes
 
-    /// Unités décimales (1 Go = 10⁹ octets), comme le Finder et les fabricants de disques.
+    /// Decimal units (1 GB = 10⁹ bytes), like the Finder and drive manufacturers.
     public static func bytes(_ bytes: UInt64) -> String {
         let units: [(Double, String)] = [
             (1e12, L("TB", "To")), (1e9, L("GB", "Go")), (1e6, L("MB", "Mo")), (1e3, L("kB", "ko"))
@@ -109,7 +109,7 @@ public enum Formatters {
         for (index, (factor, unit)) in units.enumerated() {
             guard value >= factor else { continue }
             let scaled = value / factor
-            // 999,96 Go s'affiche « 1 To », pas « 1 000 Go ».
+            // 999.96 GB is shown as “1 TB”, not “1,000 GB”.
             if index > 0, (scaled * 10).rounded() / 10 >= 1000 {
                 return "\(decimal(value / units[index - 1].0))\(unitSpace)\(units[index - 1].1)"
             }
@@ -118,7 +118,7 @@ public enum Formatters {
         return "\(integer(bytes))\(unitSpace)\(L("bytes", "octets"))"
     }
 
-    /// Unités de données NVMe (1 unité = 1 000 × 512 octets) converties en octets, sans débordement.
+    /// NVMe data units (1 unit = 1,000 × 512 bytes) converted to bytes, without overflow.
     public static func dataUnitsToBytes(_ units: UInt64) -> UInt64 {
         units.saturatingMultiplied(by: 512_000)
     }
@@ -134,13 +134,13 @@ public enum Formatters {
         return integer(value)
     }
 
-    // MARK: - Durées et mesures
+    // MARK: - Durations and measurements
 
     public static func hours(_ value: UInt64) -> String {
         "\(integer(value))\(unitSpace)h"
     }
 
-    /// Équivalent lisible d'un nombre d'heures : « 143 jours », « 5 mois », « 3,6 ans ».
+    /// Readable equivalent of a number of hours: “143 days”, “5 months”, “3.6 years”.
     public static func approximateDuration(hours: UInt64) -> String {
         let days = Double(hours) / 24
         if days < 1 { return L("less than a day", "moins d'un jour") }
@@ -161,10 +161,10 @@ public enum Formatters {
         "\(celsius)\(unitSpace)°C"
     }
 
-    /// Unité de débit : 10⁶ octets par seconde.
+    /// Throughput unit: 10⁶ bytes per second.
     public static var speedUnit: String { L("MB/s", "Mo/s") }
 
-    /// Débit en Mo/s (10⁶ octets par seconde).
+    /// Throughput in MB/s (10⁶ bytes per second).
     public static func speed(_ megabytesPerSecond: Double) -> String {
         "\(decimal(megabytesPerSecond))\(unitSpace)\(speedUnit)"
     }
@@ -175,9 +175,9 @@ public enum Formatters {
 }
 
 public extension UInt64 {
-    /// Multiplication qui plafonne à `UInt64.max` au lieu de faire planter l'app.
-    /// Certaines valeurs S.M.A.R.T. brutes sont codées sur 48 bits par le fabricant :
-    /// multipliées par une taille de bloc, elles peuvent dépasser 64 bits.
+    /// Multiplication that saturates at `UInt64.max` instead of crashing the app.
+    /// Some raw S.M.A.R.T. values are 48-bit values set by the manufacturer:
+    /// multiplied by a block size, they can overflow 64 bits.
     func saturatingMultiplied(by other: UInt64) -> UInt64 {
         let (result, overflow) = multipliedReportingOverflow(by: other)
         return overflow ? .max : result

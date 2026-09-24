@@ -1,9 +1,9 @@
 import Foundation
 
-/// Accès à un disque ATA pour l'activation de S.M.A.R.T. (simulé dans les tests).
+/// Access to an ATA drive for turning on S.M.A.R.T. (faked in the tests).
 public protocol ATASmartDevice {
     func read(bsdName: String) throws -> DiskHealthSnapshot
-    /// Numéro de série lu dans Identify, disponible même quand S.M.A.R.T. est désactivé.
+    /// Serial number read from Identify, available even when S.M.A.R.T. is disabled.
     func serialNumber(bsdName: String) -> String?
     func enableSmart(bsdName: String) throws
 }
@@ -26,8 +26,8 @@ public struct IOKitATADevice: ATASmartDevice {
     }
 }
 
-/// Disques pour lesquels Aman a déjà tenté l'activation, par numéro de série, avec le résultat
-/// (0 : réussie, sinon le code d'erreur). Survit aux relancements : une seule tentative automatique.
+/// Drives for which Aman already tried to turn S.M.A.R.T. on, by serial number, with the result
+/// (0: success, otherwise the error code). Survives relaunches: a single automatic attempt.
 public protocol SmartActivationMemory: AnyObject {
     func attempt(for serial: String) -> Int32?
     func record(_ code: Int32, for serial: String)
@@ -57,19 +57,19 @@ public final class UserDefaultsActivationMemory: SmartActivationMemory, @uncheck
 }
 
 public enum SmartActivationResult: Equatable {
-    /// S.M.A.R.T. était déjà actif.
+    /// S.M.A.R.T. was already on.
     case read(DiskHealthSnapshot)
-    /// Aman vient de l'activer, puis a relu le disque.
+    /// Aman just turned it on, then read the drive again.
     case enabled(DiskHealthSnapshot)
-    /// Désactivé, sans tentative : réglage coupé, ou activation déjà réussie une fois
-    /// (quelqu'un l'a désactivé depuis ; on ne la refait pas d'office).
+    /// Disabled, no attempt: setting off, or activation already succeeded once
+    /// (someone turned it off since; it isn't turned on again without asking).
     case disabled
-    /// Activation refusée par le disque ou le pilote, maintenant ou lors d'un lancement précédent.
+    /// Activation refused by the drive or the driver, now or during a previous launch.
     case enableFailed(code: Int32)
 }
 
-/// Lecture d'un disque ATA avec activation de S.M.A.R.T. s'il est désactivé :
-/// une seule tentative automatique par disque, jamais de nouvelle tentative sans l'utilisateur.
+/// Reads an ATA drive and turns S.M.A.R.T. on if it's disabled:
+/// a single automatic attempt per drive, never another attempt without the user.
 public struct SmartActivator {
     private let device: ATASmartDevice
     private let memory: SmartActivationMemory
@@ -92,7 +92,7 @@ public struct SmartActivator {
         }
     }
 
-    /// Activation demandée par l'utilisateur (bouton « Activer » ou « Réessayer »).
+    /// Activation requested by the user (“Turn On” or “Try Again” button).
     public func enable(bsdName: String) throws -> SmartActivationResult {
         try enable(bsdName: bsdName, serial: memoryKey(bsdName: bsdName))
     }
@@ -109,7 +109,7 @@ public struct SmartActivator {
         return .enabled(try device.read(bsdName: bsdName))
     }
 
-    /// Sans numéro de série lisible, le nom BSD sert de repli.
+    /// Without a readable serial number, the BSD name is used as a fallback.
     private func memoryKey(bsdName: String) -> String {
         device.serialNumber(bsdName: bsdName) ?? "bsd:\(bsdName)"
     }

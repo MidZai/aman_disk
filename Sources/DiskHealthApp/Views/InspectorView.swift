@@ -87,7 +87,7 @@ struct InspectorView: View {
         }
     }
 
-    /// Seuils annoncés par le disque (NVMe), sinon seuils génériques utilisés par l'app.
+    /// Thresholds reported by the drive (NVMe), otherwise the generic thresholds used by the app.
     private func temperatureLimits(_ disk: RealDisk) -> (String, String) {
         if let id = disk.identify, id.warningTempKelvin > 0 || id.criticalTempKelvin > 0 {
             let warning = id.warningTempKelvin > 0 ? Formatters.temperature(Int(id.warningTempKelvin) - 273) : L("Not reported", "Non annoncé")

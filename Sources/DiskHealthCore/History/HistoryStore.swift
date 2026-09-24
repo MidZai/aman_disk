@@ -1,33 +1,33 @@
 import Foundation
 
-/// Historique des relevés, un fichier par disque.
+/// History of readings, one file per drive.
 ///
-/// Format : JSON Lines (`<clé>.jsonl`), une mesure par ligne, en ajout seul. Une mesure toutes les
-/// 30 s ajoute donc ~170 octets au fichier, au lieu de réécrire tout l'historique (jusqu'à ~2 Mo
-/// au bout de 30 jours, soit plusieurs Go d'écritures par jour sur le SSD surveillé).
-/// Le fichier n'est réécrit qu'au compactage, une fois par heure.
+/// Format: JSON Lines (`<key>.jsonl`), one reading per line, append-only. A reading every
+/// 30 s therefore adds ~170 bytes to the file, instead of rewriting the whole history (up to ~2 MB
+/// after 30 days, i.e. several GB written per day to the SSD being monitored).
+/// The file is only rewritten during compaction, once an hour.
 ///
-/// Les anciens fichiers `<clé>.json` (tableau JSON, v0.2 à v0.9) sont convertis à la première lecture.
+/// Old `<key>.json` files (JSON array, v0.2 to v0.9) are converted on first read.
 public final class HistoryStore: @unchecked Sendable {
-    /// Remplaçable avant le premier usage (mode démo : dossier temporaire).
+    /// Can be replaced before first use (demo mode: temporary folder).
     public static var shared = HistoryStore()
 
-    /// Dossier d'Application Support de l'app (identique à l'identifiant du bundle).
+    /// The app's Application Support folder (same as the bundle identifier).
     public static let defaultFolderName = "io.github.aman-disk.AmanDisk"
-    /// Pleine résolution conservée sur cette durée.
+    /// Full resolution is kept for this long.
     public static let fullResolutionWindow: TimeInterval = 24 * 3600
-    /// Taille des tranches de compactage au-delà de 24 h.
+    /// Size of the compaction buckets beyond 24 h.
     public static let compactionBucket: TimeInterval = 5 * 60
-    /// Au-delà, les mesures sont supprimées.
+    /// Beyond this, readings are deleted.
     public static let retention: TimeInterval = 30 * 24 * 3600
-    /// Deux mesures plus rapprochées sont considérées comme un doublon.
+    /// Two readings closer than this are considered duplicates.
     public static let minimumSpacing: TimeInterval = 15
 
-    // `.utility` et non `.background` : les E/S en QoS « background » sont fortement bridées
-    // par macOS, et l'interface attend parfois ces lectures.
+    // `.utility` rather than `.background`: I/O at “background” QoS is heavily throttled
+    // by macOS, and the interface sometimes waits for these reads.
     private let queue = DispatchQueue(label: "io.github.aman-disk.history", qos: .utility)
     private let historyFolderURL: URL
-    /// Cache mémoire, trié par date : la lecture du fichier n'a lieu qu'une fois par disque.
+    /// In-memory cache, sorted by date: the file is read only once per drive.
     private var cache: [String: [HistorySample]] = [:]
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -43,7 +43,7 @@ public final class HistoryStore: @unchecked Sendable {
         try? FileManager.default.createDirectory(at: historyFolderURL, withIntermediateDirectories: true, attributes: nil)
     }
 
-    // MARK: - Fichiers
+    // MARK: - Files
 
     private func fileURL(for key: String) -> URL {
         historyFolderURL.appendingPathComponent("\(key).jsonl")
@@ -53,7 +53,7 @@ public final class HistoryStore: @unchecked Sendable {
         historyFolderURL.appendingPathComponent("\(key).json")
     }
 
-    /// À appeler sur `queue`.
+    /// Call on `queue`.
     private func loadRaw(key: String) -> [HistorySample] {
         if let cached = cache[key] { return cached }
         var samples: [HistorySample] = []
@@ -61,7 +61,7 @@ public final class HistoryStore: @unchecked Sendable {
         if let data = try? Data(contentsOf: url) {
             samples = decodeLines(data)
         }
-        // Ancien format : tableau JSON. Converti une fois, puis supprimé.
+        // Old format: JSON array. Converted once, then deleted.
         let legacyURL = legacyFileURL(for: key)
         if let data = try? Data(contentsOf: legacyURL) {
             let legacy = (try? decoder.decode([HistorySample].self, from: data)) ?? []
@@ -77,7 +77,7 @@ public final class HistoryStore: @unchecked Sendable {
     private func decodeLines(_ data: Data) -> [HistorySample] {
         var samples: [HistorySample] = []
         samples.reserveCapacity(data.count / 160)
-        // Une ligne tronquée (coupure de courant pendant l'écriture) est simplement ignorée.
+        // A truncated line (power loss during a write) is simply ignored.
         for line in data.split(separator: UInt8(ascii: "\n")) where !line.isEmpty {
             if let s = try? decoder.decode(HistorySample.self, from: Data(line)) {
                 samples.append(s)
@@ -86,7 +86,7 @@ public final class HistoryStore: @unchecked Sendable {
         return samples
     }
 
-    /// Réécrit tout le fichier (compactage, fusion, conversion). À appeler sur `queue`.
+    /// Rewrites the whole file (compaction, merge, conversion). Call on `queue`.
     private func writeAll(key: String, samples: [HistorySample]) {
         cache[key] = samples
         var data = Data()
@@ -99,7 +99,7 @@ public final class HistoryStore: @unchecked Sendable {
         try? data.write(to: fileURL(for: key), options: .atomic)
     }
 
-    /// Ajoute une ligne en fin de fichier. À appeler sur `queue`.
+    /// Appends a line at the end of the file. Call on `queue`.
     private func appendLine(key: String, sample: HistorySample) {
         guard var line = try? encoder.encode(sample) else { return }
         line.append(UInt8(ascii: "\n"))
@@ -111,7 +111,7 @@ public final class HistoryStore: @unchecked Sendable {
                 try handle.write(contentsOf: line)
                 return
             } catch {
-                // Repli ci-dessous : réécriture complète.
+                // Fallback below: full rewrite.
             }
         }
         writeAll(key: key, samples: cache[key] ?? [sample])
@@ -124,12 +124,12 @@ public final class HistoryStore: @unchecked Sendable {
         return byDate.values.sorted { $0.date < $1.date }
     }
 
-    /// Ajoute une mesure (déjà filtrée). À appeler sur `queue`.
-    /// La durée de conservation est appliquée par le compactage horaire, pas à chaque mesure.
+    /// Adds a reading (already filtered). Call on `queue`.
+    /// Retention is applied by the hourly compaction, not on every reading.
     private func add(_ sample: HistorySample, key: String) {
         var samples = loadRaw(key: key)
         if let last = samples.last, sample.date < last.date {
-            // Mesure plus ancienne que la dernière (horloge modifiée) : insérée à sa place.
+            // Reading older than the last one (clock changed): inserted in its place.
             samples.append(sample)
             samples.sort { $0.date < $1.date }
             writeAll(key: key, samples: samples)
@@ -140,9 +140,9 @@ public final class HistoryStore: @unchecked Sendable {
         appendLine(key: key, sample: sample)
     }
 
-    // MARK: - Écriture
+    // MARK: - Writing
 
-    /// Ajout historique (v0.2) : rejette les mesures à moins de 4 min et 3 °C de la précédente.
+    /// Legacy append (v0.2): rejects readings within 4 min and 3 °C of the previous one.
     public func append(_ sample: HistorySample, for key: String) {
         queue.async {
             if let last = self.loadRaw(key: key).last {
@@ -153,7 +153,7 @@ public final class HistoryStore: @unchecked Sendable {
                 }
             }
             self.add(sample, key: key)
-            // Comportement v0.2 : purge immédiate des mesures trop anciennes.
+            // v0.2 behavior: readings that are too old are purged immediately.
             let cutoff = Date().addingTimeInterval(-Self.retention)
             if let first = self.cache[key]?.first, first.date < cutoff {
                 self.writeAll(key: key, samples: (self.cache[key] ?? []).filter { $0.date >= cutoff })
@@ -161,8 +161,8 @@ public final class HistoryStore: @unchecked Sendable {
         }
     }
 
-    /// Ajout en pleine résolution, utilisé par la surveillance continue (une mesure toutes les 30 s).
-    /// Seuls les doublons (moins de 15 s d'écart) sont ignorés.
+    /// Full-resolution append, used by continuous monitoring (one reading every 30 s).
+    /// Only duplicates (less than 15 s apart) are ignored.
     public func record(_ sample: HistorySample, for key: String) {
         queue.async {
             if let last = self.loadRaw(key: key).last, abs(sample.date.timeIntervalSince(last.date)) < Self.minimumSpacing {
@@ -172,7 +172,7 @@ public final class HistoryStore: @unchecked Sendable {
         }
     }
 
-    /// Compacte tous les historiques : pleine résolution sur 24 h, tranches de 5 min jusqu'à 30 jours.
+    /// Compacts all histories: full resolution for 24 h, 5-minute buckets up to 30 days.
     public func compactAll(now: Date = Date()) {
         queue.sync {
             for key in self.allKeys() {
@@ -185,7 +185,7 @@ public final class HistoryStore: @unchecked Sendable {
         }
     }
 
-    /// Clés présentes sur le disque (nouveau et ancien format) ou en mémoire. À appeler sur `queue`.
+    /// Keys present on disk (new and old format) or in memory. Call on `queue`.
     private func allKeys() -> Set<String> {
         let files = (try? FileManager.default.contentsOfDirectory(at: historyFolderURL, includingPropertiesForKeys: nil)) ?? []
         let onDisk = files
@@ -194,7 +194,7 @@ public final class HistoryStore: @unchecked Sendable {
         return Set(onDisk).union(cache.keys)
     }
 
-    /// Règle de conservation, sans effet de bord (testable).
+    /// Retention rule, without side effects (testable).
     public static func compact(_ samples: [HistorySample], now: Date) -> [HistorySample] {
         let retentionCutoff = now.addingTimeInterval(-retention)
         let fullResCutoff = now.addingTimeInterval(-fullResolutionWindow)
@@ -211,7 +211,7 @@ public final class HistoryStore: @unchecked Sendable {
 
         let compacted: [HistorySample] = buckets.keys.sorted().compactMap { start in
             guard let group = buckets[start], let last = group.last else { return nil }
-            // Tranche déjà compactée et seule : on la garde telle quelle.
+            // Bucket already compacted and on its own: kept as is.
             if group.count == 1, group[0].isCompacted { return group[0] }
 
             var weightedSum = 0.0
@@ -246,14 +246,14 @@ public final class HistoryStore: @unchecked Sendable {
         return compacted + recent
     }
 
-    // MARK: - Lecture
+    // MARK: - Reading
 
-    /// Lecture synchrone (outil en ligne de commande, tests). Depuis l'interface, préférer la version `async`.
+    /// Synchronous read (command-line tool, tests). From the interface, prefer the `async` version.
     public func samples(for key: String, since: Date) -> [HistorySample] {
         queue.sync { Self.suffix(of: loadRaw(key: key), since: since) }
     }
 
-    /// Lecture sans bloquer le fil principal.
+    /// Read without blocking the main thread.
     public func loadSamples(for key: String, since: Date) async -> [HistorySample] {
         await withCheckedContinuation { continuation in
             queue.async {
@@ -262,7 +262,7 @@ public final class HistoryStore: @unchecked Sendable {
         }
     }
 
-    /// Mesures postérieures à `since` dans un tableau trié (recherche dichotomique).
+    /// Readings after `since` in a sorted array (binary search).
     private static func suffix(of sorted: [HistorySample], since: Date) -> [HistorySample] {
         var lo = 0, hi = sorted.count
         while lo < hi {
@@ -272,7 +272,7 @@ public final class HistoryStore: @unchecked Sendable {
         return Array(sorted[lo...])
     }
 
-    /// Fusionne un ancien fichier d'historique (tableau JSON) dans l'historique de `key`.
+    /// Merges an old history file (JSON array) into the history of `key`.
     public func importSamples(from url: URL, for key: String) {
         guard let data = try? Data(contentsOf: url),
               let imported = try? decoder.decode([HistorySample].self, from: data),
@@ -283,7 +283,7 @@ public final class HistoryStore: @unchecked Sendable {
         }
     }
 
-    /// Efface tout l'historique de température.
+    /// Clears the whole temperature history.
     public func removeAll() {
         queue.sync {
             cache.removeAll()
@@ -294,7 +294,7 @@ public final class HistoryStore: @unchecked Sendable {
         }
     }
 
-    /// Taille occupée sur le disque par l'historique, en octets.
+    /// Space used on disk by the history, in bytes.
     public func diskUsageBytes() -> UInt64 {
         queue.sync {
             let files = (try? FileManager.default.contentsOfDirectory(at: historyFolderURL, includingPropertiesForKeys: [.fileSizeKey])) ?? []

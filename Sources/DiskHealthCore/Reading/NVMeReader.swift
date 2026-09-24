@@ -22,7 +22,7 @@ public enum NVMeReader {
         }
     }
 
-    /// Journal SMART (512 octets) et Identify (4096 octets), avec une seule ouverture du pilote.
+    /// SMART log (512 bytes) and Identify (4096 bytes), opening the driver only once.
     public static func readAll(bsdName: String) throws -> (smart: Data, identify: Data) {
         var smart = [UInt8](repeating: 0, count: 512)
         var identify = [UInt8](repeating: 0, count: 4096)

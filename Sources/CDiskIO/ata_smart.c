@@ -6,9 +6,9 @@
 #include <IOKit/storage/ata/ATASMARTLib.h>
 #include <string.h>
 
-// Aucune commande qui modifie les données du disque. Seule exception, voulue et isolée :
-// cdiskio_enable_ata_smart envoie SMARTEnableDisableOperations(true). Jamais de désactivation,
-// d'auto-sauvegarde (SMARTEnableDisableAutosave), d'autotest ni d'écriture de journal.
+// No command that changes the drive's data. One deliberate, isolated exception:
+// cdiskio_enable_ata_smart sends SMARTEnableDisableOperations(true). Never disabling,
+// autosave (SMARTEnableDisableAutosave), self-tests or log writes.
 
 typedef struct {
     IOCFPlugInInterface **plugin;
@@ -16,8 +16,8 @@ typedef struct {
 } ata_handle;
 
 static void close_handle(ata_handle *h) {
-    // QueryInterface a ajouté une référence : elle doit être rendue avant de détruire le plug-in,
-    // sinon la connexion au pilote reste ouverte à chaque lecture.
+    // QueryInterface added a reference: it must be released before the plug-in is destroyed,
+    // otherwise the connection to the driver stays open after every read.
     if (h->smart) {
         (*h->smart)->Release(h->smart);
         h->smart = NULL;
@@ -33,7 +33,7 @@ static int is_smart_disabled(IOATASMARTInterface **smart_interface) {
     UInt32 outSize = 0;
     IOReturn ikr = (*smart_interface)->GetATAIdentifyData(smart_interface, identify, 512, &outSize);
     if (ikr == kIOReturnSuccess && outSize >= 512) {
-        // Mots 82 et 85, bit 0 : S.M.A.R.T. pris en charge / activé (petit-boutiste).
+        // Words 82 and 85, bit 0: S.M.A.R.T. supported / enabled (little-endian).
         unsigned short w82 = (unsigned short)(identify[164] | (identify[165] << 8));
         unsigned short w85 = (unsigned short)(identify[170] | (identify[171] << 8));
         if ((w82 & 0x0001) != 0 && (w85 & 0x0001) == 0) {
@@ -43,7 +43,7 @@ static int is_smart_disabled(IOATASMARTInterface **smart_interface) {
     return 0;
 }
 
-// require_enabled : renvoie -6 si S.M.A.R.T. est désactivé. Identify et l'activation n'en ont pas besoin.
+// require_enabled: returns -6 if S.M.A.R.T. is disabled. Identify and enabling don't need it.
 static int open_handle(const char *bsd_name, ata_handle *out, int require_enabled) {
     out->plugin = NULL;
     out->smart = NULL;
@@ -52,12 +52,12 @@ static int open_handle(const char *bsd_name, ata_handle *out, int require_enable
     CFMutableDictionaryRef matching = IOBSDNameMatching(kIOMainPortDefault, 0, bsd_name);
     if (!matching) return -2;
 
-    // IOServiceGetMatchingService consomme la référence du dictionnaire.
+    // IOServiceGetMatchingService consumes the dictionary reference.
     io_object_t media = IOServiceGetMatchingService(kIOMainPortDefault, matching);
     if (media == 0) return -3;
 
-    // Le plug-in ATA S.M.A.R.T. est publié par un ancêtre (IOAHCIBlockStorageDevice, etc.) :
-    // on remonte l'arbre jusqu'au premier nœud qui l'accepte.
+    // The ATA S.M.A.R.T. plug-in is published by an ancestor (IOAHCIBlockStorageDevice, etc.):
+    // walk up the tree to the first node that accepts it.
     io_object_t current = media;
     IOObjectRetain(current);
     while (current != 0) {
@@ -84,7 +84,7 @@ static int open_handle(const char *bsd_name, ata_handle *out, int require_enable
 
     if (!out->smart) return -5;
 
-    // S.M.A.R.T. désactivé : on le signale ; l'activation est une commande à part.
+    // S.M.A.R.T. disabled: report it; enabling it is a separate command.
     if (require_enabled && is_smart_disabled(out->smart)) {
         close_handle(out);
         return -6;
@@ -104,7 +104,7 @@ int cdiskio_read_ata_snapshot(const char *bsd_name, unsigned char *smart_data, u
     IOReturn kr = (*h.smart)->SMARTReadData(h.smart, (ATASMARTData *)smart_data);
     if (kr != kIOReturnSuccess) { result = kr; goto done; }
 
-    // Une somme de contrôle invalide n'empêche pas la lecture : l'appelant la vérifie et l'affiche.
+    // An invalid checksum doesn't prevent reading: the caller checks it and shows it.
     kr = (*h.smart)->SMARTReadDataThresholds(h.smart, (ATASMARTDataThresholds *)thresholds);
     if (kr != kIOReturnSuccess) { result = kr; goto done; }
 
@@ -170,7 +170,7 @@ int cdiskio_enable_ata_smart(const char *bsd_name) {
     ata_handle h;
     int err = open_handle(bsd_name, &h, 0);
     if (err != 0) return err;
-    // Uniquement l'activation : le booléen est toujours vrai.
+    // Enabling only: the boolean is always true.
     IOReturn kr = (*h.smart)->SMARTEnableDisableOperations(h.smart, true);
     close_handle(&h);
     return kr == kIOReturnSuccess ? 0 : kr;

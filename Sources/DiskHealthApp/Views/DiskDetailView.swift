@@ -35,7 +35,7 @@ struct DiskDetailView: View {
     }
 }
 
-// MARK: - En-tête
+// MARK: - Header
 
 private struct DiskHeaderView: View {
     let disk: RealDisk
@@ -123,9 +123,9 @@ private struct DiskHeaderView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     LastReadLabel(date: disk.lastRead)
-                        // Cadre de taille fixe : le texte change chaque seconde, mais sa taille ne remonte
-                        // pas jusqu'à la page. Sans cela, chaque seconde relançait la mise en page de toute
-                        // la fenêtre (graphique compris) : ~5 % de processeur en permanence.
+                        // Fixed-size frame: the text changes every second, but its size doesn't propagate
+                        // up to the page. Without it, every second triggered a layout pass of the whole
+                        // window (chart included): ~5% CPU all the time.
                         .frame(width: 110, height: 20, alignment: .leading)
                 }
             }
@@ -150,7 +150,7 @@ private struct DiskHeaderView: View {
     }
 
     private var subtext: String {
-        var parts = ["\(disk.physical.mediumLabel) \(disk.physical.isInternal ? L("internal", "interne") : L("external", "externe"))", disk.physical.interfaceLabel]
+        var parts = [disk.physical.mediumAndLocationLabel, disk.physical.interfaceLabel]
         if case .ata(let ata)? = disk.snapshot, disk.physical.mediumType == .rotational, ata.rotationRate > 1 {
             parts.append(L("\(Formatters.integer(ata.rotationRate))\(Formatters.unitSpace)\(L("rpm", "tr/min"))", "\(Formatters.integer(ata.rotationRate))\(Formatters.unitSpace)tr/min"))
         }
@@ -161,7 +161,7 @@ private struct DiskHeaderView: View {
     }
 }
 
-/// « il y a 12 s » : chaque seconde quand la fenêtre est au premier plan, toutes les 10 s sinon.
+/// “12 s ago”: every second when the window is in the foreground, every 10 s otherwise.
 private struct LastReadLabel: View {
     let date: Date
     @Environment(\.controlActiveState) private var activeState
@@ -180,7 +180,7 @@ private struct LastReadLabel: View {
     }
 }
 
-/// Toutes les raisons d'un état dégradé, et non la première tronquée à 60 caractères.
+/// All the reasons for a degraded status, not just the first one truncated to 60 characters.
 private struct ReasonsCallout: View {
     let health: HealthAssessment
 
@@ -209,7 +209,7 @@ private struct ReasonsCallout: View {
     }
 }
 
-/// Affichée une fois, après l'activation automatique ou manuelle de S.M.A.R.T.
+/// Shown once, after S.M.A.R.T. was turned on automatically or manually.
 private struct SmartEnabledCard: View {
     let onDismiss: () -> Void
 
@@ -235,7 +235,7 @@ private struct SmartEnabledCard: View {
     }
 }
 
-/// Journal du disque : n'apparaît que s'il contient au moins un événement.
+/// Drive log: only appears if it contains at least one event.
 private struct DiskEventsView: View {
     let historyKey: String?
     let lastRead: Date
@@ -287,7 +287,7 @@ struct InfoPair: View {
     }
 }
 
-/// Numéro de série masqué, de la même façon partout : « ••••1234 ».
+/// Masked serial number, the same way everywhere: “••••1234”.
 enum SerialMasking {
     static func masked(_ serial: String?) -> String {
         guard let serial, !serial.isEmpty else { return "—" }

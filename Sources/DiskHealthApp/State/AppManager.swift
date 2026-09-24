@@ -11,23 +11,23 @@ enum DetailTab: Hashable {
     case health, performance
 }
 
-/// Suite d'une activation de S.M.A.R.T., affichée sur la page du disque.
+/// Outcome of turning on S.M.A.R.T., shown on the drive's page.
 enum SmartNotice: Equatable {
     case enabled
     case failed(code: Int32)
 }
 
-/// Un disque physique et son dernier relevé.
+/// A physical drive and its latest reading.
 public struct RealDisk: Identifiable, Equatable {
     public var id: String { physical.bsdName }
     public let physical: PhysicalDisk
     public let snapshot: DiskHealthSnapshot?
     public let health: HealthAssessment
     public let lastRead: Date
-    /// Indicateurs extraits une seule fois par relevé (et non à chaque rendu).
+    /// Indicators extracted once per reading (not on every render).
     public let metrics: DiskMetrics?
-    /// Clé stable (modèle + numéro de série) de l'historique et des résultats de test.
-    /// Le nom BSD (`disk0`) peut changer d'un démarrage à l'autre : il ne sert pas de clé.
+    /// Stable key (model + serial number) for the history and the test results.
+    /// The BSD name (`disk0`) can change from one boot to the next: it isn't used as a key.
     public let historyKey: String?
 
     public init(physical: PhysicalDisk, snapshot: DiskHealthSnapshot?, health: HealthAssessment, lastRead: Date = Date()) {
@@ -62,12 +62,12 @@ public struct RealDisk: Identifiable, Equatable {
 
     public var temperatureC: Int? { metrics?.temperatureC }
 
-    /// Clé des résultats de test de performances.
+    /// Key for the performance test results.
     var benchmarkKey: String {
         historyKey ?? DiskIdentity.key(model: physical.model, serial: "")
     }
 
-    /// Pourcentage de durée de vie affichable, uniquement s'il est fourni par le disque.
+    /// Life percentage that can be shown, only if the drive reports it.
     var knownLifePercent: Int? {
         AmanPalette.knownPercent(health: health, capability: physical.healthCapability)
     }
@@ -80,7 +80,7 @@ final class AppManager: ObservableObject {
 
     @Published private(set) var disks: [RealDisk] = []
     @Published private(set) var volumes: [Volume] = []
-    /// Premier chargement seulement : les actualisations suivantes gardent la page affichée.
+    /// First load only: later refreshes keep the page on screen.
     @Published private(set) var isLoading = true
     @Published private(set) var isRefreshing = false
     @Published var showDetails = false
@@ -88,14 +88,14 @@ final class AppManager: ObservableObject {
     @Published var selection: SidebarItem?
     @Published var activeTab: DetailTab = .health
     @Published var requestedVolumeToTest: String?
-    /// Par identifiant de disque. « Activé » reste affiché jusqu'à ce que l'utilisateur le ferme.
+    /// By drive identifier. “Turned on” stays visible until the user dismisses it.
     @Published private(set) var smartNotices: [String: SmartNotice] = [:]
     @Published private(set) var enablingSmart: Set<String> = []
-    /// Fenêtre principale ouverte. Fermée (mode barre des menus), SwiftUI garde sa hiérarchie de
-    /// vues en vie et continue de la mettre à jour : son contenu est alors remplacé par une vue vide.
+    /// Main window open. When it's closed (menu bar mode), SwiftUI keeps its view hierarchy
+    /// alive and keeps updating it, so its content is replaced by an empty view.
     @Published var isMainWindowVisible = true
 
-    /// Vit aussi longtemps que l'app : changer d'onglet ou de disque n'interrompt pas un test.
+    /// Lives as long as the app: switching tabs or drives doesn't interrupt a test.
     let benchmark = BenchmarkController()
 
     private var refreshTimer: Timer?
@@ -121,15 +121,15 @@ final class AppManager: ObservableObject {
         guard let session = DASessionCreate(kCFAllocatorDefault) else { return }
         daSession = session
 
-        // Seuls les disques entiers nous intéressent : les apparitions de volumes, d'images disque
-        // montées ou de partitions ne relancent pas une découverte complète.
+        // Only whole disks matter: volumes, mounted disk images and partitions
+        // appearing don't trigger a full discovery.
         let match = [kDADiskDescriptionMediaWholeKey as String: true] as CFDictionary
         let callback: DADiskAppearedCallback = { _, context in
             guard let context else { return }
             let manager = Unmanaged<AppManager>.fromOpaque(context).takeUnretainedValue()
             Task { @MainActor in manager.loadDisks() }
         }
-        // AppManager vit aussi longtemps que l'app : une référence non retenue suffit.
+        // AppManager lives as long as the app: an unretained reference is enough.
         let context = Unmanaged.passUnretained(self).toOpaque()
         DARegisterDiskAppearedCallback(session, match, callback, context)
         DARegisterDiskDisappearedCallback(session, match, callback, context)
@@ -137,8 +137,8 @@ final class AppManager: ObservableObject {
     }
 
     private func startTimer() {
-        // Découverte complète toutes les 5 min (espace libre des volumes) ; la santé, elle,
-        // est relue toutes les 30 s par SampleScheduler.
+        // Full discovery every 5 min (free space on volumes); health itself
+        // is read again every 30 s by SampleScheduler.
         let timer = Timer(timeInterval: 300, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.loadDisks(isAutoRefresh: true) }
         }
@@ -156,12 +156,12 @@ final class AppManager: ObservableObject {
             isLoading = false
             return
         }
-        // Pendant un test, la file du disque est saturée : on ne rajoute pas de lectures.
+        // During a test the drive's queue is saturated: no extra reads are added.
         if isAutoRefresh && benchmark.isRunning { return }
 
         loadTask?.cancel()
         loadTask = Task { [weak self] in
-            // Regroupe les rafales d'événements DiskArbitration (branchement, démarrage).
+            // Coalesces bursts of DiskArbitration events (plugging in, startup).
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled, let self else { return }
             self.isRefreshing = true
@@ -169,8 +169,8 @@ final class AppManager: ObservableObject {
 
             let knownIdentify = self.knownIdentifies()
             let (finalDisks, finalVolumes, results) = await Task.detached(priority: .userInitiated) {
-                // Filtre avant toute lecture S.M.A.R.T. : les disques externes, images disque et
-                // disques virtuels ne sont pas affichés, inutile de les interroger.
+                // Filter before any S.M.A.R.T. read: external drives, disk images and
+                // virtual disks aren't shown, so there's no point querying them.
                 let physicalDisks = DiskDiscovery.listPhysicalDisks().filter(DiskFilter.isMonitored)
                 let results = physicalDisks.map { Self.read($0, knownIdentify: knownIdentify[$0.bsdName]) }
                 let (disks, volumes) = DiskFilter.filter(disks: results.map(\.disk), volumes: VolumeDiscovery.listVolumes())
@@ -185,8 +185,8 @@ final class AppManager: ObservableObject {
         }
     }
 
-    /// Lecture complète d'un disque (hors fil principal). En ATA, S.M.A.R.T. désactivé est activé
-    /// une seule fois par disque si le réglage le permet (voir `SmartActivator`).
+    /// Full read of a drive (off the main thread). On ATA, a disabled S.M.A.R.T. is turned on
+    /// once per drive if the setting allows it (see `SmartActivator`).
     nonisolated private static func read(_ physical: PhysicalDisk, knownIdentify: NVMeIdentify?) -> (disk: RealDisk, notice: SmartNotice?) {
         var current = physical
         var snapshot: DiskHealthSnapshot?
@@ -210,14 +210,14 @@ final class AppManager: ObservableObject {
             } catch ATAReadError.smartDisabled {
                 current = physical.withCapability(.unsupported(reason: .smartDisabled))
             } catch {
-                NSLog("Aman Disk : lecture S.M.A.R.T. impossible pour %@ (%@)", physical.bsdName, "\(error)")
+                NSLog("Aman Disk: could not read S.M.A.R.T. data for %@ (%@)", physical.bsdName, "\(error)")
                 current = physical.withCapability(.unsupported(reason: .readFailed(code: "\(error)")))
             }
         }
         return (RealDisk(physical: current, snapshot: snapshot, health: health, lastRead: Date()), notice)
     }
 
-    /// Relevé obtenu et message à afficher ; l'activation réussie entre dans le journal du disque.
+    /// Reading obtained and message to show; a successful activation goes into the drive's log.
     nonisolated private static func handle(_ result: SmartActivationResult) -> (DiskHealthSnapshot?, SmartNotice?) {
         switch result {
         case .read(let snapshot):
@@ -246,7 +246,7 @@ final class AppManager: ObservableObject {
         smartNotices[diskId] = nil
     }
 
-    /// Activation demandée par l'utilisateur (« Activer S.M.A.R.T.… » ou « Réessayer »).
+    /// Activation requested by the user (“Turn On S.M.A.R.T.…” or “Try Again”).
     func enableSmart(diskId: String) {
         guard !Self.isDemo, let disk = disk(withId: diskId), !enablingSmart.contains(diskId) else { return }
         enablingSmart.insert(diskId)
@@ -256,7 +256,7 @@ final class AppManager: ObservableObject {
                 do {
                     return AppManager.handle(try SmartActivator(memory: AppManager.smartMemory).enable(bsdName: bsdName))
                 } catch {
-                    // Activé, mais la relecture a échoué : la prochaine découverte s'en chargera.
+                    // Turned on, but reading it again failed: the next discovery will take care of it.
                     return (nil, nil)
                 }
             }.value
@@ -279,7 +279,7 @@ final class AppManager: ObservableObject {
         return result
     }
 
-    /// Publie la nouvelle liste et signale les branchements et changements d'état.
+    /// Publishes the new list and reports drives being plugged in and status changes.
     private func apply(disks newDisks: [RealDisk], announceChanges: Bool) {
         if announceChanges {
             let oldById = Dictionary(disks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -311,19 +311,19 @@ final class AppManager: ObservableObject {
         }
     }
 
-    /// Vrai pendant un test de performances : son échantillonneur prend le relais des mesures.
+    /// True during a performance test: its sampler takes over the readings.
     var isBenchmarkRunning: Bool { benchmark.isRunning }
 
-    /// Mesure légère pour la surveillance continue : relit la santé des disques internes déjà
-    /// connus (sans nouvelle découverte), enregistre un échantillon et met à jour l'affichage.
+    /// Lightweight reading for continuous monitoring: reads the health of the internal drives already
+    /// known again (no new discovery), records a sample and updates the display.
     func sampleNow() async {
         if Self.isDemo { return }
         let targets = disks.filter { $0.physical.isInternal && $0.physical.healthCapability == .supported && $0.snapshot != nil }
         guard !targets.isEmpty else { return }
 
         let updated: [RealDisk] = await Task.detached(priority: .utility) {
-            // Une seule lecture à la fois : les disques sont lus l'un après l'autre.
-            // En NVMe, seules les 512 octets du journal SMART sont relus (Identify ne change pas).
+            // One read at a time: drives are read one after the other.
+            // On NVMe, only the 512 bytes of the SMART log are read again (Identify doesn't change).
             targets.compactMap { disk -> RealDisk? in
                 let snapshot: DiskHealthSnapshot?
                 switch disk.physical.protocolType {
@@ -346,7 +346,7 @@ final class AppManager: ObservableObject {
         apply(disks: newDisks, announceChanges: true)
     }
 
-    /// Relevé pris par le test de performances : garde l'historique et l'affichage à jour.
+    /// Reading taken by the performance test: keeps the history and the display up to date.
     func recordBenchmarkSnapshot(_ snapshot: DiskHealthSnapshot, date: Date, diskId: String) {
         guard let index = disks.firstIndex(where: { $0.id == diskId }) else { return }
         var newDisks = disks
@@ -354,7 +354,7 @@ final class AppManager: ObservableObject {
         apply(disks: newDisks, announceChanges: true)
     }
 
-    /// Disque physique qui porte le volume de démarrage (« / »), sinon le premier disque interne.
+    /// Physical drive that holds the startup volume (“/”), otherwise the first internal drive.
     var bootDisk: RealDisk? {
         if let root = volumes.first(where: { $0.mountPoint == "/" }),
            let disk = disks.first(where: { root.physicalDiskBSDNames.contains($0.physical.bsdName) }) {

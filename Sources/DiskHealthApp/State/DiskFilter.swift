@@ -1,9 +1,9 @@
 import Foundation
 import DiskHealthCore
 
-/// Disques affichés par l'app (0.9 : disques internes seulement).
+/// Drives shown by the app (0.9: internal drives only).
 enum DiskFilter {
-    /// Disque surveillé : interne, ni USB, ni virtuel, ni image disque.
+    /// Monitored drive: internal, not USB, not virtual, not a disk image.
     static func isMonitored(_ disk: PhysicalDisk) -> Bool {
         disk.isInternal && disk.connection != .usb && !disk.isVirtual && !disk.isDiskImage
             && disk.protocolType != .virtualDisk
@@ -12,7 +12,7 @@ enum DiskFilter {
     static func filter(disks: [RealDisk], volumes: [Volume]) -> (disks: [RealDisk], volumes: [Volume]) {
         let filteredDisks = disks.filter { isMonitored($0.physical) }
         let names = Set(filteredDisks.map(\.physical.bsdName))
-        // Rattachement par disque physique (et non par nom de volume, qui peut être en double).
+        // Matched by physical disk (not by volume name, which can be duplicated).
         let filteredVols = volumes.filter { v in v.physicalDiskBSDNames.contains(where: names.contains) }
         return (filteredDisks, filteredVols)
     }

@@ -5,11 +5,11 @@ public protocol TemperatureSamplerDelegate: AnyObject {
     func temperatureSamplerDidUpdate(_ temp: Int)
 }
 
-/// Relève la température du disque pendant un test de performances (toutes les 2 s en NVMe, 5 s sinon).
+/// Records the drive temperature during a performance test (every 2 s for NVMe, 5 s otherwise).
 ///
-/// Minuterie GCD sur une file série : l'ancienne version bloquait sa propre file avec
-/// `RunLoop.run()`, si bien qu'aucune mesure n'était prise après la première (l'arrêt de sécurité
-/// à 70 °C ne pouvait jamais se déclencher) et que le fil et la minuterie fuyaient à chaque test.
+/// GCD timer on a serial queue: the old version blocked its own queue with
+/// `RunLoop.run()`, so no reading was taken after the first one (the safety stop at
+/// 70 °C could never trigger), and the thread and timer leaked on every test.
 public final class TemperatureSampler: @unchecked Sendable {
     private let bsdName: String
     private let protocolType: StorageProtocol
@@ -22,7 +22,7 @@ public final class TemperatureSampler: @unchecked Sendable {
     private var _maxTempC: Int?
 
     public weak var delegate: TemperatureSamplerDelegate?
-    /// Chaque relevé complet, pour que l'historique de température n'ait pas de trou pendant le test.
+    /// Every full reading, so the temperature history has no gap during the test.
     public var onSnapshot: ((DiskHealthSnapshot, Date) -> Void)?
 
     public var currentTempC: Int? { lock.withLock { _currentTempC } }
@@ -38,8 +38,8 @@ public final class TemperatureSampler: @unchecked Sendable {
         timer?.cancel()
     }
 
-    /// Démarre les mesures. La première est prise immédiatement, de façon synchrone :
-    /// la température de départ est donc connue dès le retour de cette fonction.
+    /// Starts the readings. The first one is taken immediately and synchronously,
+    /// so the starting temperature is known as soon as this function returns.
     public func start() {
         queue.sync { self.sample() }
         let interval: TimeInterval = protocolType == .nvme ? 2.0 : 5.0
@@ -57,7 +57,7 @@ public final class TemperatureSampler: @unchecked Sendable {
         }
     }
 
-    /// À appeler sur `queue`.
+    /// Call on `queue`.
     private func sample() {
         let snapshot: DiskHealthSnapshot?
         switch protocolType {

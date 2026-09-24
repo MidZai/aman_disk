@@ -1,7 +1,7 @@
 import SwiftUI
 import DiskHealthCore
 
-// Couleurs, libellés et symboles centralisés : une seule définition pour toutes les vues et rapports.
+// Colors, labels and symbols in one place: a single definition for all views and reports.
 extension HealthStatus {
     public var color: Color {
         switch self {
@@ -32,7 +32,7 @@ extension HealthStatus {
 }
 
 extension AttributeState {
-    /// Couleur du texte dans le tableau S.M.A.R.T.
+    /// Text color in the S.M.A.R.T. table.
     var tableColor: Color {
         switch self {
         case .normal, .informational: return .primary
@@ -41,7 +41,7 @@ extension AttributeState {
         }
     }
 
-    /// Couleur de la pastille d'état.
+    /// Color of the status dot.
     var dotColor: Color {
         switch self {
         case .normal:        return .green
@@ -51,7 +51,7 @@ extension AttributeState {
         }
     }
 
-    /// Libellé de la colonne « État ».
+    /// Label of the “Status” column.
     var localizedLabel: String {
         switch self {
         case .normal:        return "Normal"
@@ -77,7 +77,7 @@ extension TemperatureStatus {
 }
 
 extension PhysicalDisk {
-    /// « NVMe », « PCIe AHCI », « SATA »… (une seule définition, auparavant copiée dans 5 vues).
+    /// “NVMe”, “PCIe AHCI”, “SATA”… (defined once; it used to be copied into 5 views).
     var interfaceLabel: String {
         switch protocolType {
         case .nvme: return "NVMe"
@@ -97,6 +97,13 @@ extension PhysicalDisk {
     }
 
     var locationLabel: String { isInternal ? L("Internal", "Interne") : L("External", "Externe") }
+
+    /// “Internal SSD”, “SSD interne”: the word order differs between the two languages.
+    var mediumAndLocationLabel: String {
+        if Localization.isFrench { return "\(mediumLabel) \(locationLabel.lowercased())" }
+        let medium = mediumType == .solidState ? mediumLabel : mediumLabel.lowercased()
+        return "\(locationLabel) \(medium)"
+    }
 
     var mediumLabel: String {
         switch mediumType {

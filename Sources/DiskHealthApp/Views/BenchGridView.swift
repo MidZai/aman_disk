@@ -3,11 +3,11 @@ import AppKit
 import BenchmarkCore
 import DiskHealthCore
 
-/// Ce que la grille doit afficher : un résultat terminé, ou le test en cours.
+/// What the grid must show: a finished result, or the test in progress.
 struct BenchGridContent {
     var tests: [TestResult]
     var profile: BenchProfile
-    /// Test en cours (nil si le résultat est terminé).
+    /// Test in progress (nil if the result is finished).
     var liveState: BenchmarkState?
 
     func result(_ spec: BenchTestSpec, _ direction: BenchDirection) -> TestResult? {
@@ -15,8 +15,8 @@ struct BenchGridContent {
     }
 }
 
-/// Couleurs des barres : bleu pour la lecture, orange pour l'écriture.
-/// Paire vérifiée (daltonisme, contraste) en clair et en sombre.
+/// Bar colors: blue for reads, orange for writes.
+/// Pair checked (color blindness, contrast) in light and dark mode.
 enum BenchColors {
     static let read = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
@@ -30,15 +30,15 @@ enum BenchColors {
     }
 }
 
-/// Échelle des barres : chaque test est comparé à un SSD NVMe rapide récent (valeurs en Mo/s).
-/// Le rapport est le même en Mo/s et en IOPS : la barre ne change pas avec l'unité.
+/// Bar scale: each test is compared with a fast recent NVMe SSD (values in MB/s).
+/// The ratio is the same in MB/s and in IOPS, so the bar doesn't change with the unit.
 enum BenchScale {
     static func referenceMegabytesPerSecond(for spec: BenchTestSpec, direction: BenchDirection) -> Double {
         switch spec.id {
         case "SEQ1M_QD8": return 7_000
         case "SEQ1M_QD1": return 5_000
         case "RND4K_QD64": return 2_500
-        // En 4K QD1, les écritures passent par le cache du disque : bien plus rapides que les lectures.
+        // At 4K QD1, writes go through the drive's cache: much faster than reads.
         case "RND4K_QD1": return direction == .read ? 100 : 300
         default: return spec.pattern == .sequential ? 7_000 : 2_500
         }
@@ -172,7 +172,7 @@ struct BenchGridCell: View {
         .accessibilityValue(accessibilityValue)
     }
 
-    /// Valeur + unité, puis la jauge colorée.
+    /// Value + unit, then the colored gauge.
     private func cellBody(value: String, fraction: Double?, footnote: String?, isLive: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -257,7 +257,7 @@ struct BenchGridCell: View {
     }
 }
 
-/// Jauge horizontale : piste discrète, remplissage coloré arrondi.
+/// Horizontal gauge: subtle track, rounded colored fill.
 private struct SpeedBar: View {
     let fraction: Double
     let color: Color
@@ -270,7 +270,7 @@ private struct SpeedBar: View {
                 if fraction > 0 {
                     Capsule()
                         .fill(color)
-                        // Une valeur non nulle reste visible, même très faible.
+                        // A non-zero value stays visible, even when very small.
                         .frame(width: max(6, geo.size.width * fraction))
                 }
             }

@@ -1,19 +1,19 @@
 import Foundation
 
 public enum HealthEngine {
-    /// En dessous de ce pourcentage de durée de vie restante, le disque passe « À surveiller ».
-    /// Même seuil que le passage au rouge de l'anneau (charte : rouge à 25 % et moins) : un anneau
-    /// rouge à côté de « En bonne santé » serait contradictoire.
+    /// Below this remaining-life percentage, the drive becomes “Needs attention”.
+    /// Same threshold as the ring turning red (brand guide: red at 25% and below): a red
+    /// ring next to “Healthy” would be contradictory.
     public static let lowLifeThreshold = 25
 
     public static func evaluate(smart: NVMeSmartLog, identify: NVMeIdentify) -> HealthAssessment {
         var reasons: [String] = []
         var status: HealthStatus = .good
 
-        // « Pourcentage utilisé » peut dépasser 100 : la durée de vie restante est alors de 0 %.
+        // “Percentage used” can exceed 100: remaining life is then 0%.
         let healthPercent = max(0, 100 - Int(smart.percentageUsed))
 
-        // Défaillances (bits 0, 2, 3 et 4 de « Critical Warning »).
+        // Failures (bits 0, 2, 3 and 4 of “Critical Warning”).
         let spareReason = L("Spare capacity has dropped below the manufacturer's threshold.", "La réserve de secours est passée sous le seuil du fabricant.")
         if (smart.criticalWarning & 0b0001_1101) != 0 {
             status = .bad
@@ -26,11 +26,11 @@ public enum HealthEngine {
             status = .bad
             if !reasons.contains(spareReason) { reasons.append(spareReason) }
         }
-        // À surveiller. Ces constats sont listés même si l'état est déjà « Défaillance probable » :
-        // l'utilisateur doit voir tout ce qui ne va pas, pas seulement le plus grave.
+        // Needs attention. These findings are listed even if the status is already “Likely failing”:
+        // the user must see everything that's wrong, not just the most serious problem.
         var cautionReasons: [String] = []
         if smart.percentageUsed >= 100 {
-            // Au-delà de 100 %, l'endurance garantie est dépassée, sans panne certaine pour autant.
+            // Beyond 100%, the rated endurance is exceeded, but a failure isn't certain.
             cautionReasons.append(L("The manufacturer's rated endurance is fully used up (\(smart.percentageUsed)% used).", "L'endurance prévue par le fabricant est entièrement consommée (\(smart.percentageUsed) % utilisés)."))
         } else if healthPercent <= lowLifeThreshold {
             cautionReasons.append(L("Remaining life is low (\(healthPercent)%).", "La durée de vie restante est faible (\(healthPercent) %)."))
@@ -43,9 +43,9 @@ public enum HealthEngine {
             reasons += cautionReasons
         }
 
-        // La température n'entre pas dans l'état de santé : une chauffe passagère (copie, test)
-        // ferait basculer l'état et déclencher des alertes « changement d'état » à tort.
-        // Elle a son propre indicateur et sa propre alerte (5 min au-dessus du seuil).
+        // Temperature doesn't count toward the health status: a short burst of heat (copy, test)
+        // would flip the status and wrongly trigger “status change” alerts.
+        // It has its own indicator and its own alert (5 min above the threshold).
 
         if status == .good {
             reasons.append(L("No problems detected.", "Aucune anomalie détectée."))

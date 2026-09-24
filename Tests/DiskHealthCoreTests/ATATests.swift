@@ -118,8 +118,8 @@ import Foundation
         let evalCautionAttr = ATAHealthEvaluator.evaluate(snapshot: snapCautionAttr)
         #expect(evalCautionAttr.status == HealthStatus.caution)
         
-        // Température élevée : indicateur et alerte à part, l'état de santé ne change pas
-        // (une chauffe passagère ne doit pas déclencher une alerte « changement d'état »).
+        // High temperature: separate indicator and alert, the health status doesn't change
+        // (a short burst of heat must not trigger a “status change” alert).
         let tempAttr = [(id: UInt8(0xC2), flags: UInt16(0), current: UInt8(100), worst: UInt8(100), raw: [UInt8]([62, 0, 0, 0, 0, 0]))]
         let smartTemp = makeATASmartData(attributes: tempAttr)
         let snapTemp = ATASmartParser.parse(smartData: smartTemp, thresholdsData: threshGood, identifyData: identifyData, statusExceeded: false)!
@@ -148,7 +148,7 @@ import Foundation
         #expect(attrAEInfo.role == .hostReadsBytes(multiplier: 1048576))
         
         let samsungProfile = ATACatalog.profile(for: "Samsung SSD 870 EVO 1TB")
-        #expect(samsungProfile.name == "Samsung")   // I2: was wrongly "GenericATA" before fix
+        #expect(samsungProfile.name == "Samsung")   // was wrongly "GenericATA" before the fix
         
         let attrB1Info = ATACatalog.attributeInfo(id: 0xB1, profile: samsungProfile)
         #expect(attrB1Info.role == .lifeRemainingPercentNormalized)

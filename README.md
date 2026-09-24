@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="Branding/Aman-Disk-brand/logo/aman-disk-logo-sombre.svg">
-    <source media="(prefers-color-scheme: light)" srcset="Branding/Aman-Disk-brand/logo/aman-disk-logo-clair.svg">
-    <img alt="Aman Disk" src="Branding/Aman-Disk-brand/logo/aman-disk-logo-clair.svg" width="300">
+    <source media="(prefers-color-scheme: dark)" srcset="Branding/Aman-Disk-brand/logo/aman-disk-logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="Branding/Aman-Disk-brand/logo/aman-disk-logo-light.svg">
+    <img alt="Aman Disk" src="Branding/Aman-Disk-brand/logo/aman-disk-logo-light.svg" width="300">
   </picture>
 </p>
 
@@ -38,10 +38,10 @@ Internal NVMe and SATA drives today. External USB drives are coming in version 1
 - **NVMe and ATA/AHCI health**: reads S.M.A.R.T. data from NVMe SSDs, Apple PCIe AHCI SSDs and SATA drives, with a clear status (“Healthy”, “Needs attention”, “Likely failing”) and the remaining life when the drive reports it.
 - **Attributes explained**: every S.M.A.R.T. attribute has a readable name and an explanation; values are converted to their unit (°C, hours, TB), or shown as raw hexadecimal on request.
 - **Temperature history**: one reading every 30 seconds, kept at full resolution for 24 hours, then as averages for 30 days; charts over 1 hour, 24 hours, 7 days and 30 days. Each reading adds about 170 bytes to the history, so the app doesn't wear out the drive it watches.
-- **Performance test**: sequential and random reads and writes. The test file is always deleted.
+- **Performance test**: sequential and random reads and writes, with large and small blocks at several queue depths. The test file is always deleted.
 - **Menu bar**: status and temperature of each internal drive, with the last hour's curve. The app can stay there when its window is closed.
 - **Live Dock icon**: the ring around the icon follows the health of the startup drive.
-- **Alerts**: a notification when a drive changes status, stays too hot, or drops below 50 %, 25 % or 10 % of its life (off by default).
+- **Alerts**: a notification when a drive changes status, stays too hot, or drops below 50%, 25% or 10% of its life (off by default).
 - **Reports**: PDF, text or JSON export, with the serial number masked by default.
 - **English and French** interface.
 
@@ -53,15 +53,37 @@ Internal NVMe and SATA drives today. External USB drives are coming in version 1
 
 ## Installation
 
-1. Download `Aman-Disk-0.9.1.dmg` from the [releases page](https://github.com/MidZai/aman_disk/releases/latest).
-2. Open the DMG and drag **Aman Disk** into the **Applications** folder.
-3. The app isn't notarized by Apple, so macOS blocks it on first launch. Go to **System Settings › Privacy & Security** and click **“Open Anyway”**. You only need to do this once.
+1. Download the DMG (`Aman-Disk-<version>.dmg`) from the [latest release](https://github.com/MidZai/aman_disk/releases/latest).
+2. Open it and drag **Aman Disk** into the **Applications** folder.
+3. Open Aman Disk. The first time, macOS blocks it: follow the steps below. You only need to do this once.
+
+### macOS says Aman Disk can't be opened
+
+Aman Disk is free and open source, but it isn't signed with a paid Apple Developer ID, so macOS can't verify who made it and blocks it the first time. The source code is all here, and you can [build the app yourself](#build-from-source).
+
+**macOS 15 Sequoia or later**
+
+1. Open Aman Disk, then click **Done** in the warning.
+2. Go to **System Settings › Privacy & Security** and scroll down to **Security**.
+3. Next to “Aman Disk was blocked to protect your Mac”, click **Open Anyway**, then confirm with your password or Touch ID.
+
+If the **Open Anyway** button isn't there, open Aman Disk once more, then go back to System Settings.
+
+**macOS 14 Sonoma**: in the **Applications** folder, Control-click **Aman Disk**, choose **Open**, then click **Open**.
+
+**Or, in Terminal** (any version), remove the download flag that macOS checks:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Aman Disk.app"
+```
+
+The DMG contains the same steps in **How to Install.txt**.
 
 ### Build from source
 
 ```bash
 scripts/bundle.sh --release   # Aman Disk.app, universal binary
-scripts/make-dmg.sh           # dist/Aman-Disk-0.9.1.dmg
+scripts/make-dmg.sh           # dist/Aman-Disk-<version>.dmg
 scripts/test.sh               # full test suite (also works without Xcode)
 ```
 
@@ -82,9 +104,9 @@ The main goal of version 1.0 is **external USB drives**: reading the health of S
 
 The name has three meanings, and all of them fit an app that watches over your drives:
 
-- In **Arabic**, *amān* (أمان) means safety and security, and also peace of mind: the calm of knowing you are protected.
-- In **Kabyle**, *aman* means water, hence the drop at the center of the icon. The ring around it is also the letter ⴰ of the Tifinagh alphabet.
+- In **Kabyle**, *aman* means water, hence the drop at the center of the icon. The ring around it is also ⴰ, the letter A of the Tifinagh alphabet.
 - In **Tolkien**'s world, Aman is the Blessed Realm, the land in the far West where the Valar live. It is Gandalf's original home: before coming to Middle-earth, he lived there as Olórin, in the gardens of Lórien in Valinor.
+- In **Arabic**, *amān* (أمان) means safety and security, and also peace of mind: the calm of knowing you are protected.
 
 ## Support the project
 

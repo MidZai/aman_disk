@@ -1,7 +1,7 @@
-// Lanceur de tests pour les Command Line Tools seuls (sans Xcode).
-// L'assistant de SwiftPM est signé par Apple avec la validation des bibliothèques : depuis macOS 26,
-// il refuse de charger le paquet de tests signé localement. Ce lanceur fait la même chose
-// (dlopen du paquet, puis point d'entrée de Swift Testing), sans cette restriction.
+// Test runner for the Command Line Tools alone (without Xcode).
+// SwiftPM's helper is signed by Apple with library validation: since macOS 26,
+// it refuses to load the locally signed test bundle. This runner does the same thing
+// (dlopen of the bundle, then the Swift Testing entry point), without that restriction.
 import Darwin
 import Testing
 
@@ -10,11 +10,11 @@ struct TestRunner {
     static func main() async {
         var args = CommandLine.arguments.dropFirst()
         guard let bundle = args.popFirst() else {
-            fputs("usage: TestRunner <paquet de tests> [arguments de swift-testing]\n", stderr)
+            fputs("usage: TestRunner <test bundle> [swift-testing arguments]\n", stderr)
             exit(2)
         }
         guard dlopen(bundle, RTLD_NOW) != nil else {
-            fputs("Impossible de charger \(bundle) : \(String(cString: dlerror()))\n", stderr)
+            fputs("Couldn't load \(bundle): \(String(cString: dlerror()))\n", stderr)
             exit(1)
         }
         exit(await Testing.__swiftPMEntryPoint(passing: nil))

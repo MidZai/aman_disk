@@ -11,7 +11,7 @@ public enum ATASmartParser {
         return String(bytes: chars, encoding: .ascii)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    // B4: Compute a checksum using UInt to avoid any intermediate overflow.
+    // Compute the checksum using UInt to avoid any intermediate overflow.
     private static func verifyChecksum(_ data: Data) -> Bool {
         let sum = data.prefix(512).reduce(UInt(0)) { $0 + UInt($1) }
         return sum % 256 == 0
@@ -22,7 +22,7 @@ public enum ATASmartParser {
             return nil
         }
 
-        // B3+B4: Verify checksums for both SMART data and thresholds.
+        // Verify the checksums of both the SMART data and the thresholds.
         let checksumValid = verifyChecksum(smartData)
         let thresholdsChecksumValid = verifyChecksum(thresholdsData)
 

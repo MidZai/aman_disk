@@ -13,8 +13,8 @@ enum DiskIconProvider {
         icon(for: disk.physical)
     }
 
-    /// Icône Finder du volume, mise en cache : `NSWorkspace.icon(forFile:)` interroge le système
-    /// de fichiers, et la barre latérale est redessinée à chaque relevé (toutes les 30 s).
+    /// Finder icon of the volume, cached: `NSWorkspace.icon(forFile:)` queries the file
+    /// system, and the sidebar is redrawn on every reading (every 30 s).
     @MainActor
     static func icon(for volume: Volume) -> some View {
         Image(nsImage: cachedIcon(path: volume.mountPoint))

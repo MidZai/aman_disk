@@ -6,8 +6,8 @@ enum BenchUnit: String {
     case mbps, iops
 }
 
-/// Réglages et historique de l'onglet Performances pour un disque. Le test lui-même est porté
-/// par `BenchmarkController` (dans AppManager) et survit à la disparition de la vue.
+/// Settings and history of the Performance tab for one drive. The test itself is owned
+/// by `BenchmarkController` (in AppManager) and outlives the view.
 @MainActor
 final class PerformanceViewModel: ObservableObject {
     static let sizes: [UInt64] = [1 << 30, 4 << 30, 16 << 30]
@@ -20,7 +20,7 @@ final class PerformanceViewModel: ObservableObject {
     @Published var selectedUnit: BenchUnit = .mbps
     @Published var showConfirm = false
     @Published private(set) var history: [BenchmarkResult] = []
-    /// Résultat de l'historique choisi par l'utilisateur ; nil = dernier résultat.
+    /// History result picked by the user; nil = latest result.
     @Published var viewedResult: BenchmarkResult?
 
     let disk: RealDisk
@@ -50,13 +50,13 @@ final class PerformanceViewModel: ObservableObject {
         Task { await loadHistory() }
     }
 
-    /// Hors du fil principal : la vérification écrit un petit fichier sur chaque volume.
+    /// Off the main thread: the check writes a small file on each volume.
     func resolveTargets() {
         resolveTask?.cancel()
         isResolvingTargets = true
         let volumes = appManager.volumes(on: disk)
-            // « / » (volume système scellé) et « /System/Volumes/Data » partagent le même
-            // dossier de test : on ne propose que le second s'ils sont tous deux présents.
+            // “/” (sealed system volume) and “/System/Volumes/Data” share the same
+            // test folder: only the second is offered if both are present.
             .sorted { $0.mountPoint.count > $1.mountPoint.count }
         let physical = appManager.disks.map(\.physical)
         let size = selectedSize

@@ -2,9 +2,6 @@ import Foundation
 import DiskHealthCore
 import BenchmarkCore
 
-// L'outil en ligne de commande est encore entièrement en français : on y garde les textes du cœur en français.
-Localization.language = .french
-
 let args = CommandLine.arguments
 
 func printHexDump(data: Data, limit: Int? = nil) {
@@ -54,7 +51,7 @@ if args.count > 1 {
             case .unsupported(let reason):
                 capabilityStr = "unsupported(\(reason.rawValue))"
             }
-            print("\(disk.bsdName) : \(disk.protocolType.rawValue), \(disk.mediumType.rawValue), \(capabilityStr)")
+            print("\(disk.bsdName): \(disk.protocolType.rawValue), \(disk.mediumType.rawValue), \(capabilityStr)")
         }
     } else if command == "raw" {
         if args.count < 3 {
@@ -232,9 +229,10 @@ if args.count > 1 {
                 print(String(format: "%-8@ %-20@ %6.1f GB  %-8@ %-30@ (Phys: %@)", vol.bsdName, vol.name, sizeGB, vol.format, vol.mountPoint, phys))
             }
         }
-        } else if command == "bench" {
+    } else if command == "bench" {
         BenchCLI.run(args: Array(args.dropFirst(2)))
-    } else {        print("Unknown command: \(command)")
+    } else {
+        print("Unknown command: \(command)")
     }
 } else {
     print("diskprobe OK")

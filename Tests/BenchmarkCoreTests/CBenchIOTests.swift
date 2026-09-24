@@ -26,7 +26,7 @@ import CBenchIO
         var st = stat()
         #expect(stat(tempFile, &st) == 0)
         #expect(UInt64(st.st_size) == size)
-        #expect(UInt64(st.st_blocks) * 512 >= size, "Fichier ne doit pas être creux")
+        #expect(UInt64(st.st_blocks) * 512 >= size, "File must not be sparse")
         
         let handle = FileHandle(forReadingAtPath: tempFile)!
         let data = handle.readData(ofLength: 4096)
@@ -34,7 +34,7 @@ import CBenchIO
         
         #expect(data.count == 4096)
         let zeros = Data(repeating: 0, count: 4096)
-        #expect(data != zeros, "Fichier ne doit pas être rempli de zéros")
+        #expect(data != zeros, "File must not be filled with zeros")
     }
     
     @Test func testRunPassSeqReadQD1() {
@@ -85,7 +85,7 @@ import CBenchIO
         
         #expect(err == 0)
         #expect(result.error == 0)
-        #expect(result.bytes == size, "Passe d'écriture séquentielle doit correspondre exactement à file_size")
+        #expect(result.bytes == size, "Sequential write pass must match file_size exactly")
     }
     
     @Test func testRunPassRndQD1WithLatencies() {
@@ -101,7 +101,7 @@ import CBenchIO
             block_size: 4096,
             queue_depth: 1,
             file_size: size,
-            max_seconds: 0.1, // Court
+            max_seconds: 0.1, // Short
             max_bytes: 0
         )
         
@@ -150,6 +150,6 @@ import CBenchIO
         
         #expect(err == -100)
         #expect(result.error == -100)
-        #expect(elapsed < 1.0, "Doit retourner en moins d'une seconde")
+        #expect(elapsed < 1.0, "Must return in less than a second")
     }
 }

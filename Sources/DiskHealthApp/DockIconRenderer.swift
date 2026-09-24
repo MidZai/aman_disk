@@ -2,12 +2,12 @@ import AppKit
 import SwiftUI
 import DiskHealthCore
 
-/// Icône vivante du Dock : fond squircle encre, piste blanche à 16 %, arc coloré, goutte blanche.
-/// Reproduit `etats-sante/icone-app-svg/aman-XXX.svg` du kit de marque.
+/// Live Dock icon: ink squircle background, white track at 16%, colored arc, white drop.
+/// Reproduces `health-states/app-icon-svg/aman-XXX.svg` from the brand kit.
 enum DockIconRenderer {
-    /// Ce qui détermine l'icône : on ne redessine que si l'une de ces valeurs change.
+    /// What determines the icon: it's redrawn only when one of these values changes.
     struct State: Equatable {
-        /// Pourcentage de durée de vie arrondi à 1 %, nil si le disque ne le fournit pas.
+        /// Life percentage rounded to 1%, nil if the drive doesn't report it.
         let percent: Int?
         let level: AmanPalette.Level
 
@@ -22,14 +22,14 @@ enum DockIconRenderer {
             if known != nil {
                 self.level = AmanPalette.level(health: health, capability: capability)
             } else {
-                // Pourcentage inconnu : jauge figée à 80 % (icône officielle), couleur de l'état seulement.
+                // Unknown percentage: gauge fixed at 80% (official icon), status color only.
                 self.level = AmanPalette.level(health: HealthAssessment(status: health.status, healthPercent: nil, reasons: []), capability: capability)
             }
         }
 
-        /// Pourcentage inconnu et état bon : c'est exactement l'icône officielle.
+        /// Unknown percentage and good status: this is exactly the official icon.
         var isOfficialIcon: Bool { percent == nil && level == .water }
-        /// Arc dessiné : le pourcentage réel, ou 80 % (icône officielle) s'il est inconnu.
+        /// Arc drawn: the real percentage, or 80% (official icon) if it's unknown.
         var drawnPercent: Int { percent ?? 80 }
     }
 
@@ -43,7 +43,7 @@ enum DockIconRenderer {
         }
     }
 
-    /// Squircle du kit : superellipse d'exposant 5, centre (512, 512), demi-côté 412.
+    /// The kit's squircle: superellipse with exponent 5, center (512, 512), half-side 412.
     static func squirclePath() -> CGPath {
         let path = CGMutablePath()
         let c: CGFloat = 512, r: CGFloat = 412, n: CGFloat = 5
@@ -59,16 +59,16 @@ enum DockIconRenderer {
         return path
     }
 
-    /// Rendu 1024 × 1024 (repère SVG, origine en haut à gauche).
+    /// 1024 × 1024 rendering (SVG coordinates, origin at the top left).
     static func cgImage(state: State) -> CGImage? {
         let size = Int(canvas)
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-        // Repère SVG : y vers le bas.
+        // SVG coordinates: y points down.
         ctx.translateBy(x: 0, y: canvas)
         ctx.scaleBy(x: 1, y: -1)
 
-        // Fond encre avec l'ombre du kit (dy 10, flou 10, noir 30 %).
+        // Ink background with the kit's shadow (dy 10, blur 10, black 30%).
         ctx.saveGState()
         ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 20, color: CGColor(gray: 0, alpha: 0.3))
         ctx.setFillColor(CGColor(srgbRed: 0x0B / 255, green: 0x22 / 255, blue: 0x30 / 255, alpha: 1))
@@ -76,7 +76,7 @@ enum DockIconRenderer {
         ctx.fillPath()
         ctx.restoreGState()
 
-        // Glyphe : translate(100 100) scale(8.24).
+        // Glyph: translate(100 100) scale(8.24).
         ctx.translateBy(x: 100, y: 100)
         ctx.scaleBy(x: 8.24, y: 8.24)
         let center = AmanRingGeometry.center
@@ -97,7 +97,7 @@ enum DockIconRenderer {
             let sweep = AmanRingGeometry.sweep(fraction: Double(p) / 100)
             let start = -CGFloat.pi / 2
             ctx.setLineCap(.round)
-            // Repère y vers le bas : angle croissant = sens horaire à l'écran.
+            // y points down: an increasing angle is clockwise on screen.
             ctx.addArc(center: center, radius: r, startAngle: start, endAngle: start + sweep, clockwise: false)
             ctx.strokePath()
         }

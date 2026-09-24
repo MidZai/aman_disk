@@ -1,9 +1,9 @@
 import Foundation
 
-/// Événement notable de la vie d'un disque, vu par Aman.
+/// Notable event in a drive's life, as seen by Aman.
 public struct DiskEvent: Codable, Equatable, Hashable {
     public enum Kind: String, Codable {
-        /// S.M.A.R.T. était désactivé ; Aman l'a activé.
+        /// S.M.A.R.T. was disabled; Aman turned it on.
         case smartEnabled
     }
 
@@ -16,8 +16,8 @@ public struct DiskEvent: Codable, Equatable, Hashable {
     }
 }
 
-/// Journal des événements, un fichier JSON par disque (même clé que l'historique).
-/// Dans son propre dossier : effacer l'historique de température ne l'efface pas.
+/// Event log, one JSON file per drive (same key as the history).
+/// In its own folder: clearing the temperature history doesn't clear it.
 public final class DiskEventLog: @unchecked Sendable {
     public static var shared = DiskEventLog()
 

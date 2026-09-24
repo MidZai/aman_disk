@@ -1,8 +1,8 @@
 import SwiftUI
 import DiskHealthCore
 
-/// Anneau-jauge de l'en-tête : fond encre, piste, arc de durée de vie, goutte.
-/// Même géométrie que l'icône du Dock et de la barre des menus (`AmanRingGeometry`).
+/// Header ring gauge: ink background, track, life arc, drop.
+/// Same geometry as the Dock and menu bar icons (`AmanRingGeometry`).
 struct HealthRingView: View {
     let health: HealthAssessment
     let capability: HealthCapability
@@ -30,7 +30,7 @@ struct HealthRingView: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .onAppear { animate(to: target) }
-        // Le relevé change (toutes les 30 s) : l'arc suit, sans repartir de zéro.
+        // The reading changes (every 30 s): the arc follows without starting from zero.
         .onChange(of: target) { animate(to: target) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
@@ -53,8 +53,8 @@ struct HealthRingView: View {
     }
 }
 
-/// Arc qui part de midi, dans le sens horaire, avec la règle de longueur de l'icône
-/// (les bouts arrondis ne font pas paraître la jauge plus remplie qu'elle ne l'est).
+/// Arc starting at noon, clockwise, with the icon's length rule
+/// (the round caps don't make the gauge look fuller than it is).
 private struct AmanArc: Shape {
     var fraction: Double
 
@@ -69,7 +69,7 @@ private struct AmanArc: Shape {
         let scale = side / 100
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let radius = AmanRingGeometry.radius * scale
-        // `sweep` est défini dans le repère 100 × 100 : l'angle ne dépend pas de l'échelle.
+        // `sweep` is defined in the 100 × 100 space: the angle doesn't depend on the scale.
         let sweep = AmanRingGeometry.sweep(fraction: fraction)
         var path = Path()
         path.addArc(center: center, radius: radius, startAngle: .radians(-.pi / 2),

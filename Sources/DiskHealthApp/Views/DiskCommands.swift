@@ -116,7 +116,7 @@ struct DiskCommands: Commands {
         )
         
         let line4 = NSAttributedString(
-            string: L("Aman means “water” in Kabyle. The ring is also the letter ⴰ of the Tifinagh alphabet.\n", "Aman signifie « eau » en kabyle. L'anneau est aussi la lettre ⴰ de l'alphabet tifinagh.\n"),
+            string: L("Aman means “water” in Kabyle. The ring is also ⴰ, the letter A of the Tifinagh alphabet.\n", "Aman signifie « eau » en kabyle. L'anneau est aussi ⴰ, la lettre A de l'alphabet tifinagh.\n"),
             attributes: [
                 .font: font,
                 .foregroundColor: NSColor.secondaryLabelColor,
@@ -125,16 +125,7 @@ struct DiskCommands: Commands {
         )
 
         let line5 = NSAttributedString(
-            string: L("Aman Disk never connects to the Internet.\n", "Aman Disk ne se connecte jamais à Internet.\n"),
-            attributes: [
-                .font: font,
-                .foregroundColor: NSColor.secondaryLabelColor,
-                .paragraphStyle: paragraphStyle
-            ]
-        )
-
-        let line6 = NSAttributedString(
-            string: L("Free and open source, MIT License.", "Logiciel libre, sous licence MIT."),
+            string: L("Aman Disk never connects to the Internet.", "Aman Disk ne se connecte jamais à Internet."),
             attributes: [
                 .font: font,
                 .foregroundColor: NSColor.secondaryLabelColor,
@@ -147,13 +138,12 @@ struct DiskCommands: Commands {
         credits.append(line3)
         credits.append(line4)
         credits.append(line5)
-        credits.append(line6)
         
         var options: [NSApplication.AboutPanelOptionKey: Any] = [.credits: credits]
         
         let appearance = NSApp.effectiveAppearance
         let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let logoName = isDark ? "aman-disk-logo-sombre@2x" : "aman-disk-logo-clair@2x"
+        let logoName = isDark ? "aman-disk-logo-dark@2x" : "aman-disk-logo-light@2x"
         
         if let url = Bundle.main.url(forResource: logoName, withExtension: "png"), let img = NSImage(contentsOf: url) {
             options[.applicationIcon] = img

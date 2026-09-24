@@ -2,7 +2,7 @@ import SwiftUI
 import ServiceManagement
 import DiskHealthCore
 
-/// Clés des préférences (UserDefaults).
+/// Preference keys (UserDefaults).
 enum PreferenceKey {
     static let stayInMenuBar = "stayInMenuBar"
     static let showMenuBarTemperature = "showMenuBarTemperature"
@@ -12,7 +12,7 @@ enum PreferenceKey {
     static let language = Localization.defaultsKey
 }
 
-/// Réglages : une seule page, formulaire groupé (⌘,).
+/// Settings: a single page, grouped form (⌘,).
 struct SettingsView: View {
     @AppStorage(PreferenceKey.stayInMenuBar) private var stayInMenuBar = true
     @AppStorage(PreferenceKey.showMenuBarTemperature) private var showMenuBarTemperature = false
@@ -120,7 +120,7 @@ struct SettingsView: View {
         }
     }
 
-    /// L'autorisation n'est demandée qu'à l'activation. Refusée : l'interrupteur revient à « désactivé ».
+    /// Permission is only requested when turning alerts on. If denied, the switch goes back to “off”.
     private func setAlerts(_ enabled: Bool) {
         guard enabled else {
             alertsEnabled = false
@@ -153,7 +153,7 @@ struct SettingsView: View {
         refreshLoginStatus()
     }
 
-    /// Relance l'app : la langue n'est lue qu'au démarrage.
+    /// Relaunches the app: the language is only read at startup.
     private func relaunch() {
         let url = Bundle.main.bundleURL
         guard url.pathExtension == "app" else { return }

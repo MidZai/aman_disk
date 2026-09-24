@@ -3,7 +3,7 @@ import Testing
 @testable import DiskHealthApp
 import DiskHealthCore
 
-/// Phase 4 (0.9) : les mesures écrites dans l'ancien dossier `DiskHealth/History` sont fusionnées une fois.
+/// Readings written to the old `DiskHealth/History` folder are merged once.
 @Suite struct LegacyHistoryMergeTests {
     @Test func legacyHistoryIsMergedOnce() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -23,10 +23,10 @@ import DiskHealthCore
         MigrationService.mergeLegacyHistoryIfNeeded(appSupport: root, store: store, defaults: defaults)
         #expect(store.samples(for: "KEY", since: .distantPast).map(\.temperatureC) == [33, 35])
         #expect(defaults.bool(forKey: MigrationService.historyMergedKey))
-        // L'ancien fichier est copié, pas déplacé.
+        // The old file is copied, not moved.
         #expect(FileManager.default.fileExists(atPath: legacyDir.appendingPathComponent("KEY.json").path))
         
-        // Deuxième appel : aucun effet.
+        // Second call: no effect.
         MigrationService.mergeLegacyHistoryIfNeeded(appSupport: root, store: store, defaults: defaults)
         #expect(store.samples(for: "KEY", since: .distantPast).count == 2)
     }
