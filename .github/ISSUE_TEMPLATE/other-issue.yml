@@ -1,0 +1,26 @@
+name: Other issue
+description: A bug, question or suggestion that isn't about drive recognition.
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happens, and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: Aman Disk version
+      description: Aman Disk menu › About Aman Disk.
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version

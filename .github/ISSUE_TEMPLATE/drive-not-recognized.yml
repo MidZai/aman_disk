@@ -1,0 +1,39 @@
+name: Drive not recognized or wrong values
+description: A drive doesn't appear, doesn't show its health, or shows values that look wrong.
+labels: ["drive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! The JSON file helps add support for your drive. In Aman Disk, select the drive, then:
+        - health not available: click **Export Diagnostic…** on the drive's page;
+        - values that look wrong: choose **Export as JSON…** in the export menu.
+  - type: input
+    id: mac
+    attributes:
+      label: Mac model
+      description: Apple menu › About This Mac (for example “MacBook Pro 14-inch, M3, 2023”).
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "macOS 26.1"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong
+      description: Missing drive, health not available, or which value looks wrong (and the expected value, if you know it).
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostic
+    attributes:
+      label: Diagnostic JSON
+      description: Paste the contents of the file created by “Export Diagnostic…” (or “Export as JSON…”), or drag the file into this field.
+      render: json
+    validations:
+      required: true
