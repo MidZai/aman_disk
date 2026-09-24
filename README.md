@@ -6,11 +6,16 @@
   </picture>
 </p>
 
-<p align="center"><b>Health, temperature and performance of your Mac's internal drives, explained in plain language.</b></p>
+<p align="center"><b>Health, temperature and performance of your Mac's drives, explained in plain language.</b><br>
+Internal NVMe and SATA drives today. External USB drives are coming in version 1.0.</p>
 
 <p align="center">
   <a href="https://github.com/MidZai/aman_disk/releases/latest">
     <img src="https://img.shields.io/badge/Download_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS" height="44">
+  </a>
+  &nbsp;
+  <a href="https://ko-fi.com/midzai">
+    <img src="https://img.shields.io/badge/Support_on_Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi" height="44">
   </a>
 </p>
 
@@ -67,7 +72,11 @@ Demo mode (`DISKHEALTH_DEMO=1`) shows fictional drives in every state.
 - **macOS 14 Sonoma** or later.
 - **Apple Silicon** and **Intel** Macs (universal binary).
 - **Internal** NVMe and AHCI/SATA drives, including Fusion Drive.
-- External and USB drives: not supported yet.
+- External USB drives: coming in version 1.0 (see below).
+
+## Roadmap to 1.0
+
+The main goal of version 1.0 is **external USB drives**: reading the health of SSDs and hard drives in USB enclosures, when the enclosure passes S.M.A.R.T. commands through. To help, [open an issue](https://github.com/MidZai/aman_disk/issues/new/choose) with the model of your USB drive or enclosure: it helps decide which ones to support first.
 
 ## Why “Aman”?
 
