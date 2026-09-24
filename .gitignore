@@ -4,3 +4,6 @@
 .DS_Store
 dist/
 *.bak
+
+# Généré par build_app.sh
+*-entitlement.plist

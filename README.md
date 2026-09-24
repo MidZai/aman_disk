@@ -6,72 +6,83 @@
   </picture>
 </p>
 
-<p align="center">Santé, température et performances des disques internes de votre Mac, expliquées en français.</p>
+<p align="center"><b>Health, temperature and performance of your Mac's internal drives, explained in plain language.</b></p>
 
 <p align="center">
-  <a href="https://github.com/MidZai/aman_disk/releases/latest"><img src="https://img.shields.io/github/v/release/MidZai/aman_disk?label=T%C3%A9l%C3%A9charger&style=for-the-badge" alt="Télécharger la dernière version"></a>
+  <a href="https://github.com/MidZai/aman_disk/releases/latest">
+    <img src="https://img.shields.io/badge/Download_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS" height="44">
+  </a>
 </p>
 
 <p align="center">
-  <a href="https://ko-fi.com/midzai"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Soutenir sur Ko-fi"></a>
+  <sub>Free and open source · macOS 14 or later · Apple Silicon and Intel · <a href="https://github.com/MidZai/aman_disk/releases/latest">Latest version</a></sub>
 </p>
 
-> **In English —** Aman Disk is a free, open-source macOS app that shows the health (S.M.A.R.T.), temperature history and performance of your Mac's internal NVMe and SATA/AHCI drives. It lives in the menu bar, turns its Dock icon into a live health gauge, can alert you when a drive changes state, and never connects to the Internet. The interface is available in English and French.
+<p align="center">
+  <img src="docs/screenshots/health.png" alt="Aman Disk: drive health" width="820">
+</p>
 
-## Captures
+## Screenshots
 
-| Santé du disque | Test de performances |
+| Performance test | Menu bar |
 |---|---|
-| ![Page santé](docs/screenshots/sante.png) | ![Onglet Performance](docs/screenshots/performance.png) |
+| <img src="docs/screenshots/performance.png" alt="Performance test" width="520"> | <img src="docs/screenshots/menu-bar.png" alt="Menu bar panel" width="300"> |
 
-## Fonctions
+## Features
 
-- **Santé NVMe et ATA/AHCI** : lecture S.M.A.R.T. des SSD NVMe, des SSD Apple PCIe AHCI et des disques SATA, avec un état clair (« En bonne santé », « À surveiller », « Défaillance probable ») et la durée de vie restante quand le disque la fournit.
-- **Attributs expliqués en français** : chaque attribut S.M.A.R.T. porte un nom français et une explication ; les valeurs sont converties dans leur unité (°C, heures, To), ou affichées en hexadécimal brut à la demande.
-- **Historique de température** : une mesure toutes les 30 secondes, conservée 24 heures en pleine résolution puis 30 jours en moyennes ; courbes sur 1 heure, 24 heures, 7 jours et 30 jours. Chaque mesure ajoute environ 170 octets à l'historique : l'app n'use pas le disque qu'elle surveille.
-- **Test de performances** : lecture et écriture séquentielles et aléatoires ; le fichier de test est toujours supprimé.
-- **Barre des menus** : état et température de chaque disque interne, courbe de la dernière heure ; l'app peut y rester quand la fenêtre est fermée.
-- **Icône du Dock vivante** : l'anneau de l'icône suit la santé du disque de démarrage.
-- **Alertes** : notification quand un disque change d'état, chauffe trop longtemps ou passe sous 50 %, 25 % ou 10 % de durée de vie (désactivées par défaut).
-- **Rapports** : export PDF, texte ou JSON, avec numéro de série masqué par défaut.
+- **NVMe and ATA/AHCI health**: reads S.M.A.R.T. data from NVMe SSDs, Apple PCIe AHCI SSDs and SATA drives, with a clear status (“Healthy”, “Needs attention”, “Likely failing”) and the remaining life when the drive reports it.
+- **Attributes explained**: every S.M.A.R.T. attribute has a readable name and an explanation; values are converted to their unit (°C, hours, TB), or shown as raw hexadecimal on request.
+- **Temperature history**: one reading every 30 seconds, kept at full resolution for 24 hours, then as averages for 30 days; charts over 1 hour, 24 hours, 7 days and 30 days. Each reading adds about 170 bytes to the history, so the app doesn't wear out the drive it watches.
+- **Performance test**: sequential and random reads and writes. The test file is always deleted.
+- **Menu bar**: status and temperature of each internal drive, with the last hour's curve. The app can stay there when its window is closed.
+- **Live Dock icon**: the ring around the icon follows the health of the startup drive.
+- **Alerts**: a notification when a drive changes status, stays too hot, or drops below 50 %, 25 % or 10 % of its life (off by default).
+- **Reports**: PDF, text or JSON export, with the serial number masked by default.
+- **English and French** interface.
 
-## Confidentialité
+## Privacy
 
-- **Aucune connexion réseau** : Aman Disk ne se connecte jamais à Internet. Pas de télémétrie, pas de vérification de mise à jour. Les seuls liens (GitHub, dont « Voir les nouvelles versions… », et Ko-fi) s'ouvrent dans votre navigateur, à votre demande.
-- **Aucune donnée envoyée** : l'historique et les résultats restent sur votre Mac, dans `~/Library/Application Support/io.github.aman-disk.AmanDisk/`.
-- **Aman ne modifie jamais vos données.** Seule exception : il active S.M.A.R.T. s'il est désactivé (réglable). L'app ne demande jamais de mot de passe administrateur. Le test de performances, lancé par vous, écrit un fichier temporaire, supprimé ensuite, même après un arrêt brutal de l'app.
+- **No network connection**: Aman Disk never connects to the Internet. No telemetry, no update check. The only links (GitHub, including “Check for New Versions…”, and Ko-fi) open in your browser when you click them.
+- **No data sent**: history and results stay on your Mac, in `~/Library/Application Support/io.github.aman-disk.AmanDisk/`.
+- **Aman never changes your data.** One exception: it turns on S.M.A.R.T. if it's turned off (you can disable this in Settings). The app never asks for an administrator password. The performance test, which you start yourself, writes a temporary file that is deleted afterwards, even if the app is force-quit.
 
 ## Installation
 
-1. Téléchargez `Aman-Disk-0.9.1.dmg` depuis la [page des versions](https://github.com/MidZai/aman_disk/releases/latest).
-2. Ouvrez le DMG et glissez **Aman Disk** dans le dossier **Applications**.
-3. L'app n'est pas notariée par Apple : au premier lancement, macOS la bloque. Allez dans **Réglages Système › Confidentialité et sécurité** et cliquez sur **« Ouvrir quand même »**. Il suffit de le faire une fois.
+1. Download `Aman-Disk-0.9.1.dmg` from the [releases page](https://github.com/MidZai/aman_disk/releases/latest).
+2. Open the DMG and drag **Aman Disk** into the **Applications** folder.
+3. The app isn't notarized by Apple, so macOS blocks it on first launch. Go to **System Settings › Privacy & Security** and click **“Open Anyway”**. You only need to do this once.
 
-### Compiler depuis les sources
+### Build from source
 
 ```bash
-scripts/bundle.sh --release   # Aman Disk.app, binaire universel
+scripts/bundle.sh --release   # Aman Disk.app, universal binary
 scripts/make-dmg.sh           # dist/Aman-Disk-0.9.1.dmg
-scripts/test.sh               # toute la suite de tests (fonctionne aussi sans Xcode)
+scripts/test.sh               # full test suite (also works without Xcode)
 ```
 
-Le mode démo (`DISKHEALTH_DEMO=1`) affiche des disques fictifs dans tous les états.
+Demo mode (`DISKHEALTH_DEMO=1`) shows fictional drives in every state.
 
-## Compatibilité
+## Compatibility
 
-- **macOS 14 Sonoma** ou plus récent.
-- Mac **Apple Silicon** et **Intel** (binaire universel).
-- Disques **internes** NVMe et AHCI/SATA, y compris Fusion Drive.
-- Disques externes et USB : pas encore pris en charge.
+- **macOS 14 Sonoma** or later.
+- **Apple Silicon** and **Intel** Macs (universal binary).
+- **Internal** NVMe and AHCI/SATA drives, including Fusion Drive.
+- External and USB drives: not supported yet.
 
-## Pourquoi « Aman » ?
+## Why “Aman”?
 
-*Aman* signifie « eau » en kabyle, d'où la goutte au centre de l'icône. L'anneau qui l'entoure est aussi la lettre ⴰ de l'alphabet tifinagh.
+The name has three meanings, and all of them fit an app that watches over your drives:
 
-## Soutenir le projet
+- In **Arabic**, *amān* (أمان) means safety and security, and also peace of mind: the calm of knowing you are protected.
+- In **Kabyle**, *aman* means water, hence the drop at the center of the icon. The ring around it is also the letter ⴰ of the Tifinagh alphabet.
+- In **Tolkien**'s world, Aman is the Blessed Realm, the land in the far West where the Valar live. It is Gandalf's original home: before coming to Middle-earth, he lived there as Olórin, in the gardens of Lórien in Valinor.
 
-Aman Disk est gratuit et open source. Si l'app vous est utile, vous pouvez soutenir son développement sur [Ko-fi](https://ko-fi.com/midzai).
+## Support the project
 
-## Licence
+Aman Disk is free and open source. If you find it useful, you can support its development on Ko-fi.
 
-[MIT](LICENSE) © 2026 Aman Disk contributors.
+<a href="https://ko-fi.com/midzai"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support on Ko-fi"></a>
+
+## License
+
+[MIT](LICENSE) © 2026 MidZai
