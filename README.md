@@ -9,16 +9,20 @@
 <p align="center">Santé, température et performances des disques internes de votre Mac, expliquées en français.</p>
 
 <p align="center">
+  <a href="https://github.com/MidZai/aman_disk/releases/latest"><img src="https://img.shields.io/github/v/release/MidZai/aman_disk?label=T%C3%A9l%C3%A9charger&style=for-the-badge" alt="Télécharger la dernière version"></a>
+</p>
+
+<p align="center">
   <a href="https://ko-fi.com/midzai"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Soutenir sur Ko-fi"></a>
 </p>
 
-> **In English —** Aman Disk is a free, open-source macOS app that shows the health (S.M.A.R.T.), temperature history and performance of your Mac's internal NVMe and SATA/AHCI drives. It lives in the menu bar, turns its Dock icon into a live health gauge, can alert you when a drive changes state, and never connects to the Internet. The interface is in French for now.
+> **In English —** Aman Disk is a free, open-source macOS app that shows the health (S.M.A.R.T.), temperature history and performance of your Mac's internal NVMe and SATA/AHCI drives. It lives in the menu bar, turns its Dock icon into a live health gauge, can alert you when a drive changes state, and never connects to the Internet. The interface is available in English and French.
 
 ## Captures
 
-| Santé du disque | Test de performances | Barre des menus |
-|---|---|---|
-| ![Page santé](docs/screenshots/sante.png) | ![Onglet Performance](docs/screenshots/performance.png) | ![Barre des menus](docs/screenshots/barre-des-menus.png) |
+| Santé du disque | Test de performances |
+|---|---|
+| ![Page santé](docs/screenshots/sante.png) | ![Onglet Performance](docs/screenshots/performance.png) |
 
 ## Fonctions
 
@@ -39,7 +43,7 @@
 
 ## Installation
 
-1. Téléchargez `Aman-Disk-0.9.1.dmg` depuis la page des versions (*Releases*).
+1. Téléchargez `Aman-Disk-0.9.1.dmg` depuis la [page des versions](https://github.com/MidZai/aman_disk/releases/latest).
 2. Ouvrez le DMG et glissez **Aman Disk** dans le dossier **Applications**.
 3. L'app n'est pas notariée par Apple : au premier lancement, macOS la bloque. Allez dans **Réglages Système › Confidentialité et sécurité** et cliquez sur **« Ouvrir quand même »**. Il suffit de le faire une fois.
 
