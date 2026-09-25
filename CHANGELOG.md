@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.6 — 2026-09-25
+
+- **S.M.A.R.T. reading via SAT SMART Driver**: detects when the user has installed the open-source third-party SAT SMART Driver (by checking for ATA S.M.A.R.T. plugin capability in `IOCFPlugInTypes` on the drive's IOKit service), and reads full ATA S.M.A.R.T. health data, attributes, temperature, and history for compatible USB SATA enclosures without requiring any specialized tool.
+- **Strict safety boundaries (Rules 0.1-1 and 0.1-3)**: Aman Disk never downloads, bundles, installs, or prompts to install kernel extensions, and never urges users to reduce system security.
+- **Interface & labeling**: external USB drives with active SAT translation display the "USB" connection badge with the technical interface "USB (SATA via SAT)" and a discrete header mention "Lu via le SAT SMART Driver" / "Read via SAT SMART Driver".
+- **S.M.A.R.T. activation on USB drives**: if a USB drive reports S.M.A.R.T. disabled, the same single-command activation logic and user preference applies as for internal SATA drives.
+- **Help sheet — Third-party driver (advanced)**: updated the "Learn More" modal sheet with a neutral section detailing what the SAT SMART Driver does, its limitations (Apple Silicon Reduced Security requirement, SATA-only restriction, boot re-plugging requirement), and a button opening the project's official GitHub page in the browser.
+- **Crash resilience**: disconnecting a USB drive during a read produces an explicit error code with a "Try Again" / "Réessayer" action, with zero crashes or panics.
+- **Test suite**: added `SATDriverTests` verifying plugin UUID detection, uppercase/lowercase handling, drive classification, detail labeling, ATA health parity on USB drives, and disconnect error handling.
+
 ## 0.9.5 — 2026-09-24
 
 - **USB drive details without S.M.A.R.T.**: displays maximum useful hardware information for any USB drive, even when S.M.A.R.T. health data is not accessible through macOS.

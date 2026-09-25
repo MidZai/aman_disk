@@ -432,6 +432,10 @@ extension ExtraTranslations {
         "External SSDs connected via Thunderbolt 3/4/5 or USB4 in PCIe mode attach directly to the PCIe bus and support full S.M.A.R.T. monitoring without any driver.": "Thunderbolt 3/4/5 또는 PCIe 모드의 USB4를 통해 연결된 외장 SSD는 PCIe 버스에 직접 연결되어 드라이버 없이 완전한 S.M.A.R.T. 모니터링을 지원합니다.",
         "Help the project": "프로젝트 돕기",
         "You can export a diagnostic report to help Aman expand its hardware compatibility database.": "Aman이 하드웨어 호환성 데이터베이스를 확장할 수 있도록 진단 보고서를 내보낼 수 있습니다.",
+        "Read via SAT SMART Driver": "SAT SMART Driver를 통해 읽음",
+        "Third-party driver (advanced)": "타사 드라이버(고급)",
+        "View on GitHub": "GitHub에서 보기",
+        "An open-source kernel extension (such as the SAT SMART Driver) can enable S.M.A.R.T. for compatible USB SATA enclosures by translating ATA commands.\n\nImportant considerations:\n• Apple Silicon: Installing a kernel extension requires setting macOS Startup Security to \"Reduced Security\" in Recovery.\n• SATA only: Does not support USB NVMe enclosures.\n• Reconnect tip: macOS does not load third-party drivers at boot. If connected during startup, unplug and replug the drive.\n• Compatibility: Some bridge chips do not relay commands even with the driver.": "오픈 소스 커널 확장(예: SAT SMART Driver)은 ATA 명령을 변환하여 호환 가능한 USB SATA 외장 케이스에서 S.M.A.R.T.를 활성화할 수 있습니다.\n\n중요 고려 사항 및 제한 사항:\n• Apple Silicon: 커널 확장을 설치하려면 복구 모드에서 macOS 시동 보안을 '보안 수준 저하'로 설정해야 합니다.\n• SATA 전용: USB NVMe 외장 케이스는 지원하지 않습니다.\n• 재연결 팁: macOS는 부팅 시 타사 드라이버를 로드하지 않습니다. 시동 전 연결되어 있었다면 드라이버 분리 후 다시 연결하세요.\n• 호환성: 일부 브리지 칩은 드라이버가 있어도 명령을 전달하지 않습니다.",
     ]
 
     static let japanese: [String: String] = [
@@ -865,5 +869,9 @@ extension ExtraTranslations {
         "External SSDs connected via Thunderbolt 3/4/5 or USB4 in PCIe mode attach directly to the PCIe bus and support full S.M.A.R.T. monitoring without any driver.": "Thunderbolt 3/4/5またはPCIeモードのUSB4経由で接続された外付けSSDは、PCIeバスに直接接続され、ドライバなしで完全なS.M.A.R.T.監視をサポートします。",
         "Help the project": "プロジェクトを支援",
         "You can export a diagnostic report to help Aman expand its hardware compatibility database.": "診断レポートをエクスポートして、Amanのハードウェア互換性データベースの拡張を支援できます。",
+        "Read via SAT SMART Driver": "SAT SMART Driver経由で読み取り",
+        "Third-party driver (advanced)": "サードパーティ製ドライバ (高度)",
+        "View on GitHub": "GitHub で見る",
+        "An open-source kernel extension (such as the SAT SMART Driver) can enable S.M.A.R.T. for compatible USB SATA enclosures by translating ATA commands.\n\nImportant considerations:\n• Apple Silicon: Installing a kernel extension requires setting macOS Startup Security to \"Reduced Security\" in Recovery.\n• SATA only: Does not support USB NVMe enclosures.\n• Reconnect tip: macOS does not load third-party drivers at boot. If connected during startup, unplug and replug the drive.\n• Compatibility: Some bridge chips do not relay commands even with the driver.": "オープンソースのカーネル機能拡張（SAT SMART Driverなど）を使用すると、ATAコマンドを変換して対応するUSB SATAケースでS.M.A.R.T.監視を有効にできます。\n\n重要な考慮事項と制限：\n• Apple Silicon: カーネル機能拡張をインストールするには、復旧モードでmacOSの起動セキュリティを「セキュリティ低」に設定する必要があります。\n• SATAのみ: USB NVMeケースには対応していません。\n• 再接続のヒント: macOSは起動時にサードパーティ製ドライバを読み込みません。起動前に接続されていた場合は、取り外して再接続してください。\n• 互換性: 一部のブリッジチップはドライバがあってもコマンドを中継しません。",
     ]
 }

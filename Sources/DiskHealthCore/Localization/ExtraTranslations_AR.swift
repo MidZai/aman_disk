@@ -432,5 +432,9 @@ extension ExtraTranslations {
         "External SSDs connected via Thunderbolt 3/4/5 or USB4 in PCIe mode attach directly to the PCIe bus and support full S.M.A.R.T. monitoring without any driver.": "تتصل محركات أقراص SSD الخارجية المتصلة عبر Thunderbolt 3/4/5 أو USB4 في وضع PCIe مباشرة بناقل PCIe وتدعم مراقبة S.M.A.R.T. الكاملة بدون أي برنامج تشغيل.",
         "Help the project": "مساعدة المشروع",
         "You can export a diagnostic report to help Aman expand its hardware compatibility database.": "يمكنك تصدير تقرير تشخيصي لمساعدة Aman في توسيع قاعدة بيانات توافق الأجهزة.",
+        "Read via SAT SMART Driver": "تمت القراءة عبر SAT SMART Driver",
+        "Third-party driver (advanced)": "برنامج تشغيل من جهة خارجية (متقدم)",
+        "View on GitHub": "عرض على GitHub",
+        "An open-source kernel extension (such as the SAT SMART Driver) can enable S.M.A.R.T. for compatible USB SATA enclosures by translating ATA commands.\n\nImportant considerations:\n• Apple Silicon: Installing a kernel extension requires setting macOS Startup Security to \"Reduced Security\" in Recovery.\n• SATA only: Does not support USB NVMe enclosures.\n• Reconnect tip: macOS does not load third-party drivers at boot. If connected during startup, unplug and replug the drive.\n• Compatibility: Some bridge chips do not relay commands even with the driver.": "يمكن لملحق نواة مفتوح المصدر (مثل SAT SMART Driver) تمكين مراقبة S.M.A.R.T. لعلب USB SATA المتوافقة عن طريق ترجمة أوامر ATA.\n\nاعتبارات وقيود مهمة:\n• Apple Silicon: يتطلب تثبيت ملحق النواة ضبط أمان بدء تشغيل macOS على \"أمان منخفض\" في وضع الاسترداد.\n• SATA فقط: لا يدعم علب USB NVMe.\n• تلميح إعادة التوصيل: لا يقوم macOS بتحميل برامج تشغيل الجهات الخارجية عند بدء التشغيل. إذا كان محرك الأقراص متصلاً قبل بدء التشغيل، فافصله ثم أعد توصيله.\n• التوافق: بعض شرائح الجسور لا تقوم بتمرير الأوامر حتى مع تثبيت برنامج التشغيل.",
     ]
 }

@@ -71,6 +71,9 @@ struct InspectorView: View {
                     LabeledContent(L("Interface", "Interface"), value: disk.physical.detailInterfaceLabel)
                     LabeledContent(L("Location", "Emplacement"), value: disk.physical.locationLabel)
                     LabeledContent(L("Media", "Support"), value: disk.physical.mediumLabel)
+                    if disk.physical.isSATTranslationActive {
+                        LabeledContent(L("Driver", "Pilote"), value: "SAT SMART Driver")
+                    }
                 }
 
                 let diskVolumes = appManager.volumes(on: disk)

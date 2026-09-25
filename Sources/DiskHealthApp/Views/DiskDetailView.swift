@@ -83,6 +83,17 @@ private struct DiskHeaderView: View {
                 Text(subtext)
                     .font(.callout)
                     .foregroundStyle(.secondary)
+
+                if disk.physical.isSATTranslationActive {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.shield")
+                            .font(.caption)
+                        Text(Strings.readViaSATSMARTDriver)
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 1)
+                }
             }
         }
     }

@@ -245,6 +245,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         driveConnection == .thunderboltNVMe
     }
 
+    /// Whether this drive is an external USB drive using SAT (SCSI / ATA Translation) via the SAT SMART Driver.
+    public var isSATTranslationActive: Bool {
+        (driveConnection == .usb || connection == .usb) && (protocolType == .ata || protocolType == .pcieAhci)
+    }
+
     /// Formatted USB Bridge Chip string (e.g. "Realtek (0x0BDA)" or "Puce inconnue (0x1234)")
     public var usbBridgeLabel: String? {
         guard let vid = usbVendorID else { return nil }
@@ -292,10 +297,13 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         return nil
     }
 
-    /// Detailed connection type for disk details: e.g. “Thunderbolt / USB4 (PCIe)”
+    /// Detailed connection type for disk details: e.g. “Thunderbolt / USB4 (PCIe)” or “USB (SATA via SAT)”
     public var detailInterfaceLabel: String {
         if driveConnection == .thunderboltNVMe {
             return "Thunderbolt / USB4 (PCIe)"
+        }
+        if isSATTranslationActive {
+            return "USB (SATA via SAT)"
         }
         switch protocolType {
         case .nvme: return "NVMe"

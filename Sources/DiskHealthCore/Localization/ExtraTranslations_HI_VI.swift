@@ -432,6 +432,10 @@ extension ExtraTranslations {
         "External SSDs connected via Thunderbolt 3/4/5 or USB4 in PCIe mode attach directly to the PCIe bus and support full S.M.A.R.T. monitoring without any driver.": "PCIe मोड में Thunderbolt 3/4/5 या USB4 के माध्यम से जुड़े बाहरी SSD सीधे PCIe बस से जुड़ते हैं और बिना किसी ड्राइवर के पूर्ण S.M.A.R.T. निगरानी का समर्थन करते हैं।",
         "Help the project": "परियोजना की मदद करें",
         "You can export a diagnostic report to help Aman expand its hardware compatibility database.": "Aman को अपने हार्डवेयर संगतता डेटाबेस का विस्तार करने में मदद करने के लिए आप डायग्नोस्टिक रिपोर्ट निर्यात कर सकते हैं।",
+        "Read via SAT SMART Driver": "SAT SMART Driver के माध्यम से पढ़ा गया",
+        "Third-party driver (advanced)": "तृतीय-पक्ष ड्राइवर (उन्नत)",
+        "View on GitHub": "GitHub पर देखें",
+        "An open-source kernel extension (such as the SAT SMART Driver) can enable S.M.A.R.T. for compatible USB SATA enclosures by translating ATA commands.\n\nImportant considerations:\n• Apple Silicon: Installing a kernel extension requires setting macOS Startup Security to \"Reduced Security\" in Recovery.\n• SATA only: Does not support USB NVMe enclosures.\n• Reconnect tip: macOS does not load third-party drivers at boot. If connected during startup, unplug and replug the drive.\n• Compatibility: Some bridge chips do not relay commands even with the driver.": "एक ओपन-सोर्स कर्नेल एक्सटेंशन (जैसे SAT SMART Driver) ATA कमांड का अनुवाद करके संगत USB SATA एनक्लोजर के लिए S.M.A.R.T. सक्षम कर सकता है।\n\nमहत्वपूर्ण विचार और सीमाएं:\n• Apple Silicon: कर्नेल एक्सटेंशन इंस्टॉल करने के लिए रिकवरी मोड में macOS स्टार्टअप सुरक्षा को \"कम सुरक्षा\" पर सेट करना आवश्यक है।\n• केवल SATA: USB NVMe एनक्लोजर का समर्थन नहीं करता है।\n• पुन: कनेक्ट करने की युक्ति: macOS बूट के समय तृतीय-पक्ष ड्राइवर लोड नहीं करता है। यदि स्टार्टअप से पहले कनेक्ट था, तो ड्राइव को अनप्लग करें और फिर से लगाएं।\n• अनुकूलता: कुछ ब्रिज चिप्स ड्राइवर स्थापित होने पर भी कमांड रिले नहीं करते हैं।",
     ]
 
     static let vietnamese: [String: String] = [
@@ -865,5 +869,9 @@ extension ExtraTranslations {
         "External SSDs connected via Thunderbolt 3/4/5 or USB4 in PCIe mode attach directly to the PCIe bus and support full S.M.A.R.T. monitoring without any driver.": "SSD ngoài được kết nối qua Thunderbolt 3/4/5 hoặc USB4 ở chế độ PCIe gắn trực tiếp vào bus PCIe và hỗ trợ giám sát S.M.A.R.T. đầy đủ mà không cần trình điều khiển.",
         "Help the project": "Giúp đỡ dự án",
         "You can export a diagnostic report to help Aman expand its hardware compatibility database.": "Bạn có thể xuất báo cáo chẩn đoán để giúp Aman mở rộng cơ sở dữ liệu tương thích phần cứng.",
+        "Read via SAT SMART Driver": "Được đọc qua SAT SMART Driver",
+        "Third-party driver (advanced)": "Trình điều khiển bên thứ ba (nâng cao)",
+        "View on GitHub": "Xem trên GitHub",
+        "An open-source kernel extension (such as the SAT SMART Driver) can enable S.M.A.R.T. for compatible USB SATA enclosures by translating ATA commands.\n\nImportant considerations:\n• Apple Silicon: Installing a kernel extension requires setting macOS Startup Security to \"Reduced Security\" in Recovery.\n• SATA only: Does not support USB NVMe enclosures.\n• Reconnect tip: macOS does not load third-party drivers at boot. If connected during startup, unplug and replug the drive.\n• Compatibility: Some bridge chips do not relay commands even with the driver.": "Một tiện ích mở rộng kernel mã nguồn mở (như SAT SMART Driver) có thể kích hoạt S.M.A.R.T. cho các vỏ ổ đĩa USB SATA tương thích bằng cách dịch các lệnh ATA.\n\nCác cân nhắc và giới hạn quan trọng:\n• Apple Silicon: Việc cài đặt tiện ích mở rộng kernel yêu cầu chuyển Bảo mật khởi động của macOS sang \"Bảo mật giảm\" trong chế độ Khôi phục.\n• Chỉ SATA: Không hỗ trợ các vỏ ổ đĩa USB NVMe.\n• Mẹo kết nối lại: macOS không tải trình điều khiển bên thứ ba khi khởi động. Nếu ổ đĩa được cắm trước khi bật máy, hãy rút ra và cắm lại.\n• Khả năng tương thích: Một số chip cầu không chuyển tiếp lệnh ngay cả khi đã cài đặt trình điều khiển.",
     ]
 }

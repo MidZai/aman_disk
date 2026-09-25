@@ -3,6 +3,19 @@ import IOKit
 import DiskArbitration
 
 public enum ProtocolDetector {
+    public static let ataSmartPluginUUIDs: Set<String> = [
+        "24514B7A-2804-11D6-8A02-003065704866",
+        "5E659F92-20D3-11D6-BDB5-0003935A76B2",
+        "08ABE21C-20D4-11D6-8DF6-0003935A76B2"
+    ]
+
+    /// Inspects an `IOCFPlugInTypes` dictionary from IOKit to determine whether an ATA S.M.A.R.T. plugin is declared.
+    public static func isATASmartPluginPresent(in plugins: [String: Any]) -> Bool {
+        plugins.keys.contains { key in
+            ataSmartPluginUUIDs.contains { $0.caseInsensitiveCompare(key) == .orderedSame }
+        }
+    }
+
     public static func detect(bsdName: String) -> (StorageProtocol, MediumType, HealthCapability) {
         guard let session = DASessionCreate(kCFAllocatorDefault) else {
             return (.unknown, .unknown, .unsupported(reason: .noSmartInterface))
@@ -17,6 +30,7 @@ public enum ProtocolDetector {
 
         var isNVMeSmartCapable = false
         var isATASmartCapable = false
+        var hasATASMARTPlugin = false
         var isPCIeAHCI = false
         var mediumTypeStr: String? = nil
 
@@ -30,6 +44,13 @@ public enum ProtocolDetector {
 
             if let capable = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "SMART Capable" as CFString, kCFAllocatorDefault, 0) as? Bool, capable {
                 isATASmartCapable = true
+            }
+
+            if !hasATASMARTPlugin,
+               let plugins = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "IOCFPlugInTypes" as CFString, kCFAllocatorDefault, 0) as? [String: Any] {
+                if isATASmartPluginPresent(in: plugins) {
+                    hasATASMARTPlugin = true
+                }
             }
 
             if let devChars = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "Device Characteristics" as CFString, kCFAllocatorDefault, 0) as? [String: Any] {
@@ -51,6 +72,20 @@ public enum ProtocolDetector {
                 current = parent
             } else {
                 break
+            }
+        }
+
+        if !hasATASMARTPlugin {
+            if let plugins = IORegistryEntrySearchCFProperty(
+                targetService,
+                kIOServicePlane,
+                "IOCFPlugInTypes" as CFString,
+                kCFAllocatorDefault,
+                IOOptionBits(kIORegistryIterateParents | kIORegistryIterateRecursively)
+            ) as? [String: Any] {
+                if isATASmartPluginPresent(in: plugins) {
+                    hasATASMARTPlugin = true
+                }
             }
         }
 
@@ -76,7 +111,7 @@ public enum ProtocolDetector {
         if isNVMeSmartCapable {
             return (.nvme, mediumType, .supported)
         }
-        if isATASmartCapable {
+        if isATASmartCapable && (hasATASMARTPlugin || !daProtocol.contains("USB")) {
             if isPCIeAHCI {
                 return (.pcieAhci, mediumType, .supported)
             }

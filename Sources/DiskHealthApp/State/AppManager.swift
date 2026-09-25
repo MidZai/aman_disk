@@ -225,6 +225,18 @@ final class AppManager: ObservableObject {
                     case .bufferTooSmall: errorCode = -5
                     case .unknown(let c): errorCode = c
                     }
+                } else if let ataErr = error as? ATAReadError {
+                    switch ataErr {
+                    case .invalidArguments: errorCode = -1
+                    case .diskNotFound: errorCode = -2
+                    case .mediaNotFound: errorCode = -3
+                    case .smartServiceNotFound: errorCode = -4
+                    case .pluginCreationFailed: errorCode = -5
+                    case .smartDisabled: errorCode = -6
+                    case .ioError(let code): errorCode = code
+                    case .unknown(let code): errorCode = code
+                    case .parseFailed: errorCode = -12
+                    }
                 } else {
                     errorCode = -99
                 }

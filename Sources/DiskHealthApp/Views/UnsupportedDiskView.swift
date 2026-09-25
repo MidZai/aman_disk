@@ -109,8 +109,11 @@ struct UnsupportedDiskView: View {
                 
                 Divider()
                 
-                if isUSB {
+                if case .usbBridge = reason {
                     usbNoSmartCard
+                    usbDetailsSection
+                } else if isUSB {
+                    nonUSBCard
                     usbDetailsSection
                 } else {
                     nonUSBCard
@@ -434,16 +437,12 @@ struct USBEnclosureHelpSheet: View {
                     )
 
                     helpSection(
-                        icon: "wrench.and.screwdriver",
+                        icon: "bolt.fill",
                         title: Strings.usbHelpSection2Title,
                         text: Strings.usbHelpSection2Text
                     )
 
-                    helpSection(
-                        icon: "bolt.fill",
-                        title: Strings.usbHelpSection3Title,
-                        text: Strings.usbHelpSection3Text
-                    )
+                    satDriverHelpSection
 
                     helpSection(
                         icon: "heart.fill",
@@ -473,7 +472,41 @@ struct USBEnclosureHelpSheet: View {
             }
         }
         .padding(24)
-        .frame(width: 520, height: 500)
+        .frame(width: 560, height: 560)
+    }
+
+    private var satDriverHelpSection: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "wrench.and.screwdriver")
+                .font(.system(size: 20))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 24, height: 24)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(Strings.usbHelpSection3Title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text(Strings.usbHelpSection3Text)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    if let url = URL(string: "https://github.com/kasbert/OS-X-SAT-SMART-Driver") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(Strings.viewOnGitHub)
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .padding(.top, 2)
+            }
+        }
     }
 
     private func helpSection(icon: String, title: String, text: String) -> some View {

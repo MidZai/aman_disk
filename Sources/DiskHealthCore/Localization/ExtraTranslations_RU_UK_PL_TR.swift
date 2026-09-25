@@ -432,6 +432,10 @@ extension ExtraTranslations {
         "External SSDs connected via Thunderbolt 3/4/5 or USB4 in PCIe mode attach directly to the PCIe bus and support full S.M.A.R.T. monitoring without any driver.": "Внешние SSD, подключенные через Thunderbolt 3/4/5 или USB4 в режиме PCIe, подключаются напрямую к шине PCIe и поддерживают полный мониторинг S.M.A.R.T. без каких-либо драйверов.",
         "Help the project": "Помочь проекту",
         "You can export a diagnostic report to help Aman expand its hardware compatibility database.": "Вы можете экспортировать отчет о диагностике, чтобы помочь Aman расширить базу данных совместимости оборудования.",
+        "Read via SAT SMART Driver": "Прочитано через SAT SMART Driver",
+        "Third-party driver (advanced)": "Сторонний драйвер (расширенный)",
+        "View on GitHub": "Посмотреть на GitHub",
+        "An open-source kernel extension (such as the SAT SMART Driver) can enable S.M.A.R.T. for compatible USB SATA enclosures by translating ATA commands.\n\nImportant considerations:\n• Apple Silicon: Installing a kernel extension requires setting macOS Startup Security to \"Reduced Security\" in Recovery.\n• SATA only: Does not support USB NVMe enclosures.\n• Reconnect tip: macOS does not load third-party drivers at boot. If connected during startup, unplug and replug the drive.\n• Compatibility: Some bridge chips do not relay commands even with the driver.": "Стороннее расширение ядра с открытым исходным кодом (SAT SMART Driver) позволяет включить мониторинг S.M.A.R.T. для совместимых корпусов USB SATA путем трансляции команд ATA.\n\nВажные соображения и ограничения:\n• Apple Silicon: Установка расширения ядра требует переключения безопасности загрузки macOS в режим «Сниженная безопасность» в Recovery.\n• Только SATA: Не поддерживает корпуса USB NVMe.\n• Совет по переподключению: macOS не загружает сторонние драйверы при запуске. Если диск был подключен до включения Mac, отключите и снова подключите его.\n• Совместимость: Некоторые чипы моста не передают команды даже при установленном драйвере.",
     ]
 
     static let ukrainian: [String: String] = [
@@ -865,6 +869,10 @@ extension ExtraTranslations {
         "External SSDs connected via Thunderbolt 3/4/5 or USB4 in PCIe mode attach directly to the PCIe bus and support full S.M.A.R.T. monitoring without any driver.": "Зовнішні SSD, підключені через Thunderbolt 3/4/5 або USB4 у режимі PCIe, підключаються безпосередньо до шини PCIe та підтримують повний моніторинг S.M.A.R.T. без додаткових драйверів.",
         "Help the project": "Допомогти проєкту",
         "You can export a diagnostic report to help Aman expand its hardware compatibility database.": "Ви можете експортувати звіт про діагностику, щоб допомогти Aman розширити базу даних сумісності обладнання.",
+        "Read via SAT SMART Driver": "Прочитано через SAT SMART Driver",
+        "Third-party driver (advanced)": "Сторонній драйвер (розширений)",
+        "View on GitHub": "Переглянути на GitHub",
+        "An open-source kernel extension (such as the SAT SMART Driver) can enable S.M.A.R.T. for compatible USB SATA enclosures by translating ATA commands.\n\nImportant considerations:\n• Apple Silicon: Installing a kernel extension requires setting macOS Startup Security to \"Reduced Security\" in Recovery.\n• SATA only: Does not support USB NVMe enclosures.\n• Reconnect tip: macOS does not load third-party drivers at boot. If connected during startup, unplug and replug the drive.\n• Compatibility: Some bridge chips do not relay commands even with the driver.": "Розширення ядра з відкритим вихідним кодом (SAT SMART Driver) може увімкнути моніторинг S.M.A.R.T. для сумісних корпусів USB SATA шляхом трансляції команд ATA.\n\nВажливі застереження та обмеження:\n• Apple Silicon: Встановлення розширення ядра вимагає встановлення безпеки запуску macOS на «Знижена безпека» у режимі відновлення.\n• Лише SATA: Не підтримує корпуси USB NVMe.\n• Порада щодо перепідключення: macOS не завантажує сторонні драйвери під час запуску. Якщо диск був підключений до ввімкнення Mac, від'єднайте та знову під'єднайте його.\n• Сумісність: Деякі чипи мостів не ретранслюють команди навіть із встановленим драйвером.",
     ]
 
     static let polish: [String: String] = [
@@ -1298,6 +1306,10 @@ extension ExtraTranslations {
         "External SSDs connected via Thunderbolt 3/4/5 or USB4 in PCIe mode attach directly to the PCIe bus and support full S.M.A.R.T. monitoring without any driver.": "Zewnętrzne dyski SSD podłączone przez Thunderbolt 3/4/5 lub USB4 w trybie PCIe łączą się bezpośrednio z magistralą PCIe i obsługują pełne monitorowanie S.M.A.R.T. bez żadnego sterownika.",
         "Help the project": "Pomóż projektowi",
         "You can export a diagnostic report to help Aman expand its hardware compatibility database.": "Możesz wyeksportować raport diagnostyczny, aby pomóc Aman w rozszerzaniu bazy danych zgodności sprzętowej.",
+        "Read via SAT SMART Driver": "Odczytano przez SAT SMART Driver",
+        "Third-party driver (advanced)": "Sterownik innej firmy (zaawansowany)",
+        "View on GitHub": "Zobacz na GitHubie",
+        "An open-source kernel extension (such as the SAT SMART Driver) can enable S.M.A.R.T. for compatible USB SATA enclosures by translating ATA commands.\n\nImportant considerations:\n• Apple Silicon: Installing a kernel extension requires setting macOS Startup Security to \"Reduced Security\" in Recovery.\n• SATA only: Does not support USB NVMe enclosures.\n• Reconnect tip: macOS does not load third-party drivers at boot. If connected during startup, unplug and replug the drive.\n• Compatibility: Some bridge chips do not relay commands even with the driver.": "Rozszerzenie jądra open source (np. SAT SMART Driver) może włączyć obsługę S.M.A.R.T. dla kompatybilnych obudów USB SATA poprzez translację poleceń ATA.\n\nWażne uwagi i ograniczenia:\n• Apple Silicon: Instalacja rozszerzenia jądra wymaga przełączenia ochrony uruchamiania macOS na „Obniżone bezpieczeństwo” w trybie odzyskiwania.\n• Tylko SATA: Nie obsługuje obudów USB NVMe.\n• Wskazówka ponownego podłączenia: macOS nie ładuje sterowników innych firm podczas startu. Jeśli dysk był podłączony przed uruchomieniem Maca, odłącz go i podłącz ponownie.\n• Zgodność: Niektóre mostki nie przekazują poleceń nawet po zainstalowaniu sterownika.",
     ]
 
     static let turkish: [String: String] = [
@@ -1731,5 +1743,9 @@ extension ExtraTranslations {
         "External SSDs connected via Thunderbolt 3/4/5 or USB4 in PCIe mode attach directly to the PCIe bus and support full S.M.A.R.T. monitoring without any driver.": "Thunderbolt 3/4/5 veya PCIe modunda USB4 üzerinden bağlanan harici SSD'ler doğrudan PCIe veriyoluna bağlanır ve herhangi bir sürücü olmadan tam S.M.A.R.T. izlemeyi destekler.",
         "Help the project": "Projeye yardım edin",
         "You can export a diagnostic report to help Aman expand its hardware compatibility database.": "Aman'ın donanım uyumluluk veritabanını genişletmesine yardımcı olmak için bir tanı raporu dışa aktarabilirsiniz.",
+        "Read via SAT SMART Driver": "SAT SMART Driver üzerinden okundu",
+        "Third-party driver (advanced)": "Üçüncü taraf sürücü (gelişmiş)",
+        "View on GitHub": "GitHub'da görüntüle",
+        "An open-source kernel extension (such as the SAT SMART Driver) can enable S.M.A.R.T. for compatible USB SATA enclosures by translating ATA commands.\n\nImportant considerations:\n• Apple Silicon: Installing a kernel extension requires setting macOS Startup Security to \"Reduced Security\" in Recovery.\n• SATA only: Does not support USB NVMe enclosures.\n• Reconnect tip: macOS does not load third-party drivers at boot. If connected during startup, unplug and replug the drive.\n• Compatibility: Some bridge chips do not relay commands even with the driver.": "Açık kaynaklı bir çekirdek uzantısı (SAT SMART Driver gibi), ATA komutlarını çevirerek uyumlu USB SATA kutuları için S.M.A.R.T. izlemeyi etkinleştirebilir.\n\nÖnemli hususlar ve sınırlamalar:\n• Apple Silicon: Çekirdek uzantısı yüklemek, Kurtarma modunda macOS Başlatma Güvenliği'nin \"Azaltılmış Güvenlik\" olarak ayarlanmasını gerektirir.\n• Yalnızca SATA: USB NVMe kutularını desteklemez.\n• Yeniden bağlama ipucu: macOS başlangıçta üçüncü taraf sürücüleri yüklemez. Mac başlatılmadan önce bağlıysa diski çıkarıp tekrar takın.\n• Uyumluluk: Bazı köprü yongaları sürücü yüklü olsa bile komutları iletmez.",
     ]
 }
