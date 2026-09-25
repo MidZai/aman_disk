@@ -111,7 +111,10 @@ public struct SmartActivator {
 
     /// Without a readable serial number, the BSD name is used as a fallback.
     private func memoryKey(bsdName: String) -> String {
-        device.serialNumber(bsdName: bsdName) ?? "bsd:\(bsdName)"
+        if let s = device.serialNumber(bsdName: bsdName)?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty {
+            return DiskIdentity.key(model: "smartActivation", serial: s)
+        }
+        return "bsd:\(bsdName)"
     }
 
     static func code(of error: Error) -> Int32 {

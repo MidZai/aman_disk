@@ -16,6 +16,7 @@ enum BenchCLI {
                 if let reason = target.rejectionReason {
                     var rStr = ""
                     switch reason {
+                    case .unmounted: rStr = "Unmounted"
                     case .readOnly: rStr = "Read-only"
                     case .network: rStr = "Network volume"
                     case .diskImage: rStr = "Disk image"

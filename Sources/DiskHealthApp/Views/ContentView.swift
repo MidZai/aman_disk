@@ -145,10 +145,13 @@ private struct SidebarView: View {
                 }
             }
 
-            if !externalDisks.isEmpty {
+            if !externalDisks.isEmpty || !appManager.disconnectedDisks.isEmpty {
                 Section(L("External drives", "Disques externes")) {
                     ForEach(externalDisks) { disk in
                         diskRows(for: disk)
+                    }
+                    ForEach(appManager.disconnectedDisks) { item in
+                        disconnectedDiskRow(for: item)
                     }
                 }
             }
@@ -159,6 +162,24 @@ private struct SidebarView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
         }
+    }
+
+    @ViewBuilder
+    private func disconnectedDiskRow(for item: DisconnectedDisk) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "externaldrive.badge.xmark")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.disk.physical.model)
+                    .font(.body)
+                    .lineLimit(1)
+                    .environment(\.layoutDirection, .leftToRight)
+                Text(Strings.lastSeen(date: Formatters.date(item.lastSeen)))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .tag(SidebarItem.disconnectedDisk(item.id))
     }
 
     @ViewBuilder
@@ -191,7 +212,7 @@ private struct SidebarView: View {
         Divider()
         Button(L("Open Disk Utility", "Ouvrir Utilitaire de disque")) {
             NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/System/Applications/Utilities/Disk Utility.app"),
-                                               configuration: NSWorkspace.OpenConfiguration())
+                                                configuration: NSWorkspace.OpenConfiguration())
         }
     }
 }
@@ -207,6 +228,12 @@ private struct DetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             switch appManager.selection {
+            case .disconnectedDisk(let key)?:
+                if let item = appManager.disconnectedDisk(withId: key) {
+                    DisconnectedDiskView(item: item, appManager: appManager).id(item.id)
+                } else {
+                    placeholder(L("This drive is no longer connected", "Ce disque n'est plus connecté"), systemImage: "externaldrive.badge.xmark")
+                }
             case .physicalDisk(let id)?:
                 if let disk = appManager.disk(withId: id) {
                     // `.id`: each drive has its own view identity (local state, ring animation).
@@ -218,7 +245,8 @@ private struct DetailView: View {
                         DiskDetailView(disk: disk).id(disk.id)
                     }
                 } else {
-                    placeholder(L("This drive is no longer connected", "Ce disque n'est plus connecté"), systemImage: "externaldrive.badge.xmark")
+                    let lastSeen = appManager.lastSeenDate(forBsdName: id)
+                    disconnectedPlaceholder(lastSeen: lastSeen)
                 }
             case .volume(let id)?:
                 if let volume = appManager.volumes.first(where: { $0.id == id }) {
@@ -230,6 +258,23 @@ private struct DetailView: View {
                 placeholder(L("Select a drive", "Sélectionnez un disque"), systemImage: "internaldrive")
             }
         }
+    }
+
+    private func disconnectedPlaceholder(lastSeen: Date?) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: "externaldrive.badge.xmark")
+                .font(.system(size: 36, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text(L("This drive is no longer connected", "Ce disque n'est plus connecté"))
+                .font(.title3)
+                .foregroundStyle(.secondary)
+            if let lastSeen {
+                Text(Strings.lastSeen(date: Formatters.date(lastSeen)))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func placeholder(_ text: String, systemImage: String) -> some View {

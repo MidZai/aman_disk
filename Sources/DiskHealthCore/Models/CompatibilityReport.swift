@@ -77,7 +77,7 @@ public struct CompatibilityReport: Codable, Equatable, Sendable {
     public let iokitParentChain: [IOKitNodeDiagnostic]
 
     public init(
-        amanVersion: String = "0.9.7",
+        amanVersion: String = "0.9.8",
         macosVersion: String,
         architecture: String,
         model: String,
@@ -113,7 +113,7 @@ public struct CompatibilityReport: Codable, Equatable, Sendable {
     public static func collect(
         physical: PhysicalDisk,
         snapshot: DiskHealthSnapshot? = nil,
-        amanVersion: String = "0.9.7"
+        amanVersion: String = "0.9.8"
     ) -> CompatibilityReport {
         let os = ProcessInfo.processInfo.operatingSystemVersion
         let macosVersion = "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"

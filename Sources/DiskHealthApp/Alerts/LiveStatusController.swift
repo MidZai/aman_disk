@@ -105,7 +105,7 @@ final class LiveStatusController {
     private func update(disks: [RealDisk]) {
         refreshDockIcon()
         
-        let readings = disks.filter { ($0.physical.isInternal || $0.physical.driveConnection == .thunderboltNVMe) && $0.snapshot != nil }.map { disk in
+        let readings = disks.filter { $0.physical.healthCapability == .supported && $0.snapshot != nil }.map { disk in
             AlertReading(
                 diskId: disk.id,
                 name: disk.physical.model,
@@ -126,6 +126,7 @@ final class LiveStatusController {
     
     /// Updates the Dock icon only if the percentage, the status or the setting changes.
     func refreshDockIcon() {
+        guard NSApp != nil else { return }
         let enabled = Self.dockShowsHealth
         let state = appManager?.bootDisk.map {
             DockIconRenderer.State(health: $0.health, capability: $0.physical.healthCapability)

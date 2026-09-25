@@ -149,4 +149,42 @@ import DiskHealthCore
         engine2.process([reading(status: .caution, life: 40)])
         #expect(poster.posted.isEmpty)
     }
+
+    @Test func externalDriveReceivesAlerts() {
+        let engine = makeEngine()
+        let ext = AlertReading(diskId: "disk3", name: "Crucial X8", status: .good, firstReason: nil, temperatureC: 35, isRotational: false, lifePercent: 80)
+        engine.process([ext])
+        #expect(poster.posted.isEmpty)
+
+        // Status degraded to caution
+        let degraded = AlertReading(diskId: "disk3", name: "Crucial X8", status: .caution, firstReason: "Overheating wear", temperatureC: 38, isRotational: false, lifePercent: 80)
+        engine.process([degraded])
+        #expect(poster.posted.count == 1)
+        #expect(poster.posted.last?.diskId == "disk3")
+        #expect(poster.posted.last?.message == "Crucial X8: Needs attention. Overheating wear.")
+    }
+
+    @Test func externalDriveHotUnplugEmitsNoAlert() {
+        let engine = makeEngine()
+        let internalDisk = AlertReading(diskId: "disk0", name: "Internal SSD", status: .good, firstReason: nil, temperatureC: 35, isRotational: false, lifePercent: 95)
+        let externalDisk = AlertReading(diskId: "disk3", name: "Seagate Backup", status: .good, firstReason: nil, temperatureC: 32, isRotational: true, lifePercent: nil)
+
+        // Both drives connected
+        engine.process([internalDisk, externalDisk])
+        #expect(poster.posted.isEmpty)
+
+        // Advance clock and simulate external drive hot-unplug: only internalDisk is reported
+        clock.advance(30)
+        let postDisconnectEvents = engine.process([internalDisk])
+
+        // Verify: ZERO alerts emitted when external drive is unplugged
+        #expect(postDisconnectEvents.isEmpty)
+        #expect(poster.posted.isEmpty)
+
+        // Another cycle without external drive
+        clock.advance(30)
+        let secondCycleEvents = engine.process([internalDisk])
+        #expect(secondCycleEvents.isEmpty)
+        #expect(poster.posted.isEmpty)
+    }
 }

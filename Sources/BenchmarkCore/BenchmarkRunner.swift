@@ -123,6 +123,11 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
         stop(reason: nil)
     }
 
+    /// Drive disconnected during test.
+    public func stopForDisconnection() {
+        stop(reason: "disconnected")
+    }
+
     private func stop(reason: String?) {
         lock.withLock {
             guard !_cancelled else { return }
@@ -213,7 +218,8 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
         let err = cbench_prepare_file(ctx, path, fileSize)
         prepMonitor.cancel()
         if err != 0 {
-            stop(reason: err == -100 ? nil : "error:\(err)")
+            let isDisconnected = err == 6 /* ENXIO */ || err == 5 /* EIO */ || err == 2 /* ENOENT */ || err == 9 /* EBADF */ || !FileManager.default.fileExists(atPath: target.volume.mountPoint)
+            stop(reason: isDisconnected ? "disconnected" : (err == -100 ? nil : "error:\(err)"))
             return
         }
 
@@ -263,7 +269,8 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
 
                     if pErr != 0 || outRes.error != 0 {
                         let e = outRes.error != 0 ? outRes.error : pErr
-                        stop(reason: e == -100 ? nil : "error:\(e)")
+                        let isDisconnected = e == 6 /* ENXIO */ || e == 5 /* EIO */ || e == 2 /* ENOENT */ || e == 9 /* EBADF */ || !FileManager.default.fileExists(atPath: target.volume.mountPoint)
+                        stop(reason: isDisconnected ? "disconnected" : (e == -100 ? nil : "error:\(e)"))
                         return
                     }
 

@@ -2,6 +2,7 @@ import Foundation
 import DiskHealthCore
 
 public enum TargetRejectionReason: Equatable, CustomStringConvertible {
+    case unmounted
     case readOnly
     case network
     case diskImage
@@ -11,6 +12,7 @@ public enum TargetRejectionReason: Equatable, CustomStringConvertible {
     
     public var description: String {
         switch self {
+        case .unmounted: return L("Unmounted", "Non monté")
         case .readOnly: return L("Read-only", "Lecture seule")
         case .network: return L("Network", "Réseau")
         case .diskImage: return L("Disk image", "Image disque")
@@ -45,8 +47,28 @@ public enum BenchTargetResolver {
         let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
         
         for volume in volumes {
+            if volume.mountPoint.isEmpty || !fileManager.fileExists(atPath: volume.mountPoint) {
+                targets.append(BenchTarget(
+                    volume: volume,
+                    testDirectoryURL: URL(fileURLWithPath: "/"),
+                    rejectionReason: .unmounted,
+                    availableBytes: 0,
+                    isEncrypted: false,
+                    fileSystem: volume.format
+                ))
+                continue
+            }
+            
             let url = URL(fileURLWithPath: volume.mountPoint)
             guard let resourceValues = try? url.resourceValues(forKeys: [.volumeIsReadOnlyKey, .volumeIsLocalKey, .volumeAvailableCapacityKey, .volumeIsEncryptedKey, .volumeLocalizedFormatDescriptionKey]) else {
+                targets.append(BenchTarget(
+                    volume: volume,
+                    testDirectoryURL: URL(fileURLWithPath: "/"),
+                    rejectionReason: .unmounted,
+                    availableBytes: 0,
+                    isEncrypted: false,
+                    fileSystem: volume.format
+                ))
                 continue
             }
             

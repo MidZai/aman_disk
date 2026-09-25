@@ -1,10 +1,12 @@
 import Foundation
 import DiskArbitration
 import DiskHealthCore
+import BenchmarkCore
 
 enum SidebarItem: Hashable {
     case physicalDisk(String)
     case volume(String)
+    case disconnectedDisk(String)
 }
 
 enum DetailTab: Hashable {
@@ -15,6 +17,18 @@ enum DetailTab: Hashable {
 enum SmartNotice: Equatable {
     case enabled
     case failed(code: Int32)
+}
+
+/// Information about an external drive that is currently disconnected.
+public struct DisconnectedDisk: Identifiable, Equatable {
+    public var id: String { disk.benchmarkKey }
+    public let disk: RealDisk
+    public let lastSeen: Date
+
+    public init(disk: RealDisk, lastSeen: Date = Date()) {
+        self.disk = disk
+        self.lastSeen = lastSeen
+    }
 }
 
 /// A physical drive and its latest reading.
@@ -37,6 +51,7 @@ public struct RealDisk: Identifiable, Equatable {
         self.lastRead = lastRead
         self.metrics = snapshot.map(DiskMetrics.init(snapshot:))
         self.historyKey = snapshot.map { DiskIdentity.key(for: $0) }
+            ?? physical.serialNumber.flatMap { $0.isEmpty ? nil : DiskIdentity.key(model: physical.model, serial: $0) }
     }
 
     public var identify: NVMeIdentify? {
@@ -56,7 +71,7 @@ public struct RealDisk: Identifiable, Equatable {
         switch snapshot {
         case .nvme(_, let id): return id.serialNumber
         case .ata(let ata): return ata.serialNumber
-        case nil: return nil
+        case nil: return physical.serialNumber
         }
     }
 
@@ -64,7 +79,7 @@ public struct RealDisk: Identifiable, Equatable {
 
     /// Key for the performance test results.
     var benchmarkKey: String {
-        historyKey ?? DiskIdentity.key(model: physical.model, serial: "")
+        historyKey ?? DiskIdentity.key(model: physical.model, serial: physical.serialNumber ?? "")
     }
 
     /// Life percentage that can be shown, only if the drive reports it.
@@ -80,6 +95,8 @@ final class AppManager: ObservableObject {
 
     @Published private(set) var disks: [RealDisk] = []
     @Published private(set) var volumes: [Volume] = []
+    @Published private(set) var disconnectedDisks: [DisconnectedDisk] = []
+    private var externalDisksHistory: [String: (disk: RealDisk, lastSeen: Date)] = [:]
     /// First load only: later refreshes keep the page on screen.
     @Published private(set) var isLoading = true
     @Published private(set) var isRefreshing = false
@@ -179,6 +196,9 @@ final class AppManager: ObservableObject {
             }.value
 
             guard !Task.isCancelled else { return }
+            if !self.benchmark.isRunning {
+                BenchCleanup.run(volumes: finalVolumes)
+            }
             self.apply(disks: finalDisks, announceChanges: !self.disks.isEmpty)
             self.updateSmartNotices(results)
             self.volumes = finalVolumes
@@ -318,8 +338,16 @@ final class AppManager: ObservableObject {
                 ToastCenter.shared.show(message: L("\(disk.physical.model) connected", "\(disk.physical.model) connecté"), systemImage: "externaldrive.badge.plus")
             }
             for (id, disk) in oldById where !newIds.contains(id) {
+                if benchmark.runningDiskId == id {
+                    benchmark.cancelForDisconnection()
+                }
                 ToastCenter.shared.show(message: L("\(disk.physical.model) disconnected", "\(disk.physical.model) déconnecté"), systemImage: "externaldrive.badge.minus")
-                if selection == .physicalDisk(id) {
+                if disk.physical.isExternal {
+                    externalDisksHistory[disk.benchmarkKey] = (disk, Date())
+                    if selection == .physicalDisk(id) {
+                        selection = .disconnectedDisk(disk.benchmarkKey)
+                    }
+                } else if selection == .physicalDisk(id) {
                     selection = (bootDisk ?? newDisks.first).map { .physicalDisk($0.id) }
                 }
             }
@@ -329,6 +357,15 @@ final class AppManager: ObservableObject {
                 }
             }
         }
+        for disk in newDisks where disk.physical.isExternal {
+            externalDisksHistory.removeValue(forKey: disk.benchmarkKey)
+        }
+        let currentlyConnectedKeys = Set(newDisks.map(\.benchmarkKey))
+        disconnectedDisks = externalDisksHistory.values
+            .filter { !currentlyConnectedKeys.contains($0.disk.benchmarkKey) }
+            .map { DisconnectedDisk(disk: $0.disk, lastSeen: $0.lastSeen) }
+            .sorted { $0.lastSeen > $1.lastSeen }
+
         disks = newDisks
         if case .physicalDisk(let id) = selection, !newDisks.contains(where: { $0.id == id }) {
             selection = (bootDisk ?? newDisks.first).map { .physicalDisk($0.id) }
@@ -343,6 +380,10 @@ final class AppManager: ObservableObject {
             }
         case .volume(let id):
             if !volumes.contains(where: { $0.id == id }) {
+                selection = (bootDisk ?? disks.first).map { .physicalDisk($0.id) }
+            }
+        case .disconnectedDisk(let key):
+            if !disconnectedDisks.contains(where: { $0.id == key }) {
                 selection = (bootDisk ?? disks.first).map { .physicalDisk($0.id) }
             }
         case nil:
@@ -362,11 +403,11 @@ final class AppManager: ObservableObject {
     /// True during a performance test: its sampler takes over the readings.
     var isBenchmarkRunning: Bool { benchmark.isRunning }
 
-    /// Lightweight reading for continuous monitoring: reads the health of the internal drives already
+    /// Lightweight reading for continuous monitoring: reads the health of all monitored drives already
     /// known again (no new discovery), records a sample and updates the display.
     func sampleNow() async {
         if Self.isDemo { return }
-        let targets = disks.filter { ($0.physical.isInternal || $0.physical.driveConnection == .thunderboltNVMe) && $0.physical.healthCapability == .supported && $0.snapshot != nil }
+        let targets = disks.filter { $0.physical.healthCapability == .supported && $0.snapshot != nil }
         guard !targets.isEmpty else { return }
 
         let updated: [RealDisk] = await Task.detached(priority: .utility) {
@@ -413,6 +454,18 @@ final class AppManager: ObservableObject {
 
     func disk(withId id: String) -> RealDisk? {
         disks.first { $0.id == id }
+    }
+
+    func lastSeenDate(forBsdName bsdName: String) -> Date? {
+        disconnectedDisks.first { $0.disk.physical.bsdName == bsdName }?.lastSeen
+    }
+
+    func lastSeenDate(forKey key: String) -> Date? {
+        disconnectedDisks.first { $0.id == key }?.lastSeen
+    }
+
+    func disconnectedDisk(withId id: String) -> DisconnectedDisk? {
+        disconnectedDisks.first { $0.id == id }
     }
 
     var selectedDisk: RealDisk? {

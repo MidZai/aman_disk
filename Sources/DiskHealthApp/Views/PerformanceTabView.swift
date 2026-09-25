@@ -51,7 +51,7 @@ private struct PerformanceContent: View {
                 statusLine
                 BenchGridView(content: gridContent, unit: vm.selectedUnit)
                 if !isRunningHere, let result = displayedResult {
-                    ResultSummary(result: result, isFromHistory: vm.viewedResult != nil) {
+                    ResultSummary(result: result, physical: disk.physical, isFromHistory: vm.viewedResult != nil) {
                         vm.viewedResult = nil
                     }
                 }
@@ -169,6 +169,8 @@ private struct PerformanceContent: View {
     private func rejectionText(_ reason: TargetRejectionReason) -> String {
         let name = vm.selectedTarget?.volume.name ?? L("this volume", "ce volume")
         switch reason {
+        case .unmounted:
+            return L("Volume “\(name)” is not mounted.", "Le volume « \(name) » n'est pas monté.")
         case .insufficientFreeSpace:
             return Strings.benchNoSpace(volume: name, size: Formatters.bytes(vm.selectedSize),
                                         required: Formatters.bytes(max(vm.selectedSize.saturatingMultiplied(by: 5), vm.selectedSize + 5 << 30)))
@@ -243,6 +245,7 @@ private struct PerformanceContent: View {
 /// Conditions of the displayed test, and a way back to the latest result when browsing the history.
 private struct ResultSummary: View {
     let result: BenchmarkResult
+    let physical: PhysicalDisk
     let isFromHistory: Bool
     let onBackToLatest: () -> Void
 
@@ -276,6 +279,11 @@ private struct ResultSummary: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if let linkSpeed = LinkSpeedEstimator.estimate(for: physical) {
+                Text(linkSpeed.explanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Text(Strings.benchHelpValues)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
@@ -290,6 +298,7 @@ private struct ResultSummary: View {
         switch result.stopReason {
         case "temperature": return L("Stopped: temperature", "Arrêté : température")
         case "cancelled": return L("Interrupted", "Interrompu")
+        case "disconnected": return Strings.benchDisconnected
         default: return L("Failed", "Échec")
         }
     }

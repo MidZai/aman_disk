@@ -72,6 +72,8 @@ public enum DiskDiscovery {
                     var usbLinkSpeedBps: UInt64? = nil
                     var usbBcdUSB: UInt16? = nil
                     var usbIsUAS: Bool? = nil
+                    var serialNumber: String? = (protocolChars?["Serial Number"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if serialNumber?.isEmpty == true { serialNumber = nil }
 
                     if driveConnection == .usb || protocolName.contains("USB") {
                         let details = getUSBDetails(service: serviceToProcess)
@@ -82,6 +84,9 @@ public enum DiskDiscovery {
                         usbLinkSpeedBps = details.linkSpeedBps
                         usbBcdUSB = details.bcdUSB
                         usbIsUAS = details.isUAS
+                        if serialNumber == nil {
+                            serialNumber = details.serialNumber
+                        }
                         if usbIsUAS == nil {
                             let interconnect = (protocolChars?["Physical Interconnect"] as? String) ?? ""
                             if interconnect.contains("Attached SCSI") {
@@ -141,6 +146,7 @@ public enum DiskDiscovery {
                         mediumType: mediumType,
                         healthCapability: healthCapability,
                         smartAvailability: smartAvailability,
+                        serialNumber: serialNumber,
                         isVirtual: isVirtual,
                         isDiskImage: isDiskImage
                     ))
@@ -231,7 +237,8 @@ public enum DiskDiscovery {
         productName: String?,
         linkSpeedBps: UInt64?,
         bcdUSB: UInt16?,
-        isUAS: Bool?
+        isUAS: Bool?,
+        serialNumber: String?
     ) {
         var vid: UInt16?
         var pid: UInt16?
@@ -240,6 +247,7 @@ public enum DiskDiscovery {
         var linkSpeedBps: UInt64?
         var bcdUSB: UInt16?
         var isUAS: Bool?
+        var serialNumber: String?
 
         var current = service
         IOObjectRetain(current)
@@ -281,6 +289,13 @@ public enum DiskDiscovery {
                     productName = pn
                 }
             }
+            if serialNumber == nil {
+                if let sn = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "kUSBSerialNumberString" as CFString, kCFAllocatorDefault, 0) as? String, !sn.isEmpty {
+                    serialNumber = sn.trimmingCharacters(in: .whitespacesAndNewlines)
+                } else if let sn = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "Serial Number" as CFString, kCFAllocatorDefault, 0) as? String, !sn.isEmpty {
+                    serialNumber = sn.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
             if linkSpeedBps == nil, let speed = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "UsbLinkSpeed" as CFString, kCFAllocatorDefault, 0) as? NSNumber {
                 linkSpeedBps = speed.uint64Value
             }
@@ -297,6 +312,6 @@ public enum DiskDiscovery {
                 break
             }
         }
-        return (vid, pid, vendorName, productName, linkSpeedBps, bcdUSB, isUAS)
+        return (vid, pid, vendorName, productName, linkSpeedBps, bcdUSB, isUAS, serialNumber)
     }
 }

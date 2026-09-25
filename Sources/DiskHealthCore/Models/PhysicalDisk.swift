@@ -25,6 +25,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
     public let mediumType: MediumType
     public let healthCapability: HealthCapability
     public let smartAvailability: SmartAvailability?
+    public let serialNumber: String?
     public let isVirtual: Bool
     public let isDiskImage: Bool
 
@@ -47,6 +48,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         mediumType: MediumType,
         healthCapability: HealthCapability,
         smartAvailability: SmartAvailability? = nil,
+        serialNumber: String? = nil,
         isVirtual: Bool = false,
         isDiskImage: Bool = false
     ) {
@@ -55,6 +57,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         self.sizeBytes = sizeBytes
         self.isInternal = isInternal
         self.connection = connection
+        self.serialNumber = serialNumber
         if let dc = driveConnection {
             self.driveConnection = dc
         } else {
@@ -106,6 +109,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         mediumType: MediumType,
         healthCapability: HealthCapability,
         smartAvailability: SmartAvailability? = nil,
+        serialNumber: String? = nil,
         isVirtual: Bool = false,
         isDiskImage: Bool = false
     ) {
@@ -137,6 +141,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
             mediumType: mediumType,
             healthCapability: healthCapability,
             smartAvailability: smartAvailability,
+            serialNumber: serialNumber,
             isVirtual: isVirtual,
             isDiskImage: isDiskImage
         )
@@ -163,6 +168,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         mediumType      = try c.decode(MediumType.self, forKey: .mediumType)
         healthCapability = try c.decode(HealthCapability.self, forKey: .healthCapability)
         smartAvailability = try c.decodeIfPresent(SmartAvailability.self, forKey: .smartAvailability)
+        serialNumber    = try c.decodeIfPresent(String.self, forKey: .serialNumber)
         isVirtual       = try c.decodeIfPresent(Bool.self, forKey: .isVirtual) ?? false
         isDiskImage     = try c.decodeIfPresent(Bool.self, forKey: .isDiskImage) ?? false
 
@@ -187,7 +193,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case bsdName, model, sizeBytes, isInternal, connection, driveConnection, volumeNames
         case usbVendorID, usbProductID, usbVendorName, usbProductName, usbLinkSpeedBps, usbBcdUSB, usbIsUAS
-        case protocolType, mediumType, healthCapability, smartAvailability
+        case protocolType, mediumType, healthCapability, smartAvailability, serialNumber
         case isVirtual, isDiskImage
     }
 
@@ -211,6 +217,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
             mediumType: mediumType,
             healthCapability: capability,
             smartAvailability: smartAvailability,
+            serialNumber: serialNumber,
             isVirtual: isVirtual,
             isDiskImage: isDiskImage
         )
@@ -236,6 +243,7 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
             mediumType: mediumType,
             healthCapability: healthCapability,
             smartAvailability: availability,
+            serialNumber: serialNumber,
             isVirtual: isVirtual,
             isDiskImage: isDiskImage
         )

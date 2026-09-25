@@ -14,6 +14,8 @@ struct InspectorView: View {
         case .volume(let id)?:
             let volume = appManager.volumes.first { $0.id == id }
             return volume?.physicalDiskBSDNames.first.flatMap(appManager.disk(withId:))
+        case .disconnectedDisk(let key)?:
+            return appManager.disconnectedDisk(withId: key)?.disk
         case nil:
             return nil
         }

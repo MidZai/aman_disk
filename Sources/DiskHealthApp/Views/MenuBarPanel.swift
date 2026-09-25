@@ -35,8 +35,12 @@ struct MenuBarPanel: View {
 
     @State private var bootSamples: [HistorySample] = []
 
-    private var monitoredDisks: [RealDisk] {
-        appManager.disks
+    private var internalDisks: [RealDisk] {
+        appManager.disks.filter { $0.physical.isInternal }
+    }
+
+    private var externalDisks: [RealDisk] {
+        appManager.disks.filter { $0.physical.isExternal }
     }
 
     var body: some View {
@@ -44,13 +48,19 @@ struct MenuBarPanel: View {
             Text("Aman Disk")
                 .font(.headline)
 
-            if monitoredDisks.isEmpty || appManager.isLoading {
+            if (internalDisks.isEmpty && externalDisks.isEmpty) || appManager.isLoading {
                 Text(appManager.isLoading ? L("Reading drives…", "Lecture des disques…") : L("No drive found", "Aucun disque détecté"))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
                 VStack(spacing: 8) {
-                    ForEach(monitoredDisks) { disk in
+                    ForEach(internalDisks) { disk in
+                        diskRow(disk)
+                    }
+                    if !internalDisks.isEmpty && !externalDisks.isEmpty {
+                        Divider().padding(.vertical, 2)
+                    }
+                    ForEach(externalDisks) { disk in
                         diskRow(disk)
                     }
                 }

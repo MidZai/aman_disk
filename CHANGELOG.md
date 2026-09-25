@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.9.8 — 2026-09-25
+
+- **Performance test on external drives**:
+  - Benchmarking is now available for all connected external drives. Select any mounted, writable volume with sufficient free space directly in the Performance tab.
+  - Safe pre-flight validation prevents launching tests on unmounted, read-only, or full volumes with clear contextual rejection notices.
+  - Theoretical practical throughput indicator displayed below test results (e.g. « Lien USB 5 Gb/s : environ 450 Mo/s maximum en pratique » / « Lien USB 10 Gb/s : environ 1 050 Mo/s » / « Lien Thunderbolt : environ 3 000 Mo/s »).
+  - Robust disconnection recovery: unplugging a drive mid-test stops the benchmark cleanly with « Disque déconnecté pendant le test » ("Drive disconnected during test") and automatically purges temporary test files without crashing or hanging.
+- **Persistent external drive history & strict privacy**:
+  - External drives automatically regain their temperature, health, and benchmark histories upon reconnection via a deterministic SHA-256 fingerprint hash combining model and serial number.
+  - Plaintext serial numbers are never written to disk in history, benchmark, or event log files inside `~/Library/Application Support/io.github.aman-disk.AmanDisk/`.
+  - Disconnected external drives are gracefully tracked with a « Vu pour la dernière fois : [date] » ("Last seen: [date]") indicator, preserving past test results and historical metrics.
+- **Continuous surveillance & hot-unplug safety**:
+  - Continuous health sampling and alert notifications apply to all readable external drives (Thunderbolt NVMe, USB SATA via SAT driver).
+  - Safe unplugging: hot-unplugging an external drive emits zero false-positive alerts.
+- **Menu Bar Panel**:
+  - External drives are listed below internal drives, separated by a visual divider for clean navigation.
+- **Unit test suite**:
+  - Added test suites for link speed estimation (`LinkSpeedEstimatorTests`), disconnection benchmark cleanup (`ExternalBenchmarkTests`), history privacy and serial hashing (`ExternalHistoryPrivacyTests`), and external drive app lifecycle (`Phase7AppTests`).
+
 ## 0.9.7 — 2026-09-25
 
 - **Anonymized compatibility report export**: new command "Export Compatibility Report…" ("Exporter un rapport de compatibilité…") available in the Help menu, Drive menu, external drive contextual menu, and the unsupported drive view.

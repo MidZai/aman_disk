@@ -79,6 +79,10 @@ enum Strings {
         L("Test stopped: the drive reached \(temp) °C. Let it cool down before running it again.", "Test arrêté : le disque a atteint \(temp) °C. Laissez-le refroidir avant de relancer.")
     }
     static let benchCancelled = L("Test cancelled. The test file was deleted.", "Test annulé. Le fichier de test a été supprimé.")
+    static let benchDisconnected = L("Drive disconnected during test", "Disque déconnecté pendant le test")
+    static func lastSeen(date: String) -> String {
+        L("Last seen: \(date)", "Vu pour la dernière fois : \(date)")
+    }
     static let benchHelpVolume = L("Volume where the test file is created. The test measures the physical drive that holds this volume.", "Volume sur lequel le fichier de test est créé. Le test mesure le disque physique qui porte ce volume.")
     static let benchHelpProfile = L("Quick: 3 passes of 2 s. Standard: 5 passes of 5 s. Read only: writes the test file once, then only reads.", "Rapide : 3 passes de 2 s. Standard : 5 passes de 5 s. Lecture seule : écrit le fichier de test une seule fois, puis ne fait que des lectures.")
     static let benchHelpSize = L("Size of the test file. A larger file reduces the effect of the drive's caches, but writes more data.", "Taille du fichier de test. Un fichier plus grand limite l'effet des caches du disque, mais écrit davantage.")

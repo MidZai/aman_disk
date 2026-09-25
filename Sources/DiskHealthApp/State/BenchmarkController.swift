@@ -47,6 +47,11 @@ final class BenchmarkController: ObservableObject {
         runner?.cancel()
     }
 
+    /// Drive was unplugged / disconnected during a test.
+    func cancelForDisconnection() {
+        runner?.stopForDisconnection()
+    }
+
     /// Quitting during a test: the app waits for the test file to be deleted before quitting.
     func cancelForTermination() {
         terminationPending = true
@@ -98,6 +103,8 @@ final class BenchmarkController: ObservableObject {
             ToastCenter.shared.show(message: Strings.benchStoppedTemp(temp: temp), systemImage: "thermometer.high")
         case "cancelled":
             ToastCenter.shared.show(message: Strings.benchCancelled, systemImage: "xmark.circle")
+        case "disconnected":
+            ToastCenter.shared.show(message: Strings.benchDisconnected, systemImage: "externaldrive.badge.xmark")
         default:
             ToastCenter.shared.show(message: L("The test failed. The test file was deleted.", "Le test a échoué. Le fichier de test a été supprimé."), systemImage: "exclamationmark.triangle")
         }
