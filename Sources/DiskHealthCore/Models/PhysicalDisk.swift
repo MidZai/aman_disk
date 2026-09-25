@@ -16,6 +16,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
     public let volumeNames: [String]
     public let usbVendorID: UInt16?     // only if connection == .usb
     public let usbProductID: UInt16?
+    public let usbVendorName: String?
+    public let usbProductName: String?
+    public let usbLinkSpeedBps: UInt64?
+    public let usbBcdUSB: UInt16?
+    public let usbIsUAS: Bool?
     public let protocolType: StorageProtocol
     public let mediumType: MediumType
     public let healthCapability: HealthCapability
@@ -33,6 +38,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         volumeNames: [String],
         usbVendorID: UInt16? = nil,
         usbProductID: UInt16? = nil,
+        usbVendorName: String? = nil,
+        usbProductName: String? = nil,
+        usbLinkSpeedBps: UInt64? = nil,
+        usbBcdUSB: UInt16? = nil,
+        usbIsUAS: Bool? = nil,
         protocolType: StorageProtocol,
         mediumType: MediumType,
         healthCapability: HealthCapability,
@@ -64,6 +74,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         self.volumeNames = volumeNames
         self.usbVendorID = usbVendorID
         self.usbProductID = usbProductID
+        self.usbVendorName = usbVendorName
+        self.usbProductName = usbProductName
+        self.usbLinkSpeedBps = usbLinkSpeedBps
+        self.usbBcdUSB = usbBcdUSB
+        self.usbIsUAS = usbIsUAS
         self.protocolType = protocolType
         self.mediumType = mediumType
         self.healthCapability = healthCapability
@@ -82,6 +97,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         volumeNames: [String],
         usbVendorID: UInt16? = nil,
         usbProductID: UInt16? = nil,
+        usbVendorName: String? = nil,
+        usbProductName: String? = nil,
+        usbLinkSpeedBps: UInt64? = nil,
+        usbBcdUSB: UInt16? = nil,
+        usbIsUAS: Bool? = nil,
         protocolType: StorageProtocol,
         mediumType: MediumType,
         healthCapability: HealthCapability,
@@ -108,6 +128,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
             volumeNames: volumeNames,
             usbVendorID: usbVendorID,
             usbProductID: usbProductID,
+            usbVendorName: usbVendorName,
+            usbProductName: usbProductName,
+            usbLinkSpeedBps: usbLinkSpeedBps,
+            usbBcdUSB: usbBcdUSB,
+            usbIsUAS: usbIsUAS,
             protocolType: protocolType,
             mediumType: mediumType,
             healthCapability: healthCapability,
@@ -129,6 +154,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
         volumeNames     = try c.decode([String].self, forKey: .volumeNames)
         usbVendorID     = try c.decodeIfPresent(UInt16.self, forKey: .usbVendorID)
         usbProductID    = try c.decodeIfPresent(UInt16.self, forKey: .usbProductID)
+        usbVendorName   = try c.decodeIfPresent(String.self, forKey: .usbVendorName)
+        usbProductName  = try c.decodeIfPresent(String.self, forKey: .usbProductName)
+        usbLinkSpeedBps = try c.decodeIfPresent(UInt64.self, forKey: .usbLinkSpeedBps)
+        usbBcdUSB       = try c.decodeIfPresent(UInt16.self, forKey: .usbBcdUSB)
+        usbIsUAS        = try c.decodeIfPresent(Bool.self, forKey: .usbIsUAS)
         protocolType    = try c.decode(StorageProtocol.self, forKey: .protocolType)
         mediumType      = try c.decode(MediumType.self, forKey: .mediumType)
         healthCapability = try c.decode(HealthCapability.self, forKey: .healthCapability)
@@ -156,7 +186,8 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
 
     private enum CodingKeys: String, CodingKey {
         case bsdName, model, sizeBytes, isInternal, connection, driveConnection, volumeNames
-        case usbVendorID, usbProductID, protocolType, mediumType, healthCapability, smartAvailability
+        case usbVendorID, usbProductID, usbVendorName, usbProductName, usbLinkSpeedBps, usbBcdUSB, usbIsUAS
+        case protocolType, mediumType, healthCapability, smartAvailability
         case isVirtual, isDiskImage
     }
 
@@ -171,6 +202,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
             volumeNames: volumeNames,
             usbVendorID: usbVendorID,
             usbProductID: usbProductID,
+            usbVendorName: usbVendorName,
+            usbProductName: usbProductName,
+            usbLinkSpeedBps: usbLinkSpeedBps,
+            usbBcdUSB: usbBcdUSB,
+            usbIsUAS: usbIsUAS,
             protocolType: protocolType,
             mediumType: mediumType,
             healthCapability: capability,
@@ -191,6 +227,11 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
             volumeNames: volumeNames,
             usbVendorID: usbVendorID,
             usbProductID: usbProductID,
+            usbVendorName: usbVendorName,
+            usbProductName: usbProductName,
+            usbLinkSpeedBps: usbLinkSpeedBps,
+            usbBcdUSB: usbBcdUSB,
+            usbIsUAS: usbIsUAS,
             protocolType: protocolType,
             mediumType: mediumType,
             healthCapability: healthCapability,
@@ -202,6 +243,53 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
 
     public var isThunderbolt: Bool {
         driveConnection == .thunderboltNVMe
+    }
+
+    /// Formatted USB Bridge Chip string (e.g. "Realtek (0x0BDA)" or "Puce inconnue (0x1234)")
+    public var usbBridgeLabel: String? {
+        guard let vid = usbVendorID else { return nil }
+        let hexStr = String(format: "0x%04X", vid)
+        if let vendor = USBBridgeDatabase.shared.vendorName(for: vid) ?? usbVendorName, !vendor.isEmpty {
+            return "\(vendor) (\(hexStr))"
+        }
+        return L("Unknown chip (\(hexStr))", "Puce inconnue (\(hexStr))")
+    }
+
+    /// Formatted USB link speed (e.g. "USB 3.2 Gen 2 — 10 Gb/s", "USB 3.0 — 5 Gb/s", "USB 2.0 — 480 Mb/s")
+    public var usbLinkSpeedLabel: String? {
+        guard driveConnection == .usb || protocolType == .usb else { return nil }
+        if let bps = usbLinkSpeedBps {
+            if bps >= 40_000_000_000 {
+                return "USB4 — 40\(Formatters.unitSpace)Gb/s"
+            } else if bps >= 20_000_000_000 {
+                return "USB 3.2 Gen 2x2 — 20\(Formatters.unitSpace)Gb/s"
+            } else if bps >= 10_000_000_000 {
+                return "USB 3.2 Gen 2 — 10\(Formatters.unitSpace)Gb/s"
+            } else if bps >= 5_000_000_000 {
+                return "USB 3.0 — 5\(Formatters.unitSpace)Gb/s"
+            } else if bps >= 480_000_000 {
+                return "USB 2.0 — 480\(Formatters.unitSpace)Mb/s"
+            } else if bps >= 12_000_000 {
+                return "USB 1.1 — 12\(Formatters.unitSpace)Mb/s"
+            }
+        }
+        if let bcd = usbBcdUSB {
+            if bcd >= 0x0320 { return "USB 3.2" }
+            if bcd >= 0x0310 { return "USB 3.1" }
+            if bcd >= 0x0300 { return "USB 3.0" }
+            if bcd >= 0x0200 { return "USB 2.0" }
+            if bcd >= 0x0110 { return "USB 1.1" }
+        }
+        return nil
+    }
+
+    /// Formatted USB protocol label (e.g. "UAS" or "BOT")
+    public var usbProtocolLabel: String? {
+        guard driveConnection == .usb || protocolType == .usb else { return nil }
+        if let isUAS = usbIsUAS {
+            return isUAS ? "UAS (USB Attached SCSI)" : "BOT (Bulk-Only Transport)"
+        }
+        return nil
     }
 
     /// Detailed connection type for disk details: e.g. “Thunderbolt / USB4 (PCIe)”

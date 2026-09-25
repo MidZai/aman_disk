@@ -36,7 +36,7 @@ struct MenuBarPanel: View {
     @State private var bootSamples: [HistorySample] = []
 
     private var monitoredDisks: [RealDisk] {
-        appManager.disks.filter { $0.physical.isInternal || ($0.physical.driveConnection == .thunderboltNVMe && $0.snapshot != nil) }
+        appManager.disks
     }
 
     var body: some View {
@@ -45,7 +45,7 @@ struct MenuBarPanel: View {
                 .font(.headline)
 
             if monitoredDisks.isEmpty || appManager.isLoading {
-                Text(appManager.isLoading ? L("Reading drives…", "Lecture des disques…") : L("No supported drive found", "Aucun disque pris en charge"))
+                Text(appManager.isLoading ? L("Reading drives…", "Lecture des disques…") : L("No drive found", "Aucun disque détecté"))
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
@@ -85,7 +85,8 @@ struct MenuBarPanel: View {
     }
 
     private func diskRow(_ disk: RealDisk) -> some View {
-        HStack(spacing: 10) {
+        let hasHealth = disk.physical.healthCapability == .supported && disk.snapshot != nil
+        return HStack(spacing: 10) {
             MiniRingView(health: disk.health, capability: disk.physical.healthCapability, size: 26)
             VStack(alignment: .leading, spacing: 1) {
                 Text(disk.physical.model)
@@ -93,22 +94,30 @@ struct MenuBarPanel: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .environment(\.layoutDirection, .leftToRight)
-                Text(disk.health.status.localizedLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if hasHealth {
+                    Text(disk.health.status.localizedLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("—")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
             Spacer(minLength: 4)
             VStack(alignment: .trailing, spacing: 1) {
-                if let t = disk.temperatureC {
-                    Text(Formatters.temperature(t))
-                        .font(.callout)
-                        .monospacedDigit()
-                }
-                if let pct = disk.knownLifePercent {
-                    Text(L("\(pct)\(Formatters.unitSpace)% life", "\(pct)\(Formatters.unitSpace)% de vie"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
+                if hasHealth {
+                    if let t = disk.temperatureC {
+                        Text(Formatters.temperature(t))
+                            .font(.callout)
+                            .monospacedDigit()
+                    }
+                    if let pct = disk.knownLifePercent {
+                        Text(L("\(pct)\(Formatters.unitSpace)% life", "\(pct)\(Formatters.unitSpace)% de vie"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
                 }
             }
         }

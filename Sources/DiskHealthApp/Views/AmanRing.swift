@@ -94,6 +94,7 @@ struct MiniRingView: View {
     var size: CGFloat = 22
 
     var body: some View {
+        let isSupported = capability == .supported
         Canvas { ctx, canvasSize in
             let rect = CGRect(origin: .zero, size: canvasSize)
             let s = min(canvasSize.width, canvasSize.height) / 100
@@ -104,12 +105,14 @@ struct MiniRingView: View {
             let track = Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
             ctx.stroke(track, with: .color(.secondary.opacity(0.35)), lineWidth: w)
 
-            let fraction = AmanPalette.fraction(health: health, capability: capability)
-            var arc = Path()
-            arc.addArc(center: c, radius: r, startAngle: .radians(-.pi / 2), endAngle: .radians(-.pi / 2 + AmanRingGeometry.sweep(fraction: fraction)), clockwise: false)
-            ctx.stroke(arc, with: .color(AmanPalette.ringColor(health: health, capability: capability)), style: StrokeStyle(lineWidth: w, lineCap: .round))
+            if isSupported {
+                let fraction = AmanPalette.fraction(health: health, capability: capability)
+                var arc = Path()
+                arc.addArc(center: c, radius: r, startAngle: .radians(-.pi / 2), endAngle: .radians(-.pi / 2 + AmanRingGeometry.sweep(fraction: fraction)), clockwise: false)
+                ctx.stroke(arc, with: .color(AmanPalette.ringColor(health: health, capability: capability)), style: StrokeStyle(lineWidth: w, lineCap: .round))
+            }
 
-            ctx.fill(Path(AmanRingGeometry.dropPath(in: rect)), with: .color(.primary))
+            ctx.fill(Path(AmanRingGeometry.dropPath(in: rect)), with: .color(isSupported ? .primary : .secondary.opacity(0.6)))
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)

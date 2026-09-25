@@ -36,6 +36,9 @@ let package = Package(
         .target(
             name: "DiskHealthCore",
             dependencies: ["CDiskIO"],
+            resources: [
+                .process("Resources")
+            ],
             linkerSettings: [
                 .linkedFramework("IOKit"),
                 .linkedFramework("DiskArbitration"),

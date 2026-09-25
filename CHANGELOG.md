@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.5 — 2026-09-24
+
+- **USB drive details without S.M.A.R.T.**: displays maximum useful hardware information for any USB drive, even when S.M.A.R.T. health data is not accessible through macOS.
+- **Bridge chip identification**: identifies bridge controller vendors (JMicron `0x152D`, ASMedia `0x174C`, Realtek `0x0BDA`) from a local offline resource database (`Resources/usb-bridges.json`), gracefully falling back to raw hexadecimal notation (e.g. `Puce inconnue (0x1234)` / `Unknown chip (0x1234)`).
+- **USB link speed & protocol**: inspects IOKit `IOUSBHostDevice` hierarchy to display link speed (e.g. `USB 3.2 Gen 2 — 10 Gb/s`, `USB 3.0 — 5 Gb/s`, `USB 2.0 — 480 Mb/s`) and transport protocol (`UAS (USB Attached SCSI)` vs `BOT (Bulk-Only Transport)`).
+- **Volumes & partitions**: lists all partitions and volumes mounted on USB drives with capacity, filesystem format, and available space.
+- **Calm, neutral state card**: replaced the warning card with a neutral, non-alarming card explaining that macOS does not relay S.M.A.R.T. commands across most USB enclosures and that this does not indicate a drive issue.
+- **"Learn More" explanation sheet**: added an interactive modal sheet explaining bridge chips, third-party kernel drivers (SAT SMART Driver), Thunderbolt/USB4 enclosures, and how to export diagnostics to help expand hardware compatibility.
+- **Dock & Menu Bar behavior**: Dock icon strictly tracks the startup boot drive; USB drives in the menu bar panel show a neutral gray `" — "` status without displaying errors or misleading percentages.
+- **Complete localization**: all new USB strings, labels, and help sheets are localized across all 18 supported languages.
+- **Test suite**: added `USBBridgeTests` covering bridge chip lookups, unknown chip handling, malformed/missing JSON fallbacks, link speed and protocol formatting, and simulated hardware fixtures.
+
 ## 0.9.4 — 2026-09-24
 
 - **Thunderbolt / USB4 NVMe enclosures**: full S.M.A.R.T. reading on external NVMe SSDs in Thunderbolt 3/4/5 and USB4 (PCIe mode) enclosures (e.g. OWC Envoy Pro FX, Acasis, Trebleet, Sabrent).

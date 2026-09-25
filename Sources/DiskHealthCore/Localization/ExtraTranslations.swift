@@ -85,6 +85,52 @@ public struct ExtraTranslations {
             default: return nil
             }
         }
+
+        if english.starts(with: "Unknown chip (") && english.hasSuffix(")") {
+            let hex = String(english.dropFirst("Unknown chip (".count).dropLast())
+            switch language {
+            case .zhHans: return "未知芯片（\(hex)）"
+            case .zhHant: return "未知晶片（\(hex)）"
+            case .korean: return "알 수 없는 칩(\(hex))"
+            case .arabic: return "شريحة غير معروفة (\(hex))"
+            case .portuguese: return "Chip desconhecido (\(hex))"
+            case .spanish: return "Chip desconocido (\(hex))"
+            case .german: return "Unbekannter Chip (\(hex))"
+            case .italian: return "Chip sconosciuto (\(hex))"
+            case .japanese: return "不明なチップ (\(hex))"
+            case .russian: return "Неизвестный чип (\(hex))"
+            case .turkish: return "Bilinmeyen çip (\(hex))"
+            case .dutch: return "Onbekende chip (\(hex))"
+            case .polish: return "Nieznany układ scalony (\(hex))"
+            case .hindi: return "अज्ञात चिप (\(hex))"
+            case .vietnamese: return "Chip không xác định (\(hex))"
+            case .ukrainian: return "Невідомий чип (\(hex))"
+            default: return nil
+            }
+        }
+
+        if english.hasSuffix(" free") {
+            let amount = String(english.dropLast(" free".count))
+            switch language {
+            case .zhHans: return "\(amount) 可用"
+            case .zhHant: return "\(amount) 可用"
+            case .korean: return "\(amount) 여유"
+            case .arabic: return "\(amount) متوفر"
+            case .portuguese: return "\(amount) livres"
+            case .spanish: return "\(amount) libres"
+            case .german: return "\(amount) frei"
+            case .italian: return "\(amount) liberi"
+            case .japanese: return "\(amount) 空き"
+            case .russian: return "\(amount) свободно"
+            case .turkish: return "\(amount) boş"
+            case .dutch: return "\(amount) vrij"
+            case .polish: return "\(amount) wolne"
+            case .hindi: return "\(amount) खाली"
+            case .vietnamese: return "\(amount) khả dụng"
+            case .ukrainian: return "\(amount) вільно"
+            default: return nil
+            }
+        }
         
         return nil
     }

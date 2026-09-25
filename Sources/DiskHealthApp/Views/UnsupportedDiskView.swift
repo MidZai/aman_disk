@@ -6,6 +6,7 @@ struct UnsupportedDiskView: View {
     @EnvironmentObject var appManager: AppManager
     let physical: PhysicalDisk
     @State private var confirmEnable = false
+    @State private var showHelpSheet = false
 
     /// Failure to turn on S.M.A.R.T. (automatically or manually).
     private var enableFailureCode: Int32? {
@@ -21,6 +22,10 @@ struct UnsupportedDiskView: View {
             return .readFailed(code: "\(c)")
         }
         return .noSmartInterface
+    }
+
+    private var isUSB: Bool {
+        physical.driveConnection == .usb || reason == .usbBridge
     }
     
     private var iconName: String {
@@ -45,7 +50,7 @@ struct UnsupportedDiskView: View {
         case .readFailed:
             return Strings.readErrorTitle
         case .usbBridge:
-            return Strings.unsupportedTitle
+            return Strings.usbNoSmartTitle
         }
     }
     
@@ -62,7 +67,7 @@ struct UnsupportedDiskView: View {
         case .readFailed(let code):
             return Strings.readErrorText(code: code)
         case .usbBridge:
-            return Strings.unsupportedText1
+            return Strings.usbNoSmartText
         }
     }
     
@@ -104,72 +109,235 @@ struct UnsupportedDiskView: View {
                 
                 Divider()
                 
-                // Orange card
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: iconName)
-                        .font(.system(size: 22))
-                        .foregroundColor(.orange)
-                        .frame(width: 24, height: 24)
-                    
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(titleText)
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        Text(messageText)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        
-                        if reason == .smartDisabled {
-                            smartActions
-                                .padding(.top, 4)
-                        } else if case .readFailed = reason {
-                            HStack(spacing: 10) {
-                                Button(Strings.retry) {
-                                    appManager.loadDisks()
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(appManager.isRefreshing)
-
-                                if appManager.isRefreshing {
-                                    ProgressView().controlSize(.small)
-                                }
-                            }
-                            .padding(.top, 4)
-                        }
-                        
-                        if showExportButton {
-                            if isReadFailed {
-                                Button(Strings.exportDiagnostic) {
-                                    exportDiagnostic()
-                                }
-                                .buttonStyle(.bordered)
-                                .padding(.top, 4)
-                            } else {
-                                Button(Strings.exportDiagnostic) {
-                                    exportDiagnostic()
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .padding(.top, 4)
-                            }
-                        }
-                    }
+                if isUSB {
+                    usbNoSmartCard
+                    usbDetailsSection
+                } else {
+                    nonUSBCard
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.orange.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.orange.opacity(0.25), lineWidth: 1)
-                )
+
+                volumesSection
                 
                 Spacer()
             }
             .padding(24)
             .frame(maxWidth: 1400, alignment: .top)
             .frame(maxWidth: .infinity)
+        }
+        .sheet(isPresented: $showHelpSheet) {
+            USBEnclosureHelpSheet(onExport: exportDiagnostic)
+        }
+    }
+
+    // MARK: - USB Calm Neutral Card
+
+    private var usbNoSmartCard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 22))
+                .foregroundColor(.secondary)
+                .frame(width: 24, height: 24)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(Strings.usbNoSmartTitle)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text(Strings.usbNoSmartText)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 12) {
+                    Button(Strings.learnMore) {
+                        showHelpSheet = true
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button(Strings.exportDiagnostic) {
+                        exportDiagnostic()
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Non-USB Card
+
+    private var nonUSBCard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: iconName)
+                .font(.system(size: 22))
+                .foregroundColor(.orange)
+                .frame(width: 24, height: 24)
+            
+            VStack(alignment: .leading, spacing: 10) {
+                Text(titleText)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Text(messageText)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                if reason == .smartDisabled {
+                    smartActions
+                        .padding(.top, 4)
+                } else if case .readFailed = reason {
+                    HStack(spacing: 10) {
+                        Button(Strings.retry) {
+                            appManager.loadDisks()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(appManager.isRefreshing)
+
+                        if appManager.isRefreshing {
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                
+                if showExportButton {
+                    if isReadFailed {
+                        Button(Strings.exportDiagnostic) {
+                            exportDiagnostic()
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.top, 4)
+                    } else {
+                        Button(Strings.exportDiagnostic) {
+                            exportDiagnostic()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 4)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Technical Details Grid
+
+    private var usbDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(Strings.driveInformation)
+                .font(.headline)
+
+            Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 12) {
+                GridRow {
+                    InfoPair(label: L("Capacity", "Capacité"), value: Formatters.bytes(physical.sizeBytes))
+                    InfoPair(label: Strings.bridgeChip, value: physical.usbBridgeLabel ?? "—")
+                }
+                GridRow {
+                    InfoPair(label: L("Interface", "Interface"), value: physical.detailInterfaceLabel)
+                    InfoPair(label: Strings.linkSpeed, value: physical.usbLinkSpeedLabel ?? "—")
+                }
+                GridRow {
+                    InfoPair(label: L("Type", "Type"), value: physical.mediumLabel)
+                    InfoPair(label: Strings.protocolLabel, value: physical.usbProtocolLabel ?? "—")
+                }
+                GridRow {
+                    InfoPair(label: L("Location", "Emplacement"), value: physical.locationLabel)
+                    InfoPair(label: L("BSD name", "Nom BSD"), value: physical.bsdName)
+                }
+            }
+            .fixedSize()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Volumes & Partitions
+
+    private var volumesSection: some View {
+        let matchingVolumes = appManager.volumes.filter { $0.physicalDiskBSDNames.contains(physical.bsdName) }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(Strings.volumesAndPartitions)
+                .font(.headline)
+
+            if !matchingVolumes.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(matchingVolumes) { vol in
+                        HStack(spacing: 12) {
+                            DiskIconProvider.icon(for: vol)
+                                .frame(width: 28, height: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(vol.name)
+                                    .font(.body.weight(.medium))
+                                Text("\(vol.format) · \(Formatters.bytes(vol.totalBytes))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if vol.availableBytes > 0 {
+                                Text(L("\(Formatters.bytes(vol.availableBytes)) free", "\(Formatters.bytes(vol.availableBytes)) libres"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        if vol.id != matchingVolumes.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+                .padding(14)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+                )
+            } else if !physical.volumeNames.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(physical.volumeNames, id: \.self) { name in
+                        HStack(spacing: 10) {
+                            Image(systemName: "externaldrive")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                            Text(name)
+                                .font(.body.weight(.medium))
+                        }
+                    }
+                }
+                .padding(14)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+                )
+            } else {
+                Text(Strings.noMountedVolumes)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
     
@@ -228,6 +396,102 @@ struct UnsupportedDiskView: View {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } catch {
                 ToastCenter.shared.show(message: L("Export failed", "L'export a échoué"), systemImage: "xmark.octagon")
+            }
+        }
+    }
+}
+
+// MARK: - USB Enclosure Explanation Sheet
+
+struct USBEnclosureHelpSheet: View {
+    let onExport: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text(Strings.usbHelpTitle)
+                    .font(.title2.bold())
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    helpSection(
+                        icon: "cpu",
+                        title: Strings.usbHelpSection1Title,
+                        text: Strings.usbHelpSection1Text
+                    )
+
+                    helpSection(
+                        icon: "wrench.and.screwdriver",
+                        title: Strings.usbHelpSection2Title,
+                        text: Strings.usbHelpSection2Text
+                    )
+
+                    helpSection(
+                        icon: "bolt.fill",
+                        title: Strings.usbHelpSection3Title,
+                        text: Strings.usbHelpSection3Text
+                    )
+
+                    helpSection(
+                        icon: "heart.fill",
+                        title: Strings.usbHelpSection4Title,
+                        text: Strings.usbHelpSection4Text
+                    )
+                }
+                .padding(.vertical, 4)
+            }
+
+            Divider()
+
+            HStack {
+                Button(Strings.exportDiagnostic) {
+                    dismiss()
+                    onExport()
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button(Strings.done) {
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(24)
+        .frame(width: 520, height: 500)
+    }
+
+    private func helpSection(icon: String, title: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 24, height: 24)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

@@ -67,10 +67,27 @@ public enum DiskDiscovery {
 
                     var usbVendorID: UInt16? = nil
                     var usbProductID: UInt16? = nil
+                    var usbVendorName: String? = nil
+                    var usbProductName: String? = nil
+                    var usbLinkSpeedBps: UInt64? = nil
+                    var usbBcdUSB: UInt16? = nil
+                    var usbIsUAS: Bool? = nil
+
                     if driveConnection == .usb || protocolName.contains("USB") {
-                        let ids = getUSBIDs(service: serviceToProcess)
-                        usbVendorID = ids.vid
-                        usbProductID = ids.pid
+                        let details = getUSBDetails(service: serviceToProcess)
+                        usbVendorID = details.vid
+                        usbProductID = details.pid
+                        usbVendorName = details.vendorName
+                        usbProductName = details.productName
+                        usbLinkSpeedBps = details.linkSpeedBps
+                        usbBcdUSB = details.bcdUSB
+                        usbIsUAS = details.isUAS
+                        if usbIsUAS == nil {
+                            let interconnect = (protocolChars?["Physical Interconnect"] as? String) ?? ""
+                            if interconnect.contains("Attached SCSI") {
+                                usbIsUAS = true
+                            }
+                        }
                     }
 
                     let connection: Connection
@@ -115,6 +132,11 @@ public enum DiskDiscovery {
                         volumeNames: volumeNames,
                         usbVendorID: usbVendorID,
                         usbProductID: usbProductID,
+                        usbVendorName: usbVendorName,
+                        usbProductName: usbProductName,
+                        usbLinkSpeedBps: usbLinkSpeedBps,
+                        usbBcdUSB: usbBcdUSB,
+                        usbIsUAS: usbIsUAS,
                         protocolType: protocolType,
                         mediumType: mediumType,
                         healthCapability: healthCapability,
@@ -202,17 +224,70 @@ public enum DiskDiscovery {
         return Array(names).sorted()
     }
     
-    private static func getUSBIDs(service: io_object_t) -> (vid: UInt16?, pid: UInt16?) {
+    private static func getUSBDetails(service: io_object_t) -> (
+        vid: UInt16?,
+        pid: UInt16?,
+        vendorName: String?,
+        productName: String?,
+        linkSpeedBps: UInt64?,
+        bcdUSB: UInt16?,
+        isUAS: Bool?
+    ) {
+        var vid: UInt16?
+        var pid: UInt16?
+        var vendorName: String?
+        var productName: String?
+        var linkSpeedBps: UInt64?
+        var bcdUSB: UInt16?
+        var isUAS: Bool?
+
         var current = service
         IOObjectRetain(current)
-        
+
         while current != 0 {
-            if let vid = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "idVendor" as CFString, kCFAllocatorDefault, 0) as? NSNumber,
-               let pid = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "idProduct" as CFString, kCFAllocatorDefault, 0) as? NSNumber {
-                IOObjectRelease(current)
-                return (vid.uint16Value, pid.uint16Value)
+            // Check class name for UAS / BOT indicators
+            var classNameBuf = [CChar](repeating: 0, count: 128)
+            IOObjectGetClass(current, &classNameBuf)
+            let className = String(cString: classNameBuf)
+            if className.localizedCaseInsensitiveContains("UAS") {
+                isUAS = true
             }
-            
+
+            if let bProto = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "bInterfaceProtocol" as CFString, kCFAllocatorDefault, 0) as? NSNumber {
+                if bProto.uint8Value == 0x62 { // UASP
+                    isUAS = true
+                } else if bProto.uint8Value == 0x50 && isUAS == nil { // BOT
+                    isUAS = false
+                }
+            }
+
+            if vid == nil, let v = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "idVendor" as CFString, kCFAllocatorDefault, 0) as? NSNumber {
+                vid = v.uint16Value
+            }
+            if pid == nil, let p = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "idProduct" as CFString, kCFAllocatorDefault, 0) as? NSNumber {
+                pid = p.uint16Value
+            }
+            if vendorName == nil {
+                if let vn = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "USB Vendor Name" as CFString, kCFAllocatorDefault, 0) as? String, !vn.isEmpty {
+                    vendorName = vn
+                } else if let vn = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "kUSBVendorString" as CFString, kCFAllocatorDefault, 0) as? String, !vn.isEmpty {
+                    vendorName = vn
+                }
+            }
+            if productName == nil {
+                if let pn = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "USB Product Name" as CFString, kCFAllocatorDefault, 0) as? String, !pn.isEmpty {
+                    productName = pn
+                } else if let pn = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "kUSBProductString" as CFString, kCFAllocatorDefault, 0) as? String, !pn.isEmpty {
+                    productName = pn
+                }
+            }
+            if linkSpeedBps == nil, let speed = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "UsbLinkSpeed" as CFString, kCFAllocatorDefault, 0) as? NSNumber {
+                linkSpeedBps = speed.uint64Value
+            }
+            if bcdUSB == nil, let bcd = IORegistryEntrySearchCFProperty(current, kIOServicePlane, "bcdUSB" as CFString, kCFAllocatorDefault, 0) as? NSNumber {
+                bcdUSB = bcd.uint16Value
+            }
+
             var parent: io_object_t = 0
             let kr = IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent)
             IOObjectRelease(current)
@@ -222,6 +297,6 @@ public enum DiskDiscovery {
                 break
             }
         }
-        return (nil, nil)
+        return (vid, pid, vendorName, productName, linkSpeedBps, bcdUSB, isUAS)
     }
 }

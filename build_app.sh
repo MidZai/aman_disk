@@ -38,6 +38,7 @@ echo "Copying resources..."
 cp "Branding/Aman-Disk-brand/app-icon/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 cp "Branding/Aman-Disk-brand/logo/aman-disk-logo-light@2x.png" "$RESOURCES_DIR/"
 cp "Branding/Aman-Disk-brand/logo/aman-disk-logo-dark@2x.png" "$RESOURCES_DIR/"
+cp "Resources/usb-bridges.json" "$RESOURCES_DIR/"
 
 echo "Creating Info.plist..."
 cat > "$CONTENTS_DIR/Info.plist" << PLIST
