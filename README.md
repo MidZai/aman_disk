@@ -6,8 +6,8 @@
   </picture>
 </p>
 
-<p align="center"><b>Health, temperature and performance of your Mac's drives, explained in plain language.</b><br>
-Internal NVMe and SATA drives today. External USB drives are coming in version 1.0.</p>
+<p align="center"><b>Health, temperature and performance of your Mac's internal and external drives, explained in plain language.</b><br>
+Native macOS app for Apple Silicon and Intel Macs · Universal binary · Completely offline and private.</p>
 
 <p align="center">
   <a href="https://github.com/MidZai/aman_disk/releases/latest">
@@ -35,14 +35,15 @@ Internal NVMe and SATA drives today. External USB drives are coming in version 1
 
 ## Features
 
-- **NVMe and ATA/AHCI health**: reads S.M.A.R.T. data from NVMe SSDs, Apple PCIe AHCI SSDs and SATA drives, with a clear status (“Healthy”, “Needs attention”, “Likely failing”) and the remaining life when the drive reports it.
+- **Internal & external drive health**: reads S.M.A.R.T. data from internal NVMe SSDs, Apple PCIe AHCI SSDs, SATA drives, external Thunderbolt/USB4 NVMe SSDs, and external USB SATA enclosures (via open-source SAT SMART Driver), with a clear status (“Healthy”, “Needs attention”, “Likely failing”) and remaining life when reported.
+- **Hardware details without S.M.A.R.T.**: for USB drives where macOS restricts S.M.A.R.T. access, displays bridge chip vendor, USB link speed, transport protocol (UAS / BOT), volumes, and a calm, non-alarming explanation.
 - **Attributes explained**: every S.M.A.R.T. attribute has a readable name and an explanation; values are converted to their unit (°C, hours, TB), or shown as raw hexadecimal on request.
-- **Temperature history**: one reading every 30 seconds, kept at full resolution for 24 hours, then as averages for 30 days; charts over 1 hour, 24 hours, 7 days and 30 days. Each reading adds about 170 bytes to the history, so the app doesn't wear out the drive it watches.
-- **Performance test**: sequential and random reads and writes, with large and small blocks at several queue depths. The test file is always deleted.
-- **Menu bar**: status and temperature of each internal drive, with the last hour's curve. The app can stay there when its window is closed.
-- **Live Dock icon**: the ring around the icon follows the health of the startup drive.
-- **Alerts**: a notification when a drive changes status, stays too hot, or drops below 50%, 25% or 10% of its life (off by default).
-- **Reports**: PDF, text or JSON export, with the serial number masked by default.
+- **Continuous temperature history**: one reading every 30 seconds, kept at full resolution for 24 hours, then as 5-minute averages for 30 days. External drives regain their history upon reconnection via SHA-256 fingerprint hashing.
+- **Performance benchmark**: sequential and random reads and writes for internal and external drives, with live link throughput comparisons (e.g. USB 5 Gb/s vs Thunderbolt). The test file is always cleanly removed, even on mid-test disconnection.
+- **Menu bar**: status and temperature of internal and connected external drives separated by a clean divider, with the last hour's curve.
+- **Live Dock icon**: the ring around the icon follows the health of the startup boot drive.
+- **Alerts**: notifications when a readable drive changes status, stays too hot, or drops below 50%, 25% or 10% of its life (disabled by default; zero false alerts on hot-unplug).
+- **Reports**: PDF, text or JSON export, and anonymized hardware compatibility reports, with serial numbers masked by default.
 - **Multilingual interface**: available in 18 languages (English, Français, 简体中文, 繁體中文, 한국어, 日本語, Deutsch, Español, Português do Brasil, Русский, العربية with full RTL layout, Italiano, Nederlands, Polski, Türkçe, हिन्दी, Tiếng Việt, Українська). See [docs/TRANSLATING.md](docs/TRANSLATING.md) to contribute or review translations.
 
 ## Privacy
@@ -93,12 +94,24 @@ Demo mode (`DISKHEALTH_DEMO=1`) shows fictional drives in every state.
 
 - **macOS 14 Sonoma** or later.
 - **Apple Silicon** and **Intel** Macs (universal binary).
-- **Internal** NVMe and AHCI/SATA drives, including Fusion Drive.
-- **External USB and Thunderbolt drives**: see the [Hardware Compatibility List](docs/COMPATIBILITY.md).
+- **Internal drives**:
+  - Apple Silicon internal NVMe SSDs (Apple Fabric).
+  - Intel Mac internal NVMe and PCIe AHCI SSDs.
+  - Internal SATA SSDs and hard disks, including Apple Fusion Drive.
+- **External Thunderbolt & USB4 drives**:
+  - Full native NVMe S.M.A.R.T. reading, health assessment, temperature monitoring, and performance benchmarking on Thunderbolt 3/4/5 and USB4 (PCIe mode) enclosures (OWC, Acasis, Trebleet, Sabrent, etc.).
+- **External USB SATA drives with SAT SMART Driver**:
+  - Reads ATA S.M.A.R.T. health, attributes, and temperatures when the user installs the open-source third-party SAT SMART Driver kernel extension.
+- **External USB drives without driver**:
+  - Bridge chip controller identification (JMicron, ASMedia, Realtek, etc.), link speed (USB 3.2 10 Gb/s, USB 3.0 5 Gb/s, USB 2.0), transport protocol (UAS / BOT), volumes, partition formats, and performance benchmarks.
+  - See the [Hardware Compatibility Guide](docs/COMPATIBILITY.md) for tested enclosures and community reports.
 
-## Roadmap to 1.0
+## Future Roadmap (post-1.0)
 
-The main goal of version 1.0 is full support for **external USB and Thunderbolt drives**. To help expand hardware support, you can export an anonymized compatibility report directly from Aman Disk (**Help › Export Compatibility Report…**) and submit it on GitHub via the [USB Compatibility template](https://github.com/MidZai/aman_disk/issues/new?template=usb-compatibility.yml). Check the [Hardware Compatibility Page](docs/COMPATIBILITY.md) for community-tested drives and enclosures.
+- **DriverKit Extension (DEXT)**: modern user-space DriverKit driver without requiring “Reduced Security” mode on Apple Silicon, enabling S.M.A.R.T. reading across USB enclosures without legacy kernel extensions.
+- **USB NVMe bridge support**: vendor-specific passthrough commands (Realtek RTL9210, JMicron JMS583, ASMedia ASM2362) via the DriverKit driver.
+- **Apple Developer ID & Notarization**: signed and notarized binaries to eliminate macOS Gatekeeper first-launch security prompts.
+- **Desktop & Lock Screen Widgets**: WidgetKit widgets displaying drive temperature and health rings directly on your macOS desktop.
 
 ## Why “Aman”?
 

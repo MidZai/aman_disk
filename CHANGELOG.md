@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.0 — 2026-09-25
+
+**Aman Disk 1.0.0** is the first major stable release, bringing comprehensive, native, and completely private storage health and performance monitoring to macOS.
+
+### Key Highlights
+- **Universal storage monitoring**:
+  - Full S.M.A.R.T. health, temperature, and wear monitoring for internal Apple Silicon and Intel Mac NVMe SSDs, SATA SSDs, HDDs, and Apple Fusion Drives.
+  - Native S.M.A.R.T. support for external Thunderbolt 3/4/5 and USB4 (PCIe) enclosures.
+  - S.M.A.R.T. support for external USB SATA enclosures via the open-source SAT SMART Driver.
+  - Rich hardware identification for all USB drives (bridge chip manufacturer, USB link speed, UAS/BOT transport protocol, partitions, and formats) with calm, clear explanations when macOS restricts S.M.A.R.T. access.
+- **Continuous tracking & persistent history**:
+  - Background temperature and health sampling every 30 seconds with minimal SSD write impact (~170 bytes per reading).
+  - High-resolution 24-hour curves and compacted 30-day trend charts.
+  - External drives automatically regain their historical data upon reconnection via SHA-256 fingerprint hashing.
+  - Hot-unplug safety: safely tracks disconnected external drives with « Vu pour la dernière fois : [date] » ("Last seen: [date]") without emitting false alarm notifications.
+- **Integrated performance benchmark**:
+  - Measure sequential and random read and write speeds with multiple block sizes and queue depths on any internal or external volume.
+  - Contextual link throughput indicators comparing results with theoretical connection limits (USB 5 Gb/s, USB 10 Gb/s, Thunderbolt).
+  - Robust cleanup: temporary test files are guaranteed to be deleted, even if a drive is disconnected mid-test.
+- **Menu Bar & Live Dock icon**:
+  - Compact menu bar panel showing live status, temperature, and 1-hour trend charts for internal and external drives.
+  - Live Dock icon ring reflecting startup boot drive health at a glance.
+- **Absolute privacy & safety**:
+  - **100% offline**: zero network APIs, zero tracking, zero telemetry.
+  - Serial numbers are masked by default (`<masqué>`) and never stored unencrypted in plain text.
+  - Anonymized hardware compatibility report export for easy community contribution without revealing user directories or serial numbers.
+- **Accessibility & Internationalization**:
+  - Every health status is distinguishable without color (dedicated icon symbols and descriptive text).
+  - VoiceOver accessibility labels on gauge rings, trend charts, stat tiles, and interactive buttons.
+  - Fully translated into 18 languages, including complete Right-to-Left (RTL) layout support for Arabic.
+- **Packaging**:
+  - Universal binary (Apple Silicon arm64 + Intel x86_64).
+  - Homebrew Cask specification prepared in `packaging/homebrew/aman-disk.rb`.
+  - Comprehensive manual release verification checklist documented in `docs/RELEASE-CHECKLIST.md`.
+
 ## 0.9.8 — 2026-09-25
 
 - **Performance test on external drives**:
