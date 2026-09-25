@@ -91,6 +91,9 @@ struct ContentView: View {
                     Button(L("Export as PDF…", "Exporter en PDF…")) { exportRequest = ExportRequest(disk: disk, format: .pdf) }
                     Button(L("Export as Text…", "Exporter en texte…")) { exportRequest = ExportRequest(disk: disk, format: .text) }
                     Button(L("Export as JSON…", "Exporter en JSON…")) { exportRequest = ExportRequest(disk: disk, format: .json) }
+                    Button(L("Export Compatibility Report…", "Exporter un rapport de compatibilité…")) {
+                        ExportService.exportCompatibilityReport(disk: disk)
+                    }
                     Divider()
                     Button(L("Copy Summary", "Copier le résumé")) {
                         ExportService.copySummary(disk: disk)
@@ -180,6 +183,11 @@ private struct SidebarView: View {
             ToastCenter.shared.show(message: L("Summary copied", "Résumé copié"), systemImage: "doc.on.doc")
         }
         Button(L("Export Report…", "Exporter le rapport…")) { exportRequest = ExportRequest(disk: disk, format: .pdf) }
+        if disk.physical.isExternal {
+            Button(L("Export Compatibility Report…", "Exporter un rapport de compatibilité…")) {
+                ExportService.exportCompatibilityReport(disk: disk)
+            }
+        }
         Divider()
         Button(L("Open Disk Utility", "Ouvrir Utilitaire de disque")) {
             NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/System/Applications/Utilities/Disk Utility.app"),

@@ -32,9 +32,10 @@ enum Strings {
     static let viewOnGitHub = L("View on GitHub", "Voir sur GitHub")
     static let readViaSATSMARTDriver = L("Read via SAT SMART Driver", "Lu via le SAT SMART Driver")
     static let usbHelpSection4Title = L("Help the project", "Aider le projet")
-    static let usbHelpSection4Text = L("You can export a diagnostic report to help Aman expand its hardware compatibility database.", "Vous pouvez exporter un rapport de diagnostic pour aider Aman à enrichir sa base de compatibilité matérielle.")
+    static let usbHelpSection4Text = L("You can export an anonymized compatibility report and share it on GitHub to help Aman expand its hardware compatibility database.", "Vous pouvez exporter un rapport de compatibilité anonymisé et le partager sur GitHub pour aider Aman à enrichir sa base de compatibilité matérielle.")
     static let done = L("Done", "Fermer")
-    static let exportDiagnostic = L("Export Diagnostic…", "Exporter le diagnostic…")
+    static let exportDiagnostic = L("Export Compatibility Report…", "Exporter un rapport de compatibilité…")
+    static let viewCompatibilityList = L("View Compatibility List on GitHub", "Consulter la liste de compatibilité sur GitHub")
 
     static let sdCardReaderTitle = L("SD card reader", "Lecteur de carte SD")
     static let sdCardReaderText = L("This SD card reader doesn't provide health data. SD cards have no S.M.A.R.T. interface that macOS can access.", "Ce lecteur de carte SD ne fournit pas de données de santé. Les cartes SD n'ont pas d'interface S.M.A.R.T. accessible depuis macOS.")

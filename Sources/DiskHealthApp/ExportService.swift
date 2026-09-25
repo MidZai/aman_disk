@@ -97,6 +97,88 @@ enum ExportService {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
+    // MARK: - Compatibility Report Export
+
+    @MainActor
+    static func exportCompatibilityReport(disk: RealDisk) {
+        exportCompatibilityReport(physical: disk.physical, snapshot: disk.snapshot)
+    }
+
+    @MainActor
+    static func exportCompatibilityReport(physical: PhysicalDisk, snapshot: DiskHealthSnapshot? = nil) {
+        let report = CompatibilityReport.collect(physical: physical, snapshot: snapshot, amanVersion: AppInfo.version)
+        guard let url = saveCompatibilityReportURL(physical: physical) else { return }
+
+        var serials: [String] = []
+        if let s = snapshot?.serialNumber, !s.isEmpty {
+            serials.append(s)
+        }
+
+        do {
+            let data = try CompatibilityReport.generateJSON(report: report, knownSerials: serials)
+            try data.write(to: url, options: .atomic)
+            showCompatibilityReportSuccessAlert(savedURL: url)
+        } catch {
+            ToastCenter.shared.show(
+                message: L("Export failed: \(error.localizedDescription)", "L'export a échoué : \(error.localizedDescription)"),
+                systemImage: "xmark.octagon"
+            )
+        }
+    }
+
+    @MainActor
+    private static func saveCompatibilityReportURL(physical: PhysicalDisk) -> URL? {
+        let panel = NSSavePanel()
+        panel.title = L("Export Compatibility Report", "Exporter un rapport de compatibilité")
+        let invalid = CharacterSet(charactersIn: "/:\\?%*|\"<>")
+        let safeModel = physical.model.components(separatedBy: invalid).joined(separator: "-")
+            .replacingOccurrences(of: " ", with: "-")
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd_HHmm"
+
+        let filename: String
+        if let vid = physical.usbVendorID, let pid = physical.usbProductID {
+            let vidStr = String(format: "0x%04X", vid)
+            let pidStr = String(format: "0x%04X", pid)
+            filename = "Aman-Disk-compatibilite_\(safeModel)_\(vidStr)_\(pidStr)_\(formatter.string(from: Date())).json"
+        } else {
+            filename = "Aman-Disk-compatibilite_\(safeModel)_\(formatter.string(from: Date())).json"
+        }
+
+        panel.nameFieldStringValue = filename
+        if let type = UTType(filenameExtension: "json") {
+            panel.allowedContentTypes = [type]
+        }
+        panel.canCreateDirectories = true
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    @MainActor
+    private static func showCompatibilityReportSuccessAlert(savedURL: URL) {
+        let alert = NSAlert()
+        alert.messageText = L("Compatibility Report Exported", "Rapport de compatibilité enregistré")
+        alert.informativeText = L(
+            "Your report has been saved locally.\n\nTo help improve hardware support, you can open GitHub and attach this file to a new compatibility issue.",
+            "Votre rapport a été enregistré localement.\n\nPour aider à améliorer la compatibilité du matériel, vous pouvez ouvrir GitHub et joindre ce fichier à un nouveau ticket."
+        )
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: L("Open GitHub to Submit Report", "Ouvrir GitHub pour créer un rapport"))
+        alert.addButton(withTitle: L("Show in Finder", "Afficher dans le Finder"))
+        alert.addButton(withTitle: L("Done", "Terminé"))
+
+        let response = alert.runModal()
+        switch response {
+        case .alertFirstButtonReturn:
+            NSWorkspace.shared.open(AppInfo.newIssueURL)
+            NSWorkspace.shared.activateFileViewerSelecting([savedURL])
+        case .alertSecondButtonReturn:
+            NSWorkspace.shared.activateFileViewerSelecting([savedURL])
+        default:
+            break
+        }
+    }
+
     // MARK: - Summary (clipboard)
 
     static func summaryText(disk: RealDisk) -> String {

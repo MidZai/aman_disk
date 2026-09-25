@@ -370,37 +370,7 @@ struct UnsupportedDiskView: View {
     }
 
     private func exportDiagnostic() {
-        let diag = Diagnostic(physical: physical)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        
-        guard let data = try? encoder.encode(diag) else { return }
-        
-        let panel = NSSavePanel()
-        panel.title = L("Save Aman Disk Diagnostic", "Enregistrer le diagnostic Aman Disk")
-        
-        let filename: String
-        if let vid = physical.usbVendorID, let pid = physical.usbProductID {
-            let vidStr = String(format: "0x%04X", vid)
-            let pidStr = String(format: "0x%04X", pid)
-            filename = "Aman-Disk-diagnostic_\(vidStr)_\(pidStr).json"
-        } else {
-            filename = "Aman-Disk-diagnostic_\(physical.bsdName).json"
-        }
-        
-        panel.nameFieldStringValue = filename
-        panel.allowedContentTypes = [.json]
-        
-        if panel.runModal() == .OK, let url = panel.url {
-            do {
-                try data.write(to: url)
-                ToastCenter.shared.show(message: L("Diagnostic exported", "Diagnostic exporté"), systemImage: "checkmark.circle")
-                NSWorkspace.shared.activateFileViewerSelecting([url])
-            } catch {
-                ToastCenter.shared.show(message: L("Export failed", "L'export a échoué"), systemImage: "xmark.octagon")
-            }
-        }
+        ExportService.exportCompatibilityReport(physical: physical)
     }
 }
 
@@ -444,11 +414,24 @@ struct USBEnclosureHelpSheet: View {
 
                     satDriverHelpSection
 
-                    helpSection(
-                        icon: "heart.fill",
-                        title: Strings.usbHelpSection4Title,
-                        text: Strings.usbHelpSection4Text
-                    )
+                    VStack(alignment: .leading, spacing: 8) {
+                        helpSection(
+                            icon: "heart.fill",
+                            title: Strings.usbHelpSection4Title,
+                            text: Strings.usbHelpSection4Text
+                        )
+                        Button {
+                            NSWorkspace.shared.open(AppInfo.compatibilityDocURL)
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(Strings.viewCompatibilityList)
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.leading, 38)
+                    }
                 }
                 .padding(.vertical, 4)
             }

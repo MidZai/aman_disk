@@ -1,6 +1,6 @@
 import Foundation
 
-public struct IOKitNodeDiagnostic: Codable, Equatable {
+public struct IOKitNodeDiagnostic: Codable, Equatable, Sendable {
     public let className: String
     public let properties: [String: String]
     
@@ -10,7 +10,7 @@ public struct IOKitNodeDiagnostic: Codable, Equatable {
     }
 }
 
-public struct Diagnostic: Codable, Equatable {
+public struct Diagnostic: Codable, Equatable, Sendable {
     public let model: String
     public let bsdName: String
     public let protocolType: String

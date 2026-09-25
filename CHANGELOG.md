@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.7 — 2026-09-25
+
+- **Anonymized compatibility report export**: new command "Export Compatibility Report…" ("Exporter un rapport de compatibilité…") available in the Help menu, Drive menu, external drive contextual menu, and the unsupported drive view.
+- **Strict privacy & anonymization**: guarantees all serial numbers are masked with `<masqué>`, completely excludes volume names, user home paths (`/Users/...`), and Mac computer names.
+- **Comprehensive hardware diagnostics**: exports Aman version, macOS version, architecture, drive model and BSD name, connection type, `Protocol Characteristics`, `Device Characteristics`, parent `IOUSBHostDevice` properties (VID, PID, vendor, product, speed, bcdUSB), storage driver (`UAS` / `BOT`), `SmartAvailability`, error code if any, and raw S.M.A.R.T. attributes without serial numbers when readable.
+- **No automatic network transmission (Rule 0.1-1)**: saves locally via standard `NSSavePanel` and displays a completion alert with an action button that opens the GitHub New Issue page in the browser and highlights the file in Finder so the user chooses whether and when to share.
+- **GitHub issue templates**: added `.github/ISSUE_TEMPLATE/usb-compatibility.yml` and `.md` with clear fields for enclosure model, bridge chip, drive type (NVMe/SATA/HDD), Mac model, and SAT driver status.
+- **Hardware compatibility page**: created `docs/COMPATIBILITY.md` with an open hardware test table, linked from `README.md` and the "Learn More" modal sheet.
+- **Unit test suite**: added `CompatibilityReportTests` asserting that serial numbers, volume names, and user paths never leak into the exported JSON, and confirming round-trip decoding.
+
 ## 0.9.6 — 2026-09-25
 
 - **S.M.A.R.T. reading via SAT SMART Driver**: detects when the user has installed the open-source third-party SAT SMART Driver (by checking for ATA S.M.A.R.T. plugin capability in `IOCFPlugInTypes` on the drive's IOKit service), and reads full ATA S.M.A.R.T. health data, attributes, temperature, and history for compatible USB SATA enclosures without requiring any specialized tool.

@@ -56,6 +56,13 @@ public enum DiskHealthSnapshot: Codable, Equatable, Hashable {
     case nvme(NVMeSmartLog, NVMeIdentify)
     case ata(ATASmartSnapshot)
 
+    public var serialNumber: String? {
+        switch self {
+        case .nvme(_, let id): return id.serialNumber
+        case .ata(let snapshot): return snapshot.serialNumber
+        }
+    }
+
     // A dedicated nested key for ATA instead of a flat layout.
     // Backwards-compatible decode: tries the nested form first, falls back to the
     // legacy flat form (written by versions prior to this fix).

@@ -1,0 +1,80 @@
+name: Rapport de compatibilité USB / USB Compatibility Report
+description: Signaler la compatibilité d'un boîtier externe ou d'un disque USB avec Aman Disk.
+labels: ["compatibility", "usb"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de contribuer à la base de données de compatibilité d'Aman Disk !
+        Ce rapport aide la communauté à identifier les boîtiers et puces ponts compatibles avec macOS.
+        
+        Dans Aman Disk, sélectionnez votre disque externe et choisissez **Exporter un rapport de compatibilité…** (dans le menu **Aide**, le menu **Disque** ou via un clic droit sur le disque dans la barre latérale).
+  - type: input
+    id: enclosure_model
+    attributes:
+      label: Modèle du boîtier ou disque externe / Enclosure or external drive model
+      description: Marque et modèle exact (ex: Samsung T7, Crucial X9 Pro, UGREEN M.2 NVMe, Orico 2.5" SATA).
+    validations:
+      required: true
+  - type: input
+    id: bridge_chip
+    attributes:
+      label: Puce pont si connue / Bridge chip if known
+      description: Indiquée dans les détails du disque dans Aman Disk (ex: Realtek RTL9210, ASMedia ASM2362, JMicron JMS583).
+    validations:
+      required: false
+  - type: dropdown
+    id: drive_type
+    attributes:
+      label: Type de disque à l'intérieur / Drive type inside
+      description: Type de support installé dans le boîtier.
+      options:
+        - "NVMe (M.2 PCIe SSD)"
+        - "SATA (SSD 2.5\")"
+        - "Disque dur mécanique (HDD 2.5\" ou 3.5\")"
+        - "Disque externe tout-en-un / Inconnu"
+    validations:
+      required: true
+  - type: input
+    id: mac_model
+    attributes:
+      label: Modèle de Mac et version de macOS / Mac model & macOS version
+      description: Exemple : MacBook Pro 14" M3 Pro, macOS 15.3.1 (ou Mac mini Intel 2018, macOS 14.7).
+    validations:
+      required: true
+  - type: dropdown
+    id: sat_driver
+    attributes:
+      label: SAT SMART Driver tiers installé ? / Third-party SAT SMART Driver installed?
+      description: Avez-vous installé l'extension noyau OS-X-SAT-SMART-Driver ?
+      options:
+        - "Non (aucun pilote installé / comportement d'origine macOS)"
+        - "Oui (SAT SMART Driver installé par mes soins)"
+    validations:
+      required: true
+  - type: dropdown
+    id: smart_status
+    attributes:
+      label: S.M.A.R.T. lisible dans Aman Disk ? / S.M.A.R.T. readable in Aman Disk?
+      options:
+        - "Oui : santé complète, température et attributs affichés"
+        - "Non : santé non disponible / boîtier non compatible"
+        - "Partiel : certaines informations manquent"
+        - "Erreur : échec de lecture avec code d'erreur"
+    validations:
+      required: true
+  - type: textarea
+    id: json_report
+    attributes:
+      label: Fichier JSON de compatibilité / Compatibility report JSON
+      description: Glissez-déposez le fichier JSON généré par « Exporter un rapport de compatibilité… » ou collez son contenu ici. Toutes les données sont automatiquement anonymisées (aucun numéro de série, aucun nom de volume, aucun nom d'utilisateur ni de Mac).
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes et observations supplémentaires / Additional notes
+      description: Vitesse de lien rapportée, déconnexions éventuelles, comportement en veille, etc.
+    validations:
+      required: false

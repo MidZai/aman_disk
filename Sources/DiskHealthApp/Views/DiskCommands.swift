@@ -18,6 +18,14 @@ struct DiskCommands: Commands {
         }
         
         CommandGroup(after: .help) {
+            Button(L("Export Compatibility Report…", "Exporter un rapport de compatibilité…")) {
+                let targetDisk = (appManager.selectedDisk?.physical.isExternal == true ? appManager.selectedDisk : appManager.disks.first(where: { $0.physical.isExternal })) ?? appManager.selectedDisk
+                if let disk = targetDisk {
+                    ExportService.exportCompatibilityReport(disk: disk)
+                }
+            }
+            .disabled(appManager.selectedDisk == nil && !appManager.disks.contains(where: { $0.physical.isExternal }))
+
             Button(L("Check for New Versions…", "Voir les nouvelles versions…")) {
                 NSWorkspace.shared.open(AppInfo.releasesURL)
             }
@@ -55,6 +63,13 @@ struct DiskCommands: Commands {
                 NotificationCenter.default.post(name: .amanExportRequested, object: ReportFormat.pdf)
             }
             .keyboardShortcut("e", modifiers: .command)
+            .disabled(appManager.selectedDisk == nil)
+
+            Button(L("Export Compatibility Report…", "Exporter un rapport de compatibilité…")) {
+                if let disk = appManager.selectedDisk {
+                    ExportService.exportCompatibilityReport(disk: disk)
+                }
+            }
             .disabled(appManager.selectedDisk == nil)
 
             Button(L("Copy Summary", "Copier le résumé")) {

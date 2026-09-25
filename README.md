@@ -94,11 +94,11 @@ Demo mode (`DISKHEALTH_DEMO=1`) shows fictional drives in every state.
 - **macOS 14 Sonoma** or later.
 - **Apple Silicon** and **Intel** Macs (universal binary).
 - **Internal** NVMe and AHCI/SATA drives, including Fusion Drive.
-- External USB drives: coming in version 1.0 (see below).
+- **External USB and Thunderbolt drives**: see the [Hardware Compatibility List](docs/COMPATIBILITY.md).
 
 ## Roadmap to 1.0
 
-The main goal of version 1.0 is **external USB drives**: reading the health of SSDs and hard drives in USB enclosures, when the enclosure passes S.M.A.R.T. commands through. To help, [open an issue](https://github.com/MidZai/aman_disk/issues/new/choose) with the model of your USB drive or enclosure: it helps decide which ones to support first.
+The main goal of version 1.0 is full support for **external USB and Thunderbolt drives**. To help expand hardware support, you can export an anonymized compatibility report directly from Aman Disk (**Help › Export Compatibility Report…**) and submit it on GitHub via the [USB Compatibility template](https://github.com/MidZai/aman_disk/issues/new?template=usb-compatibility.yml). Check the [Hardware Compatibility Page](docs/COMPATIBILITY.md) for community-tested drives and enclosures.
 
 ## Why “Aman”?
 
