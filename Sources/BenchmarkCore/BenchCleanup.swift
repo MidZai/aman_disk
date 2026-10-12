@@ -2,7 +2,11 @@ import Foundation
 import DiskHealthCore
 
 public enum BenchCleanup {
-    public static func run(volumes: [Volume], bundleIdentifier: String = "io.github.aman-disk.AmanDisk") {
+    /// A test file modified more recently than this may belong to another running instance
+    /// (`diskprobe`, or a second copy launched when the language changes): it is left alone.
+    public static let minimumAge: TimeInterval = 2 * 60
+
+    public static func run(volumes: [Volume], bundleIdentifier: String = "io.github.aman-disk.AmanDisk", now: Date = Date()) {
         let fileManager = FileManager.default
         guard let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else { return }
         
@@ -17,11 +21,14 @@ public enum BenchCleanup {
         }
         
         for baseURL in baseURLs {
-            guard let enumerator = fileManager.enumerator(at: baseURL, includingPropertiesForKeys: nil) else { continue }
+            guard let enumerator = fileManager.enumerator(at: baseURL, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
             for case let fileURL as URL in enumerator {
-                if fileURL.lastPathComponent.hasPrefix("DiskHealthBench-") && fileURL.lastPathComponent.hasSuffix(".tmp") {
-                    try? fileManager.removeItem(at: fileURL)
+                guard fileURL.lastPathComponent.hasPrefix("DiskHealthBench-") && fileURL.lastPathComponent.hasSuffix(".tmp") else { continue }
+                if let modified = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+                   now.timeIntervalSince(modified) < minimumAge {
+                    continue
                 }
+                try? fileManager.removeItem(at: fileURL)
             }
             removeTestFolderIfEmpty(baseURL)
         }

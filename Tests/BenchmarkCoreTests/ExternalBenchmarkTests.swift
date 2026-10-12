@@ -196,3 +196,46 @@ extension ExternalBenchmarkTests {
         #expect(BenchmarkRunner.stopReason(forErrorCode: -100, mountPointExists: true) == nil)
     }
 }
+
+// Review fixes: cleanup never touches a file another instance may still be using.
+extension ExternalBenchmarkTests {
+    @Test func leftoverCleanupOnlyRemovesPathsThatLookLikeTestFiles() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bench_inflight_\(UUID().uuidString)")
+        let testFolder = dir.appendingPathComponent("DiskHealthBench.noindex")
+        try FileManager.default.createDirectory(at: testFolder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let genuine = testFolder.appendingPathComponent("DiskHealthBench-\(UUID().uuidString).tmp")
+        let stranger = dir.appendingPathComponent("important.txt")
+        let misplaced = dir.appendingPathComponent("DiskHealthBench-\(UUID().uuidString).tmp")
+        for url in [genuine, stranger, misplaced] { try Data("x".utf8).write(to: url) }
+
+        let inflight = dir.appendingPathComponent("bench-inflight.json")
+        try JSONEncoder().encode([genuine.path, stranger.path, misplaced.path]).write(to: inflight)
+        BenchInflight.fileURL = inflight
+        BenchInflight.cleanUpLeftovers()
+
+        #expect(!FileManager.default.fileExists(atPath: genuine.path))
+        #expect(FileManager.default.fileExists(atPath: stranger.path))
+        #expect(FileManager.default.fileExists(atPath: misplaced.path), "outside a DiskHealthBench.noindex folder: not ours to delete")
+        #expect(!FileManager.default.fileExists(atPath: inflight.path))
+    }
+
+    @Test func cleanupKeepsAFileModifiedLessThanTwoMinutesAgo() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bench_cleanup_\(UUID().uuidString)")
+        let testFolder = dir.appendingPathComponent("DiskHealthBench.noindex")
+        try FileManager.default.createDirectory(at: testFolder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let fresh = testFolder.appendingPathComponent("DiskHealthBench-fresh.tmp")
+        let stale = testFolder.appendingPathComponent("DiskHealthBench-stale.tmp")
+        for url in [fresh, stale] { try Data("x".utf8).write(to: url) }
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-10 * 60)], ofItemAtPath: stale.path)
+
+        BenchCleanup.run(volumes: [Volume(bsdName: "disk9s1", name: "Scratch", mountPoint: dir.path, format: "APFS",
+                                          totalBytes: 1, availableBytes: 1, physicalDiskBSDNames: ["disk9"])])
+        #expect(FileManager.default.fileExists(atPath: fresh.path), "another instance may be using it")
+        #expect(!FileManager.default.fileExists(atPath: stale.path))
+        #expect(FileManager.default.fileExists(atPath: testFolder.path), "not empty, so kept")
+    }
+}

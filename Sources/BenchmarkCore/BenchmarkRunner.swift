@@ -26,10 +26,22 @@ public extension BenchmarkRunnerDelegate {
 
 /// Test files in progress: if the app stops abruptly, they are deleted at the next launch.
 public enum BenchInflight {
-    static var fileURL: URL? {
+    /// Where the list is kept; tests point it at a temporary folder.
+    public static var fileURL: URL? = defaultFileURL
+
+    static var defaultFileURL: URL? {
         guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
         let bundleId = Bundle.main.bundleIdentifier ?? HistoryStore.defaultFolderName
         return appSupport.appendingPathComponent(bundleId).appendingPathComponent("bench-inflight.json")
+    }
+
+    /// Only a path of the form `…/DiskHealthBench.noindex/DiskHealthBench-*.tmp` is ours to delete:
+    /// the list is a plain file and must not become a way to remove anything else.
+    static func isTestFilePath(_ path: String) -> Bool {
+        let url = URL(fileURLWithPath: path)
+        let name = url.lastPathComponent
+        return name.hasPrefix("DiskHealthBench-") && name.hasSuffix(".tmp")
+            && url.deletingLastPathComponent().lastPathComponent == BenchCleanup.testFolderName
     }
 
     static func read() -> [String] {
@@ -49,8 +61,9 @@ public enum BenchInflight {
 
     /// Deletes the test files left behind by an interrupted test (crash, force quit).
     public static func cleanUpLeftovers() {
-        for path in read() {
+        for path in read() where isTestFilePath(path) {
             try? FileManager.default.removeItem(atPath: path)
+            BenchCleanup.removeTestFolderIfEmpty(URL(fileURLWithPath: path).deletingLastPathComponent())
         }
         write([])
     }
