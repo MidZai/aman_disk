@@ -35,7 +35,7 @@ Native macOS app for Apple Silicon and Intel Macs · Universal binary · Complet
 
 ## Features
 
-- **Internal & external drive health**: reads S.M.A.R.T. data from internal NVMe SSDs, Apple PCIe AHCI SSDs, SATA drives, external Thunderbolt/USB4 NVMe SSDs, and external USB SATA enclosures (via open-source SAT SMART Driver), with a clear status (“Healthy”, “Needs attention”, “Likely failing”) and remaining life when reported.
+- **Internal & external drive health**: reads S.M.A.R.T. data from internal NVMe SSDs, Apple PCIe AHCI SSDs, SATA drives, external Thunderbolt/USB4 NVMe SSDs, and external USB SATA enclosures (via open-source SAT SMART Driver), with a clear status (“Healthy”, “Needs attention”, “Likely failing”, or “Health unknown” when the drive returns empty or unverified data) and remaining life when reported. Temperature alone never changes the status.
 - **Hardware details without S.M.A.R.T.**: for USB drives where macOS restricts S.M.A.R.T. access, displays bridge chip vendor, USB link speed, transport protocol (UAS / BOT), volumes, and a calm, non-alarming explanation.
 - **Attributes explained**: every S.M.A.R.T. attribute has a readable name and an explanation; values are converted to their unit (°C, hours, TB), or shown as raw hexadecimal on request.
 - **Continuous temperature history**: one reading every 30 seconds, kept at full resolution for 24 hours, then as 5-minute averages for 30 days. External drives regain their history upon reconnection via SHA-256 fingerprint hashing.
@@ -43,7 +43,7 @@ Native macOS app for Apple Silicon and Intel Macs · Universal binary · Complet
 - **Menu bar**: status and temperature of internal and connected external drives separated by a clean divider, with the last hour's curve.
 - **Live Dock icon**: the ring around the icon follows the health of the startup boot drive.
 - **Alerts**: notifications when a readable drive changes status, stays too hot, or drops below 50%, 25% or 10% of its life (disabled by default; zero false alerts on hot-unplug).
-- **Reports**: PDF, text or JSON export, and anonymized hardware compatibility reports, with serial numbers masked by default.
+- **Reports**: PDF, text or JSON export, and anonymized hardware compatibility reports, with serial numbers masked by default (including the physical disk behind a volume).
 - **Multilingual interface**: available in 18 languages (English, Français, 简体中文, 繁體中文, 한국어, 日本語, Deutsch, Español, Português do Brasil, Русский, العربية with full RTL layout, Italiano, Nederlands, Polski, Türkçe, हिन्दी, Tiếng Việt, Українська). See [docs/TRANSLATING.md](docs/TRANSLATING.md) to contribute or review translations.
 
 ## Privacy
