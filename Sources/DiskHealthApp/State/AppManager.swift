@@ -177,10 +177,10 @@ final class AppManager: ObservableObject {
     }
 
     func loadDisks(isAutoRefresh: Bool = false) {
-        if let vols = try? FileManager.default.contentsOfDirectory(atPath: "/Volumes") {
-            for vol in vols where vol != "Macintosh HD" {
-                _ = try? FileManager.default.contentsOfDirectory(atPath: "/Volumes/" + vol)
-            }
+        if !isAutoRefresh {
+            // Startup and hot-plug only, off the main thread, without waiting for it: a volume that
+            // doesn't answer must not freeze the app.
+            Task.detached(priority: .utility) { RemovableVolumesProbe.touch() }
         }
         if Self.isDemo {
             disks = DemoData.disks.map {
@@ -214,8 +214,9 @@ final class AppManager: ObservableObject {
             }.value
 
             guard !Task.isCancelled else { return }
-            if !self.benchmark.isRunning {
-                BenchCleanup.run(volumes: finalVolumes)
+            if !isAutoRefresh && !self.benchmark.isRunning {
+                // Leftover test files: walked in the background, the list is shown without waiting.
+                Task.detached(priority: .utility) { BenchCleanup.run(volumes: finalVolumes) }
             }
             self.apply(disks: finalDisks, announceChanges: !self.disks.isEmpty)
             self.updateSmartNotices(results)
