@@ -39,6 +39,11 @@ struct ReportData {
         }
     }
 
+    /// Physical description without the serial number when it must not appear in the report.
+    var exportedPhysical: PhysicalDisk {
+        options.includeSerial ? disk.physical : disk.physical.withSerialNumber(nil)
+    }
+
     @MainActor
     static func collect(disk: RealDisk, options: ExportOptions) -> ReportData {
         var history = AggregationResult.empty
@@ -391,7 +396,7 @@ enum ExportService {
         let history: [ExportedTemperaturePoint]? = r.options.includeHistory
             ? r.history.points.map { ExportedTemperaturePoint(date: $0.date, averageC: $0.temperature, minC: $0.minTemperature, maxC: $0.maxTemperature) }
             : nil
-        let physical = r.disk.physical
+        let physical = r.exportedPhysical
         let out = ExportFormat(generator: "Aman Disk \(AppInfo.version)", physical: physical, smart: r.exportedSnapshot,
                                health: r.disk.health, metrics: r.disk.metrics, lastRead: r.disk.lastRead,
                                benchmark: r.benchmark, temperatureHistory: history)

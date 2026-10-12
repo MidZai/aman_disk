@@ -34,7 +34,8 @@ import Foundation
     static func physical(_ proto: StorageProtocol) -> PhysicalDisk {
         PhysicalDisk(bsdName: "disk0", model: "APPLE SSD", sizeBytes: 500_000_000_000, isInternal: true,
                      connection: proto == .nvme ? .nvmeInternal : .other, volumeNames: ["Macintosh HD"],
-                     protocolType: proto, mediumType: .solidState, healthCapability: .supported)
+                     protocolType: proto, mediumType: .solidState, healthCapability: .supported,
+                     serialNumber: "S3RIAL123456")
     }
 
     // MARK: Report privacy
@@ -61,6 +62,16 @@ import Foundation
         #expect(!String(decoding: try ExportService.reportJSON(masked), as: UTF8.self).contains("C02SECRET1234"))
         let shown = ReportData(disk: disk, options: ExportOptions(includeSerial: true, includeHistory: false), benchmark: nil, history: .empty, generatedAt: Date())
         #expect(ExportService.reportText(shown).contains("C02SECRET1234"))
+    }
+
+    @Test @MainActor func physicalDiskSerialIsMaskedInJSONReports() throws {
+        let snapshot = DiskHealthSnapshot.nvme(Self.nvmeLog(), Self.identify)
+        let disk = RealDisk(physical: Self.physical(.nvme), snapshot: snapshot, health: AppManager.evaluate(snapshot))
+        let masked = ReportData(disk: disk, options: ExportOptions(includeSerial: false, includeHistory: false), benchmark: nil, history: .empty, generatedAt: Date())
+        let json = String(decoding: try ExportService.reportJSON(masked), as: UTF8.self)
+        #expect(!json.contains("S3RIAL123456"))
+        let shown = ReportData(disk: disk, options: ExportOptions(includeSerial: true, includeHistory: false), benchmark: nil, history: .empty, generatedAt: Date())
+        #expect(String(decoding: try ExportService.reportJSON(shown), as: UTF8.self).contains("S3RIAL123456"))
     }
 
     @Test func unknownTemperatureIsNotReportedAsZero() {
