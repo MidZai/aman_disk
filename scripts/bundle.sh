@@ -7,7 +7,7 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/.."
 
-VERSION="1.0.0"
+VERSION="$(tr -d '[:space:]' < VERSION)"
 UNIVERSAL=0
 if [ "$1" == "--release" ]; then
     UNIVERSAL=1

@@ -1,7 +1,10 @@
 #!/bin/bash
 set -e
 
-VERSION="${VERSION:-0.9.4}"
+# Single source for the version number: the VERSION file at the repository root.
+VERSION="${VERSION:-$(tr -d '[:space:]' < VERSION)}"
+# Build number: the number of commits, or 1 outside a git checkout.
+BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 UNIVERSAL="${UNIVERSAL:-0}"
 BUILT_BINARY=".build/AmanDisk-bundle-binary"
 
@@ -61,7 +64,7 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
     <key>CFBundleShortVersionString</key>
     <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$BUILD_NUMBER</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>NSHumanReadableCopyright</key>

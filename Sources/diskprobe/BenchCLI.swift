@@ -209,6 +209,6 @@ class BenchHandler: BenchmarkRunnerDelegate {
 }
 
 enum DiskProbeInfo {
-    /// Same version as the app (see build_app.sh).
-    static let version = "0.9.2"
+    /// Same version as the app (VERSION file at the repository root).
+    static let version = AmanVersion.current
 }

@@ -1,9 +1,10 @@
 import Foundation
+import DiskHealthCore
 
 public enum AppInfo {
     public static let name = "Aman Disk"
     /// Read from the bundle; fallback value for `swift run`.
-    public static let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    public static let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? AmanVersion.current
     /// Same as `CFBundleIdentifier` (build_app.sh): used as the folder name in Application Support,
     /// including under `swift run`, where the bundle has no identifier.
     public static let bundleIdentifier = "io.github.aman-disk.AmanDisk"
