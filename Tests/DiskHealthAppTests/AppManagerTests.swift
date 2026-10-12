@@ -4,7 +4,7 @@ import Foundation
 import DiskHealthCore
 import BenchmarkCore
 
-@Suite @MainActor struct Phase7AppTests {
+@Suite @MainActor struct AppManagerTests {
 
     private func makeInternalDisk(id: String = "disk0", model: String = "APPLE SSD") -> RealDisk {
         let physical = PhysicalDisk(
@@ -39,37 +39,28 @@ import BenchmarkCore
         return RealDisk(physical: physical, snapshot: nil, health: HealthAssessment(status: .good, healthPercent: nil, reasons: []))
     }
 
-    @Test func testDisconnectedExternalDriveTrackingAndLastSeen() {
-        let app = AppManager()
+    @Test func unpluggedExternalDriveIsRememberedWithItsLastSeenDate() {
+        var tracker = ExternalDiskTracker()
         let internalDisk = makeInternalDisk()
-        let externalDisk = makeExternalDisk()
+        let external = makeExternalDisk()
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 
-        #expect(internalDisk.physical.isInternal)
-        #expect(!externalDisk.physical.isInternal)
-        #expect(app.disconnectedDisks.isEmpty)
+        // Initial list: nothing is missing yet.
+        #expect(tracker.update(previous: [], current: [internalDisk, external], recordDepartures: false, now: t0).isEmpty)
 
-        // Simulate apply via mirror or testDisks
-        // When external disk is plugged in and unplugged
-        let extKey = externalDisk.benchmarkKey
-        #expect(!extKey.isEmpty)
+        // The external drive leaves: remembered under its stable key, with the date.
+        let gone = tracker.update(previous: [internalDisk, external], current: [internalDisk], recordDepartures: true, now: t0)
+        #expect(gone.map(\.id) == [external.benchmarkKey])
+        #expect(gone.first?.lastSeen == t0)
+        #expect(external.benchmarkKey == DiskIdentity.key(model: "Crucial X8", serial: "CRUCIAL12345"))
 
-        // RealDisk serialNumber fallback
-        #expect(externalDisk.serialNumber == "CRUCIAL12345")
-        #expect(externalDisk.benchmarkKey == DiskIdentity.key(model: "Crucial X8", serial: "CRUCIAL12345"))
-    }
+        // An internal drive leaving is not tracked; the external one is still listed.
+        let later = t0.addingTimeInterval(60)
+        #expect(tracker.update(previous: [internalDisk], current: [], recordDepartures: true, now: later).map(\.id) == [external.benchmarkKey])
 
-    @Test func testMenuBarInternalAndExternalSeparation() {
-        let internalDisk = makeInternalDisk()
-        let externalDisk = makeExternalDisk()
-        let allDisks = [internalDisk, externalDisk]
-
-        let internals = allDisks.filter { $0.physical.isInternal }
-        let externals = allDisks.filter { $0.physical.isExternal }
-
-        #expect(internals.count == 1)
-        #expect(externals.count == 1)
-        #expect(internals[0].id == "disk0")
-        #expect(externals[0].id == "disk2")
+        // Plugged back in (under another BSD name): forgotten.
+        let back = makeExternalDisk(id: "disk7")
+        #expect(tracker.update(previous: [], current: [back], recordDepartures: true, now: later).isEmpty)
     }
 
     @Test func testStringsLastSeenFormat() {

@@ -97,7 +97,7 @@ final class AppManager: ObservableObject {
     @Published private(set) var disks: [RealDisk] = []
     @Published private(set) var volumes: [Volume] = []
     @Published private(set) var disconnectedDisks: [DisconnectedDisk] = []
-    private var externalDisksHistory: [String: (disk: RealDisk, lastSeen: Date)] = [:]
+    private var externalTracker = ExternalDiskTracker()
     /// First load only: later refreshes keep the page on screen.
     @Published private(set) var isLoading = true
     @Published private(set) var isRefreshing = false
@@ -369,7 +369,6 @@ final class AppManager: ObservableObject {
                 }
                 ToastCenter.shared.show(message: L("\(disk.physical.model) disconnected", "\(disk.physical.model) déconnecté"), systemImage: "externaldrive.badge.minus")
                 if disk.physical.isExternal {
-                    externalDisksHistory[disk.benchmarkKey] = (disk, Date())
                     if selection == .physicalDisk(id) {
                         selection = .disconnectedDisk(disk.benchmarkKey)
                     }
@@ -383,14 +382,7 @@ final class AppManager: ObservableObject {
                 }
             }
         }
-        for disk in newDisks where disk.physical.isExternal {
-            externalDisksHistory.removeValue(forKey: disk.benchmarkKey)
-        }
-        let currentlyConnectedKeys = Set(newDisks.map(\.benchmarkKey))
-        disconnectedDisks = externalDisksHistory.values
-            .filter { !currentlyConnectedKeys.contains($0.disk.benchmarkKey) }
-            .map { DisconnectedDisk(disk: $0.disk, lastSeen: $0.lastSeen) }
-            .sorted { $0.lastSeen > $1.lastSeen }
+        disconnectedDisks = externalTracker.update(previous: disks, current: newDisks, recordDepartures: announceChanges)
 
         disks = newDisks
         if case .physicalDisk(let id) = selection, !newDisks.contains(where: { $0.id == id }) {
