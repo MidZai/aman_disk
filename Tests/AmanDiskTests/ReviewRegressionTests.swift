@@ -229,7 +229,7 @@ import Foundation
     @Test func smartTableValuesCarryTheirUnits() {
         let rows = SmartRows.rows(for: .nvme(Self.nvmeLog(), Self.identify))
         #expect(rows.first { $0.id == 0x0C }?.value.hasSuffix("h") == true)
-        #expect(rows.first { $0.id == 0x02 }?.value.hasSuffix("°C") == true)
+        #expect(rows.first { $0.id == 0x02 }?.value.hasSuffix(Formatters.temperatureUnit.symbol) == true)
         let ata = SmartRows.rows(for: .ata(Self.ataSnapshot([Self.ataAttribute(0x09, raw: 31_482)])))
         #expect(ata.first?.rawHex == "0x000000007AFA")
     }

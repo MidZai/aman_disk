@@ -29,7 +29,7 @@ import Foundation
 
     @Test func hoursAndTemperature() {
         #expect(Formatters.hours(2814) == "2,814\(nbsp)h")
-        #expect(Formatters.temperature(38) == "38\(nbsp)°C")
+        #expect(Formatters.temperature(38, unit: .celsius) == "38\(nbsp)°C")
     }
 
     @Test func approximateDuration() {
