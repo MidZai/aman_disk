@@ -1,5 +1,7 @@
 #!/bin/bash
 set -e
+# Always work from the repository root, whatever the current directory.
+cd "$(dirname "$0")"
 
 # Single source for the version number: the VERSION file at the repository root.
 VERSION="${VERSION:-$(tr -d '[:space:]' < VERSION)}"
@@ -162,17 +164,13 @@ cat > "AmanDisk-entitlement.plist" << PLIST
 PLIST
 
 echo "Signing application..."
-# Ad hoc signature (no developer account: the app isn't notarized).
-codesign --force --deep --sign - --entitlements AmanDisk-entitlement.plist "$APP_NAME"
+# Ad hoc signature (no developer account: the app isn't notarized). Each binary inside the
+# bundle is signed explicitly, then the bundle itself, with the hardened runtime.
+codesign --force --sign - --options runtime --entitlements AmanDisk-entitlement.plist "$MACOS_DIR/AmanDisk"
+codesign --force --sign - --options runtime --entitlements AmanDisk-entitlement.plist "$APP_NAME"
 codesign --verify --deep --strict "$APP_NAME"
-
-echo "Copying to root folder..."
-cp -R "$APP_NAME" "../$APP_NAME" 2>/dev/null || true
 
 # Re-register with macOS LaunchServices so macOS updates its per-app language list
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_NAME" 2>/dev/null || true
-if [ -d "../$APP_NAME" ]; then
-    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "../$APP_NAME" 2>/dev/null || true
-fi
 
 echo "Done! $APP_NAME has been created successfully."
