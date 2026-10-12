@@ -2,6 +2,10 @@ import Foundation
 
 public enum ATAHealthEvaluator {
     public static func evaluate(snapshot: ATASmartSnapshot) -> HealthAssessment {
+        // No attribute, or a block that failed its checksum: nothing can be assessed.
+        if snapshot.attributes.isEmpty || !snapshot.checksumValid {
+            return HealthAssessment(status: .unknown, healthPercent: nil, reasons: [HealthEngine.unverifiedDataReason])
+        }
         let profile = ATACatalog.profile(for: snapshot.model)
         let metrics = DiskMetrics(snapshot: .ata(snapshot))
         let lifeRemaining = metrics.lifeRemainingPercent
@@ -57,6 +61,11 @@ public enum ATAHealthEvaluator {
         // Temperature doesn't count toward the health status (see HealthEngine).
 
         if status == .good {
+            // The thresholds block failed its checksum: the problems found above stand, but “good”
+            // would rest on thresholds we couldn't verify.
+            if !snapshot.thresholdsChecksumValid {
+                return HealthAssessment(status: .unknown, healthPercent: lifeRemaining, reasons: [HealthEngine.unverifiedThresholdsReason])
+            }
             reasons.append(L("No problems detected.", "Aucune anomalie détectée."))
         }
 

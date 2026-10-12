@@ -244,3 +244,49 @@ extension ATATests {
         #expect(metrics(attributes: [(id: 0xE9, current: 85)], rotationRate: 7200).lifeRemainingPercent == nil)
     }
 }
+
+// Review fixes: empty or unverified data gives “unknown”, never “good”.
+extension ATATests {
+    private var emptyDataReason: String {
+        L("The drive returned empty or unverified data; its health can't be assessed.", "Le disque a renvoyé des données vides ou non vérifiées ; son état ne peut pas être évalué.")
+    }
+
+    @Test func allZeroATABlockIsUnknown() {
+        // 512 zero bytes pass the checksum (sum 0) and contain no attribute.
+        let identify = makeATAIdentify(model: "Generic Model", rotationRate: 1)
+        let zeros = Data(repeating: 0, count: 512)
+        let snapshot = ATASmartParser.parse(smartData: zeros, thresholdsData: zeros, identifyData: identify, statusExceeded: false)!
+        let assessment = ATAHealthEvaluator.evaluate(snapshot: snapshot)
+        #expect(assessment.status == .unknown)
+        #expect(assessment.reasons == [emptyDataReason])
+        #expect(assessment.healthPercent == nil)
+    }
+
+    @Test func invalidATAChecksumIsUnknown() {
+        let identify = makeATAIdentify(model: "Generic Model", rotationRate: 1)
+        var smart = makeATASmartData(attributes: [(id: 9, flags: 0, current: 100, worst: 100, raw: [UInt8](repeating: 0, count: 6))])
+        smart[511] = smart[511] &+ 1
+        let thresholds = makeATAThresholds(thresholds: [(id: 9, threshold: 0)])
+        let snapshot = ATASmartParser.parse(smartData: smart, thresholdsData: thresholds, identifyData: identify, statusExceeded: false)!
+        #expect(!snapshot.checksumValid)
+        let assessment = ATAHealthEvaluator.evaluate(snapshot: snapshot)
+        #expect(assessment.status == .unknown)
+        #expect(assessment.reasons == [emptyDataReason])
+    }
+
+    @Test func invalidThresholdsChecksumCannotBeGood() {
+        let identify = makeATAIdentify(model: "Generic Model", rotationRate: 1)
+        let smart = makeATASmartData(attributes: [(id: 9, flags: 0, current: 100, worst: 100, raw: [UInt8](repeating: 0, count: 6))])
+        var thresholds = makeATAThresholds(thresholds: [(id: 9, threshold: 0)])
+        thresholds[511] = thresholds[511] &+ 1
+        let snapshot = ATASmartParser.parse(smartData: smart, thresholdsData: thresholds, identifyData: identify, statusExceeded: false)!
+        #expect(snapshot.checksumValid && !snapshot.thresholdsChecksumValid)
+        let assessment = ATAHealthEvaluator.evaluate(snapshot: snapshot)
+        #expect(assessment.status == .unknown)
+        #expect(assessment.reasons == [L("The drive's failure thresholds could not be verified; its health can't be confirmed.", "Les seuils de défaillance du disque n'ont pas pu être vérifiés ; son état ne peut pas être confirmé.")])
+
+        // A verdict that is already bad stays bad: the thresholds only decide whether “good” is allowed.
+        let failing = ATASmartParser.parse(smartData: smart, thresholdsData: thresholds, identifyData: identify, statusExceeded: true)!
+        #expect(ATAHealthEvaluator.evaluate(snapshot: failing).status == .bad)
+    }
+}

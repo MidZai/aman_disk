@@ -103,6 +103,15 @@ import Foundation
         #expect(assessment.healthPercent == 0)
     }
     
+    @Test func allZeroNVMeLogIsUnknown() {
+        // Temperature 0 K, no hours, no cycles, nothing written: the controller answered with nothing.
+        let smartLog = NVMeSmartParser.parse(makeSmartLog(availableSpare: 0, threshold: 0, temperatureKelvin: 0))!
+        let assessment = HealthEngine.evaluate(smart: smartLog, identify: defaultIdentify())
+        #expect(assessment.status == .unknown)
+        #expect(assessment.healthPercent == nil)
+        #expect(assessment.reasons == [L("The drive returned empty or unverified data; its health can't be assessed.", "Le disque a renvoyé des données vides ou non vérifiées ; son état ne peut pas être évalué.")])
+    }
+
     @Test func testHealthEngine_PercentageUsedTooHighDoesNotCrash() {
         let data = makeSmartLog(percentageUsed: 255)
         let smartLog = NVMeSmartParser.parse(data)!

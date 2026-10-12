@@ -171,6 +171,8 @@ extension ExtraTranslations {
         "No internal drive found": "لم يتم العثور على قرص داخلي",
         "No measurements (Mac asleep or Aman closed)": "لا توجد قياسات (الماك في وضع الإسبات أو أن تطبيق Aman مغلق)",
         "No problems detected.": "لم يتم اكتشاف أي مشاكل.",
+        "The drive's failure thresholds could not be verified; its health can't be confirmed.": "تعذّر التحقق من عتبات العطل لمحرك الأقراص؛ لا يمكن تأكيد حالته.",
+        "The drive returned empty or unverified data; its health can't be assessed.": "أعاد محرك الأقراص بيانات فارغة أو غير متحقق منها؛ لا يمكن تقييم حالته.",
         "No result": "No result",
         "No sectors replaced": "لم يتم استبدال أي قطاعات",
         "No selection": "لا يوجد تحديد",
