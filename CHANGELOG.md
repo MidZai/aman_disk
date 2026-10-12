@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.0.1 — 2026-10-12
+
+Corrections from a full review. No change to the interface except the points below.
+
+### Health verdicts
+- Temperature attributes never change the health status; an attribute that is not pre-fail and drops below its threshold gives "caution", not "failing". The S.M.A.R.T. table uses the same rule.
+- Remaining life is read from one attribute by a fixed priority (231, then 177, then 233), and never on hard disk drives.
+- Empty or unverified S.M.A.R.T. data (all-zero block, bad checksum, unreadable thresholds, all-zero NVMe log) gives an "unknown" status, never "good".
+- No crash when an NVMe drive reports a spare threshold of 246 or more.
+- An NVMe temperature outside −40 °C … 150 °C is treated as absent.
+
+### Privacy
+- The JSON report and the compatibility report no longer contain the physical disk's serial number.
+- No hard-coded French in exports: compatibility file name and masked placeholder follow the interface language.
+
+### App and benchmark
+- The removable-volumes check runs in the background and on local volumes only.
+- Nothing is written to a volume until a test starts.
+- The benchmark write cap applies to the whole pass; thread and memory failures are handled.
+- An I/O error on a drive that is still mounted is reported as an error, not as a disconnection.
+- Alerts, drive identification cache and benchmark history are no longer keyed by the BSD name (`disk4`), which can change between connections.
+- Cleanup never deletes a test file another running instance may still be using.
+- `diskprobe`: an unknown `--size` or `--profile` value is an error.
+
+### Distribution
+- One source for the version number (`VERSION`), real build number.
+- Homebrew cask matches the DMG name.
+- Removable-volumes permission text in English, translated into the 17 other languages.
+- Build script runs from the repository root and signs with the hardened runtime.
+- Continuous integration builds and tests every push.
+
 ## 1.0.0 — 2026-09-25
 
 **Aman Disk 1.0.0** is the first major stable release, bringing comprehensive, native, and completely private storage health and performance monitoring to macOS.
