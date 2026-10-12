@@ -221,3 +221,26 @@ extension ATATests {
         #expect(assessment.status == .bad)
     }
 }
+
+// Review fixes: remaining life comes from one attribute, chosen by a fixed priority.
+extension ATATests {
+    private func metrics(attributes: [(id: UInt8, current: UInt8)], rotationRate: Int = 1) -> DiskMetrics {
+        let identify = makeATAIdentify(model: "Generic Model", rotationRate: rotationRate)
+        let smart = makeATASmartData(attributes: attributes.map { (id: $0.id, flags: UInt16(0), current: $0.current, worst: $0.current, raw: [UInt8](repeating: 0, count: 6)) })
+        let thresholds = makeATAThresholds(thresholds: attributes.map { (id: $0.id, threshold: UInt8(0)) })
+        let snapshot = ATASmartParser.parse(smartData: smart, thresholdsData: thresholds, identifyData: identify, statusExceeded: false)!
+        return DiskMetrics(snapshot: .ata(snapshot))
+    }
+
+    @Test func lifeRemainingPrefers231Over233() {
+        #expect(metrics(attributes: [(id: 0xE7, current: 20), (id: 0xE9, current: 100)]).lifeRemainingPercent == 20)
+    }
+
+    @Test func lifeRemainingFallsBackTo233Alone() {
+        #expect(metrics(attributes: [(id: 0xE9, current: 85)]).lifeRemainingPercent == 85)
+    }
+
+    @Test func lifeRemainingIgnoredOnRotationalDrive() {
+        #expect(metrics(attributes: [(id: 0xE9, current: 85)], rotationRate: 7200).lifeRemainingPercent == nil)
+    }
+}
