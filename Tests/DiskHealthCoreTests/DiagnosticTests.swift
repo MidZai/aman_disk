@@ -17,12 +17,12 @@ import Foundation
         let sanitized = IOKitDiagnostics.sanitizeProperties(rawProps)
         
         #expect(sanitized["Device Model"] == "Apple SSD SM0512G")
-        #expect(sanitized["Serial Number"] == "<masqué>")
-        #expect(sanitized["UUID"] == "<masqué>")
-        #expect(sanitized["media-guid"] == "<masqué>")
+        #expect(sanitized["Serial Number"] == IOKitDiagnostics.maskedPlaceholder)
+        #expect(sanitized["UUID"] == IOKitDiagnostics.maskedPlaceholder)
+        #expect(sanitized["media-guid"] == IOKitDiagnostics.maskedPlaceholder)
         #expect(sanitized["RandomNumber"] == "42")
         #expect(sanitized["IsInternal"] == "true")
-        #expect(sanitized["RawUUIDValue"] == "<masqué>")
+        #expect(sanitized["RawUUIDValue"] == IOKitDiagnostics.maskedPlaceholder)
     }
     
     @Test func testDiagnosticEncodingDecoding() throws {

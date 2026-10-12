@@ -143,9 +143,9 @@ enum ExportService {
         if let vid = physical.usbVendorID, let pid = physical.usbProductID {
             let vidStr = String(format: "0x%04X", vid)
             let pidStr = String(format: "0x%04X", pid)
-            filename = "Aman-Disk-compatibilite_\(safeModel)_\(vidStr)_\(pidStr)_\(formatter.string(from: Date())).json"
+            filename = "Aman-Disk-compatibility_\(safeModel)_\(vidStr)_\(pidStr)_\(formatter.string(from: Date())).json"
         } else {
-            filename = "Aman-Disk-compatibilite_\(safeModel)_\(formatter.string(from: Date())).json"
+            filename = "Aman-Disk-compatibility_\(safeModel)_\(formatter.string(from: Date())).json"
         }
 
         panel.nameFieldStringValue = filename

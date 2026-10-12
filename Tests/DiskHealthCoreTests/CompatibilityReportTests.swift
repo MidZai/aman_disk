@@ -65,7 +65,7 @@ import Foundation
         
         // Acceptance criterion: serial number present in input must NEVER appear anywhere in output
         #expect(!jsonStr.contains(inputSerial))
-        #expect(jsonStr.contains("<masqué>"))
+        #expect(jsonStr.contains(IOKitDiagnostics.maskedPlaceholder))
         
         // Acceptance criterion: no volume names, no user paths
         #expect(!jsonStr.contains(confidentialVolume))
@@ -79,7 +79,7 @@ import Foundation
         #expect(decoded.model == "WD My Passport 2627")
         #expect(decoded.bsdName == "disk4")
         #expect(decoded.amanVersion == "0.9.7")
-        #expect(decoded.deviceCharacteristics?["Serial Number"] == "<masqué>")
+        #expect(decoded.deviceCharacteristics?["Serial Number"] == IOKitDiagnostics.maskedPlaceholder)
     }
 
     @Test func testCompatibilityReportFields() throws {
