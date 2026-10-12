@@ -58,8 +58,9 @@ final class SystemNotificationPoster: NSObject, NotificationPosting, UNUserNotif
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let diskId = response.notification.request.content.userInfo[Self.diskIdKey] as? String
         await MainActor.run {
-            if let diskId {
-                AppManager.sharedInstance?.selection = .physicalDisk(diskId)
+            // The alert is keyed by the drive's identity; the selection wants its current BSD name.
+            if let diskId, let disk = AppManager.sharedInstance?.disks.first(where: { $0.historyKey == diskId }) {
+                AppManager.sharedInstance?.selection = .physicalDisk(disk.id)
                 AppManager.sharedInstance?.activeTab = .health
             }
             WindowOpener.showMainWindow()
@@ -71,7 +72,9 @@ final class SystemNotificationPoster: NSObject, NotificationPosting, UNUserNotif
 @MainActor
 final class LiveStatusController {
     static let shared = LiveStatusController()
-    private static let alertStatesKey = "alertStates"
+    /// Keyed by drive identity (model + serial). The 1.0 key, indexed by BSD name, is erased.
+    private static let alertStatesKey = "alertStatesByIdentity"
+    private static let legacyAlertStatesKey = "alertStates"
     
     let poster = SystemNotificationPoster()
     private var engine: AlertEngine
@@ -81,6 +84,7 @@ final class LiveStatusController {
     private var lastDockEnabled: Bool?
     
     private init() {
+        UserDefaults.standard.removeObject(forKey: Self.legacyAlertStatesKey)
         let saved = UserDefaults.standard.data(forKey: Self.alertStatesKey)
             .flatMap { try? JSONDecoder().decode([String: AlertEngine.DiskState].self, from: $0) } ?? [:]
         engine = AlertEngine(poster: poster, states: saved, isEnabled: Self.alertsEnabled)
@@ -102,12 +106,13 @@ final class LiveStatusController {
             .sink { [weak self] disks in self?.update(disks: disks) }
     }
     
-    private func update(disks: [RealDisk]) {
-        refreshDockIcon()
-        
-        let readings = disks.filter { $0.physical.healthCapability == .supported && $0.snapshot != nil }.map { disk in
-            AlertReading(
-                diskId: disk.id,
+    /// Drives that were read, keyed by their identity (model + serial number), never by BSD name:
+    /// `disk4` is whatever was plugged last, and must not inherit another drive's alert state.
+    nonisolated static func alertReadings(for disks: [RealDisk]) -> [AlertReading] {
+        disks.compactMap { disk in
+            guard disk.physical.healthCapability == .supported, disk.snapshot != nil, let key = disk.historyKey else { return nil }
+            return AlertReading(
+                diskId: key,
                 name: disk.physical.model,
                 status: disk.health.status,
                 firstReason: disk.health.reasons.first,
@@ -116,10 +121,24 @@ final class LiveStatusController {
                 lifePercent: AmanPalette.knownPercent(health: disk.health, capability: disk.physical.healthCapability)
             )
         }
+    }
+
+    /// Alert state is persisted only for drives with a real serial number: without one the identity
+    /// is the model alone, which another drive could share.
+    private var transientIds: Set<String> = []
+
+    private func update(disks: [RealDisk]) {
+        refreshDockIcon()
+        
+        let readings = Self.alertReadings(for: disks)
         guard !readings.isEmpty else { return }
+        for disk in disks where (disk.serialNumber ?? "").isEmpty {
+            if let key = disk.historyKey { transientIds.insert(key) }
+        }
         engine.isEnabled = Self.alertsEnabled
         engine.process(readings)
-        if let data = try? JSONEncoder().encode(engine.states) {
+        let persisted = engine.states.filter { !transientIds.contains($0.key) }
+        if let data = try? JSONEncoder().encode(persisted) {
             UserDefaults.standard.set(data, forKey: Self.alertStatesKey)
         }
     }

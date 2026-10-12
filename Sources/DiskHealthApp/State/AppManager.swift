@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import DiskArbitration
 import DiskHealthCore
 import BenchmarkCore
@@ -119,6 +120,8 @@ final class AppManager: ObservableObject {
     private var sampleScheduler: SampleScheduler?
     private var daSession: DASession?
     private var loadTask: Task<Void, Never>?
+    private var wakeObserver: NSObjectProtocol?
+    private var identifyCache = IdentifyCache()
     nonisolated static let smartMemory = UserDefaultsActivationMemory()
 
     init() {
@@ -131,6 +134,10 @@ final class AppManager: ObservableObject {
         sampleScheduler = SampleScheduler(appManager: self)
         sampleScheduler?.start()
         LiveStatusController.shared.start(appManager: self)
+        // After sleep, a BSD name may belong to another drive: cached Identify data is dropped.
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.identifyCache.invalidateAll() }
+        }
         loadDisks()
     }
 
@@ -149,15 +156,21 @@ final class AppManager: ObservableObject {
         DASessionScheduleWithRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
     }
 
-    private static let hotplugCallback: DADiskAppearedCallback = { _, context in
+    private static let hotplugCallback: DADiskAppearedCallback = { disk, context in
         guard let context else { return }
         let manager = Unmanaged<AppManager>.fromOpaque(context).takeUnretainedValue()
-        Task { @MainActor in manager.loadDisks() }
+        let bsdName = DADiskGetBSDName(disk).map { String(cString: $0) }
+        Task { @MainActor in
+            // Appeared or disappeared: whatever is cached under that name may describe another drive.
+            if let bsdName { manager.identifyCache.invalidate(bsdName: bsdName) }
+            manager.loadDisks()
+        }
     }
 
     deinit {
         refreshTimer?.invalidate()
         loadTask?.cancel()
+        if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
         if let session = daSession {
             let context = Unmanaged.passUnretained(self).toOpaque()
             DAUnregisterCallback(session, unsafeBitCast(Self.hotplugCallback, to: UnsafeMutableRawPointer.self), context)
@@ -203,7 +216,7 @@ final class AppManager: ObservableObject {
             self.isRefreshing = true
             defer { self.isRefreshing = false }
 
-            let knownIdentify = self.knownIdentifies()
+            let knownIdentify = self.identifyCache.known(from: self.disks)
             let (finalDisks, finalVolumes, results) = await Task.detached(priority: .userInitiated) {
                 // Filter before any S.M.A.R.T. read: external drives, disk images and
                 // virtual disks aren't shown, so there's no point querying them.
@@ -340,12 +353,6 @@ final class AppManager: ObservableObject {
             newDisks[index] = RealDisk(physical: disks[index].physical.withCapability(.supported), snapshot: snapshot, health: Self.evaluate(snapshot))
             apply(disks: newDisks, announceChanges: false)
         }
-    }
-
-    private func knownIdentifies() -> [String: NVMeIdentify] {
-        var result: [String: NVMeIdentify] = [:]
-        for disk in disks { if let id = disk.identify { result[disk.id] = id } }
-        return result
     }
 
     /// Publishes the new list and reports drives being plugged in and status changes.

@@ -186,7 +186,7 @@ import Foundation
         #expect(BenchMath.estimatedMaxDuration(fileSize: gib, profile: .quick) < standard)
     }
 
-    @Test func benchmarkResultsAreFoundUnderLegacyKeys() async throws {
+    @Test func benchmarkResultsAreReadUnderTheStableKeyOnly() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
         let manager = BenchmarkHistoryManager(directoryURL: dir)
@@ -200,14 +200,15 @@ import Foundation
                                                         temperatureMaxC: 40, bytesWritten: 1 << 30),
                             tests: [], completed: true, stopReason: nil)
         }
-        // 0.9: saved under the hash of the model alone.
+        // 0.9 files (hash of the model alone, or the BSD name) could belong to another drive of the
+        // same model or to any drive that once had that name: they are no longer read.
         manager.save(result(key: DiskIdentity.key(model: disk.physical.model, serial: ""), date: Date(timeIntervalSince1970: 1)))
-        // 0.9.1: stable key, model + serial number.
+        manager.save(result(key: disk.physical.bsdName, date: Date(timeIntervalSince1970: 3)))
+        // Stable key, model + serial number.
         manager.save(result(key: disk.benchmarkKey, date: Date(timeIntervalSince1970: 2)))
 
         let found = await manager.loadResults(for: disk)
-        #expect(found.count == 2)
-        #expect(found.first?.date == Date(timeIntervalSince1970: 2))
+        #expect(found.map(\.date) == [Date(timeIntervalSince1970: 2)])
     }
 
     // MARK: Miscellaneous

@@ -30,10 +30,9 @@ final class BenchmarkHistoryManager: @unchecked Sendable {
         }
     }
 
-    /// A drive's results, newest first.
-    /// Up to 0.9, results were saved under a hash of the model alone and read back
-    /// under the BSD name (`disk0`), so the history always stayed empty. Both old keys
-    /// are read so nothing is lost.
+    /// A drive's results, newest first, under its stable key (model + serial number) only.
+    /// Files from 0.9 named after the model alone or the BSD name (`disk0`) could belong to
+    /// another drive, so they are no longer read.
     func results(for disk: RealDisk) -> [BenchmarkResult] {
         queue.sync { self.readAll(keys: Self.keys(for: disk)) }
     }
@@ -46,10 +45,7 @@ final class BenchmarkHistoryManager: @unchecked Sendable {
     }
 
     private static func keys(for disk: RealDisk) -> [String] {
-        var keys = [disk.benchmarkKey, DiskIdentity.key(model: disk.physical.model, serial: ""), disk.physical.bsdName]
-        var seen = Set<String>()
-        keys = keys.filter { seen.insert($0).inserted }
-        return keys
+        [disk.benchmarkKey]
     }
 
     private func readAll(keys: [String]) -> [BenchmarkResult] {

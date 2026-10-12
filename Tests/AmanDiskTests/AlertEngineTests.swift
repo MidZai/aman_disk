@@ -188,3 +188,33 @@ import DiskHealthCore
         #expect(poster.posted.isEmpty)
     }
 }
+
+// Review fixes: alert state is keyed by the drive's identity, never by its BSD name.
+extension AlertEngineTests {
+    private func disk(serial: String, life: Int) -> RealDisk {
+        let physical = PhysicalDisk(bsdName: "disk4", model: "Crucial X8", sizeBytes: 1_000_000_000_000, isInternal: false,
+                                    connection: .usb, driveConnection: .usb, volumeNames: ["X8"], protocolType: .usb,
+                                    mediumType: .solidState, healthCapability: .supported, serialNumber: serial)
+        let log = NVMeSmartLog(criticalWarning: 0, compositeTemperatureKelvin: 310, availableSpare: 100, availableSpareThreshold: 10,
+                               percentageUsed: UInt8(100 - life), dataUnitsRead: 1, dataUnitsWritten: 1, hostReadCommands: 0,
+                               hostWriteCommands: 0, controllerBusyTimeMinutes: 0, powerCycles: 10, powerOnHours: 100,
+                               unsafeShutdowns: 0, mediaErrors: 0, errorLogEntries: 0)
+        let identify = NVMeIdentify(serialNumber: serial, modelNumber: "Crucial X8", firmwareRevision: "1.0",
+                                    warningTempKelvin: 0, criticalTempKelvin: 0, totalCapacityBytes: 1_000_000_000_000)
+        let snapshot = DiskHealthSnapshot.nvme(log, identify)
+        return RealDisk(physical: physical, snapshot: snapshot, health: AppManager.evaluate(snapshot))
+    }
+
+    @Test func twoDrivesUnderTheSameBSDNameShareNoAlertState() {
+        let engine = makeEngine()
+        let first = LiveStatusController.alertReadings(for: [disk(serial: "AAAA1111", life: 90)])
+        let second = LiveStatusController.alertReadings(for: [disk(serial: "BBBB2222", life: 40)])
+        #expect(first.map(\.diskId) != second.map(\.diskId))
+        #expect(first.first?.diskId != "disk4")
+
+        engine.process(first)
+        engine.process(second)
+        #expect(poster.posted.isEmpty, "the second drive is a baseline, not a drop from 90% to 40%")
+        #expect(engine.states.count == 2)
+    }
+}
