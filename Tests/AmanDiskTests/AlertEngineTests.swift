@@ -5,7 +5,9 @@ import DiskHealthCore
 
 /// Alerts, tested with a fake clock and a fake notification poster.
 @Suite struct AlertEngineTests {
-    init() { Localization.language = .english }
+    // Only writes when needed: scripts/test.sh already starts in English, and a write
+    // while other suites run in parallel races on the shared formatter cache.
+    init() { if Localization.language != .english { Localization.language = .english } }
 
     final class FakePoster: NotificationPosting {
         var posted: [AlertEvent] = []

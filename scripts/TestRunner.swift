@@ -3,6 +3,7 @@
 // it refuses to load the locally signed test bundle. This runner does the same thing
 // (dlopen of the bundle, then the Swift Testing entry point), without that restriction.
 import Darwin
+import Foundation
 import Testing
 
 @main
@@ -13,6 +14,10 @@ struct TestRunner {
             fputs("usage: TestRunner <test bundle> [swift-testing arguments]\n", stderr)
             exit(2)
         }
+        // The tests expect English. Setting it here, before any test runs, means the
+        // interface language starts as English and no test needs to change it while
+        // other tests run in parallel (Localization.language is a global).
+        UserDefaults.standard.setVolatileDomain(["appLanguage": "en"], forName: UserDefaults.argumentDomain)
         guard dlopen(bundle, RTLD_NOW) != nil else {
             fputs("Couldn't load \(bundle): \(String(cString: dlerror()))\n", stderr)
             exit(1)

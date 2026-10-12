@@ -6,7 +6,9 @@ import Foundation
     /// No-break space between a number and its unit, so “36 °C” never wraps.
     let nbsp = "\u{00A0}"
 
-    init() { Localization.language = .english }
+    // Only writes when needed: scripts/test.sh already starts in English, and a write
+    // while other suites run in parallel races on the shared formatter cache.
+    init() { if Localization.language != .english { Localization.language = .english } }
 
     @Test func bytes() {
         #expect(Formatters.bytes(500_300_000_000) == "500.3\(nbsp)GB")
