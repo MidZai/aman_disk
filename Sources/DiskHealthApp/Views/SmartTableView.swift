@@ -52,15 +52,21 @@ enum SmartRows {
         }
     }
 
-    /// Same rule as `ATAHealthEvaluator`: value below the threshold = critical; threshold crossed in the
-    /// past or bad sectors = needs attention.
+    /// Same rule as `ATAHealthEvaluator`: a pre-fail attribute below its threshold = critical; an old-age
+    /// attribute below its threshold, a threshold crossed in the past or bad sectors = needs attention;
+    /// temperature never counts.
     static func state(of attr: ATASmartAttribute, role: ATARole) -> AttributeState {
-        if attr.threshold > 0 && attr.current <= attr.threshold { return .critical }
-        if attr.threshold > 0 && attr.worst <= attr.threshold { return .warning }
         switch role {
+        case .temperature:
+            // Never counts toward the verdict: its threshold is a comfort limit.
+            return .normal
         case .reallocated, .pending, .uncorrectable:
+            if attr.isPreFail && attr.isBelowThreshold { return .critical }
+            if attr.isBelowThreshold || attr.hasCrossedThreshold { return .warning }
             return attr.rawValue > 0 ? .warning : .normal
         default:
+            if attr.isPreFail && attr.isBelowThreshold { return .critical }
+            if attr.isBelowThreshold || attr.hasCrossedThreshold { return .warning }
             return .normal
         }
     }

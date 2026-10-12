@@ -103,8 +103,8 @@ import Foundation
         let evalBadExceeded = ATAHealthEvaluator.evaluate(snapshot: snapBadExceeded)
         #expect(evalBadExceeded.status == .bad)
         
-        // current <= threshold -> Bad
-        let badAttr = [(id: UInt8(5), flags: UInt16(0), current: UInt8(10), worst: UInt8(10), raw: [UInt8](repeating: 0, count: 6))]
+        // Pre-fail attribute with current <= threshold -> Bad
+        let badAttr = [(id: UInt8(5), flags: UInt16(0x01), current: UInt8(10), worst: UInt8(10), raw: [UInt8](repeating: 0, count: 6))]
         let smartBad = makeATASmartData(attributes: badAttr)
         let threshBad = makeATAThresholds(thresholds: [(id: 5, threshold: 20)])
         let snapBadAttr = ATASmartParser.parse(smartData: smartBad, thresholdsData: threshBad, identifyData: identifyData, statusExceeded: false)!
@@ -192,5 +192,32 @@ extension ATATests {
                 #expect(!(attr.name.contains("_")), "Attribute name '\\(attr.name)' for ID \\(id) in profile '\\(profile.name)' contains an underscore.")
             }
         }
+    }
+}
+
+// Review fixes: the threshold rule must depend on the attribute's role and pre-fail flag.
+extension ATATests {
+    private func evaluate(id: UInt8, flags: UInt16, current: UInt8, worst: UInt8, threshold: UInt8) -> HealthAssessment {
+        let identify = makeATAIdentify(model: "Generic Model", rotationRate: 1)
+        let smart = makeATASmartData(attributes: [(id: id, flags: flags, current: current, worst: worst, raw: [UInt8](repeating: 0, count: 6))])
+        let thresholds = makeATAThresholds(thresholds: [(id: id, threshold: threshold)])
+        let snapshot = ATASmartParser.parse(smartData: smart, thresholdsData: thresholds, identifyData: identify, statusExceeded: false)!
+        return ATAHealthEvaluator.evaluate(snapshot: snapshot)
+    }
+
+    @Test func temperatureAttributeBelowThresholdKeepsStatusGood() {
+        // Attribute 190 (airflow temperature) with threshold 45 and current 40: a hot drive, not a failing one.
+        let assessment = evaluate(id: 0xBE, flags: 0, current: 40, worst: 40, threshold: 45)
+        #expect(assessment.status == .good)
+    }
+
+    @Test func nonPreFailAttributeBelowThresholdIsCaution() {
+        let assessment = evaluate(id: 0xB7, flags: 0, current: 10, worst: 10, threshold: 20)
+        #expect(assessment.status == .caution)
+    }
+
+    @Test func preFailAttributeBelowThresholdIsBad() {
+        let assessment = evaluate(id: 0xB7, flags: 0x01, current: 10, worst: 10, threshold: 20)
+        #expect(assessment.status == .bad)
     }
 }
