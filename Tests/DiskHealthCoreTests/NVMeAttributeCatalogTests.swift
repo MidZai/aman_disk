@@ -71,4 +71,16 @@ extension NVMeAttributeCatalogTests {
         let attrs = NVMeAttributeCatalog.attributes(from: log, identify: nil)
         #expect(attrs.first { $0.id == 0x03 }?.state == .normal)
     }
+
+    @Test func absurdTemperatureIsTreatedAsAbsent() {
+        func log(kelvin: UInt16) -> NVMeSmartLog {
+            NVMeSmartLog(criticalWarning: 0, compositeTemperatureKelvin: kelvin, availableSpare: 100, availableSpareThreshold: 10, percentageUsed: 0, dataUnitsRead: 0, dataUnitsWritten: 0, hostReadCommands: 0, hostWriteCommands: 0, controllerBusyTimeMinutes: 0, powerCycles: 0, powerOnHours: 0, unsafeShutdowns: 0, mediaErrors: 0, errorLogEntries: 0)
+        }
+        #expect(log(kelvin: 0xFFFF).temperatureCelsius == nil)
+        #expect(log(kelvin: 0).temperatureCelsius == nil)
+        #expect(log(kelvin: 200).temperatureCelsius == nil)   // −73 °C
+        #expect(log(kelvin: 233).temperatureCelsius == -40)
+        #expect(log(kelvin: 423).temperatureCelsius == 150)
+        #expect(log(kelvin: 424).temperatureCelsius == nil)
+    }
 }
