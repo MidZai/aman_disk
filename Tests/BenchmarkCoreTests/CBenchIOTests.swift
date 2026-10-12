@@ -153,3 +153,38 @@ import CBenchIO
         #expect(elapsed < 1.0, "Must return in less than a second")
     }
 }
+
+// Review fixes: the write cap is global to a pass, and bad parameters are refused.
+extension CBenchIOTests {
+    @Test func maxBytesCapsTheWholePassNotEachThread() {
+        let ctx = cbench_ctx_create()
+        defer { cbench_ctx_destroy(ctx) }
+
+        let size: UInt64 = 16 * 1024 * 1024
+        cbench_prepare_file(ctx, tempFile, size)
+
+        let cap: UInt64 = 4 * 1024 * 1024
+        var params = cbench_params(pattern: CBENCH_RND, direction: CBENCH_WRITE, block_size: 4096, queue_depth: 8,
+                                   file_size: size, max_seconds: 0, max_bytes: cap)
+        var result = cbench_result()
+        let err = cbench_run_pass(ctx, tempFile, &params, &result, nil, 0, nil)
+        #expect(err == 0)
+        #expect(result.bytes >= cap)
+        #expect(result.bytes <= cap + 8 * 4096, "8 threads may each overshoot by one block at most")
+    }
+
+    @Test func zeroBlockSizeIsRefused() {
+        let ctx = cbench_ctx_create()
+        defer { cbench_ctx_destroy(ctx) }
+        cbench_prepare_file(ctx, tempFile, 1_048_576)
+
+        var params = cbench_params(pattern: CBENCH_SEQ, direction: CBENCH_READ, block_size: 0, queue_depth: 1,
+                                   file_size: 1_048_576, max_seconds: 0, max_bytes: 0)
+        var result = cbench_result()
+        #expect(cbench_run_pass(ctx, tempFile, &params, &result, nil, 0, nil) == EINVAL)
+
+        params.block_size = 4096
+        params.file_size = 1024
+        #expect(cbench_run_pass(ctx, tempFile, &params, &result, nil, 0, nil) == EINVAL)
+    }
+}

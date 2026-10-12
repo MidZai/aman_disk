@@ -16,6 +16,7 @@ struct cbench_ctx {
 
 cbench_ctx *cbench_ctx_create(void) {
     cbench_ctx *ctx = calloc(1, sizeof(cbench_ctx));
+    if (!ctx) return NULL;
     atomic_init(&ctx->cancelled, 0);
     atomic_init(&ctx->progress_bytes, 0);
     return ctx;
@@ -130,9 +131,13 @@ typedef struct {
     pthread_mutex_t *start_mutex;
     pthread_cond_t *start_cond;
     _Atomic int *start_flag;
+    // Set when the pass could not be started (thread creation failed): the thread exits at once.
+    _Atomic int *abort_flag;
     
     // Shared state for SEQ
     _Atomic uint64_t *shared_block_idx;
+    // Bytes transferred by all threads of the pass: max_bytes caps this total, not one thread.
+    _Atomic uint64_t *shared_bytes;
     
     // Output
     uint64_t bytes;
@@ -159,6 +164,7 @@ static void *thread_func(void *arg_void) {
         pthread_cond_wait(arg->start_cond, arg->start_mutex);
     }
     pthread_mutex_unlock(arg->start_mutex);
+    if (atomic_load(arg->abort_flag)) return NULL;
     
     uint64_t max_ns = (uint64_t)(arg->params->max_seconds * 1000000000.0);
     
@@ -173,7 +179,7 @@ static void *thread_func(void *arg_void) {
             break;
         }
         
-        if (arg->params->max_bytes > 0 && arg->bytes >= arg->params->max_bytes) {
+        if (arg->params->max_bytes > 0 && atomic_load(arg->shared_bytes) >= arg->params->max_bytes) {
             break;
         }
         
@@ -240,6 +246,7 @@ static void *thread_func(void *arg_void) {
         
         arg->bytes += arg->params->block_size;
         arg->ios += 1;
+        atomic_fetch_add(arg->shared_bytes, arg->params->block_size);
         atomic_fetch_add(&arg->ctx->progress_bytes, arg->params->block_size);
         
         if (io_start > 0 && arg->latencies_ns != NULL && arg->latencies_count < arg->latencies_cap) {
@@ -255,6 +262,8 @@ int cbench_run_pass(cbench_ctx *ctx, const char *path, const cbench_params *p,
                     cbench_result *out,
                     uint64_t *latencies_ns, uint64_t latencies_cap, uint64_t *latencies_count) {
     if (!ctx || !path || !p || !out) return EINVAL;
+    // A zero block would loop forever; a file smaller than one block has no block to test.
+    if (p->block_size == 0 || p->file_size < p->block_size) return EINVAL;
     
     atomic_store(&ctx->progress_bytes, 0);
     out->bytes = 0;
@@ -301,7 +310,11 @@ int cbench_run_pass(cbench_ctx *ctx, const char *path, const cbench_params *p,
     pthread_mutex_t start_mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t start_cond = PTHREAD_COND_INITIALIZER;
     _Atomic int start_flag = 0;
+    _Atomic int abort_flag = 0;
     _Atomic uint64_t shared_block_idx = 0;
+    _Atomic uint64_t shared_bytes = 0;
+    int started = 0;
+    int create_err = 0;
     
     for (int i = 0; i < num_threads; i++) {
         args[i].ctx = ctx;
@@ -319,7 +332,9 @@ int cbench_run_pass(cbench_ctx *ctx, const char *path, const cbench_params *p,
         args[i].start_mutex = &start_mutex;
         args[i].start_cond = &start_cond;
         args[i].start_flag = &start_flag;
+        args[i].abort_flag = &abort_flag;
         args[i].shared_block_idx = &shared_block_idx;
+        args[i].shared_bytes = &shared_bytes;
         
         args[i].bytes = 0;
         args[i].ios = 0;
@@ -334,7 +349,30 @@ int cbench_run_pass(cbench_ctx *ctx, const char *path, const cbench_params *p,
         }
         args[i].latencies_count = 0;
         
-        pthread_create(&threads[i], NULL, thread_func, &args[i]);
+        create_err = pthread_create(&threads[i], NULL, thread_func, &args[i]);
+        if (create_err != 0) break;
+        started++;
+    }
+    
+    if (create_err != 0) {
+        // Release the threads already started so they exit without doing any I/O, then fail.
+        while (atomic_load(&ready_count) < started) {
+            usleep(100);
+        }
+        pthread_mutex_lock(&start_mutex);
+        atomic_store(&abort_flag, 1);
+        atomic_store(&start_flag, 1);
+        pthread_cond_broadcast(&start_cond);
+        pthread_mutex_unlock(&start_mutex);
+        for (int i = 0; i < started; i++) {
+            pthread_join(threads[i], NULL);
+        }
+        for (int i = 0; i < num_threads; i++) {
+            free(bufs[i]);
+        }
+        close(fd);
+        out->error = create_err;
+        return create_err;
     }
     
     // Wait for all threads to be ready
