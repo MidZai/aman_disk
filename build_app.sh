@@ -74,7 +74,7 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSRemovableVolumesUsageDescription</key>
-    <string>Aman Disk a besoin de cette permission pour détecter et surveiller l'état de vos disques durs externes et clés USB.</string>
+    <string>Aman Disk needs this permission to detect and monitor the health of your external drives and USB sticks.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <!-- Resident app (menu bar): macOS must not quit it on its own when the window is closed
@@ -82,7 +82,7 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
     <key>NSSupportsAutomaticTermination</key>
     <false/>
     <key>CFBundleDevelopmentRegion</key>
-    <string>fr</string>
+    <string>en</string>
     <key>CFBundleAllowMixedLocalizations</key>
     <true/>
     <key>CFBundleLocalizations</key>
@@ -111,12 +111,38 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
 </plist>
 PLIST
 
+# Text of the “Removable Volumes” permission prompt, per language (macOS shows the user's language).
+removable_volumes_description() {
+    case "$1" in
+        en) echo "Aman Disk needs this permission to detect and monitor the health of your external drives and USB sticks." ;;
+        fr) echo "Aman Disk a besoin de cette permission pour détecter et surveiller l'état de vos disques externes et clés USB." ;;
+        zh-Hans) echo "Aman Disk 需要此权限来检测并监控您的外置硬盘和 U 盘的健康状况。" ;;
+        zh-Hant) echo "Aman Disk 需要此權限來偵測並監控您的外接硬碟和 USB 隨身碟的健康狀況。" ;;
+        ko) echo "Aman Disk가 외장 드라이브와 USB 메모리의 상태를 감지하고 모니터링하려면 이 권한이 필요합니다." ;;
+        ar) echo "يحتاج Aman Disk إلى هذا الإذن لاكتشاف أقراصك الخارجية ومفاتيح USB ومراقبة حالتها." ;;
+        pt-BR|pt) echo "O Aman Disk precisa desta permissão para detectar e monitorar a saúde dos seus discos externos e pen drives." ;;
+        es) echo "Aman Disk necesita este permiso para detectar y supervisar el estado de sus discos externos y memorias USB." ;;
+        de) echo "Aman Disk benötigt diese Berechtigung, um den Zustand Ihrer externen Laufwerke und USB-Sticks zu erkennen und zu überwachen." ;;
+        it) echo "Aman Disk ha bisogno di questa autorizzazione per rilevare e monitorare lo stato dei tuoi dischi esterni e delle chiavette USB." ;;
+        ja) echo "Aman Disk が外付けドライブや USB メモリの状態を検出して監視するには、この許可が必要です。" ;;
+        ru) echo "Aman Disk нужно это разрешение, чтобы обнаруживать внешние диски и USB-накопители и следить за их состоянием." ;;
+        tr) echo "Aman Disk, harici sürücülerinizin ve USB belleklerinizin sağlığını algılayıp izlemek için bu izne ihtiyaç duyar." ;;
+        nl) echo "Aman Disk heeft deze toestemming nodig om de gezondheid van uw externe schijven en usb-sticks te detecteren en te bewaken." ;;
+        pl) echo "Aman Disk potrzebuje tego uprawnienia, aby wykrywać dyski zewnętrzne i pamięci USB oraz monitorować ich stan." ;;
+        hi) echo "Aman Disk को आपकी बाहरी ड्राइव और USB स्टिक की स्थिति का पता लगाने और निगरानी करने के लिए इस अनुमति की आवश्यकता है।" ;;
+        vi) echo "Aman Disk cần quyền này để phát hiện và theo dõi tình trạng ổ đĩa ngoài và USB của bạn." ;;
+        uk) echo "Aman Disk потрібен цей дозвіл, щоб виявляти зовнішні диски та USB-накопичувачі й стежити за їхнім станом." ;;
+        *) echo "Aman Disk needs this permission to detect and monitor the health of your external drives and USB sticks." ;;
+    esac
+}
+
 echo "Creating localization resources..."
 for lang in fr en zh-Hans zh-Hant ko ar pt-BR pt es de it ja ru tr nl pl hi vi uk; do
     mkdir -p "$RESOURCES_DIR/$lang.lproj"
     cat > "$RESOURCES_DIR/$lang.lproj/InfoPlist.strings" << EOF
 CFBundleDisplayName = "Aman Disk";
 CFBundleName = "Aman Disk";
+NSRemovableVolumesUsageDescription = "$(removable_volumes_description "$lang")";
 EOF
     cat > "$RESOURCES_DIR/$lang.lproj/Localizable.strings" << EOF
 "CFBundleDisplayName" = "Aman Disk";
