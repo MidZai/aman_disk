@@ -3,7 +3,9 @@ import Foundation
 @testable import BenchmarkCore
 import DiskHealthCore
 
-@Suite struct ExternalBenchmarkTests {
+/// Serialized: every test points the global `BenchInflight.fileURL` somewhere, and the
+/// benchmark run writes to it; in parallel they would race on that path.
+@Suite(.serialized) struct ExternalBenchmarkTests {
     /// The in-flight list is never written to the real Application Support folder by a test.
     init() {
         BenchInflight.fileURL = FileManager.default.temporaryDirectory
