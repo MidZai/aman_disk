@@ -113,7 +113,7 @@ import CBenchIO
         
         #expect(err == 0)
         #expect(result.error == 0)
-        #expect(latenciesCount == result.ios, "Latencies count should equal ios")
+        #expect(latenciesCount == min(result.ios, UInt64(latencies.count)), "One latency per I/O, up to the buffer size")
     }
     
     @Test func testCancellation() {
