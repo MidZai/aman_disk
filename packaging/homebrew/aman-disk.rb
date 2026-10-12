@@ -1,6 +1,6 @@
 cask "aman-disk" do
-  version "1.0.0"
-  sha256 :no_check # replace with the DMG sha256 at release time
+  version "1.0.1"
+  sha256 "2af8fc3c17ed74136d57426b516bf5fd76c7392d13ad0d55c70f9ec6588cfe9e"
 
   url "https://github.com/MidZai/aman_disk/releases/download/v#{version}/Aman-Disk-#{version}.dmg"
   name "Aman Disk"
