@@ -34,19 +34,30 @@ enum BenchCLI {
         
         var profile = BenchProfile.standard
         let pIdx = args.firstIndex(of: "--profile") ?? -1
-        if pIdx >= 0, pIdx + 1 < args.count {
-            let pStr = args[pIdx + 1]
-            if pStr == "quick" { profile = .quick }
-            else if pStr == "readonly" { profile = .readOnly }
+        if pIdx >= 0 {
+            // An unknown value is an error, not silently the default.
+            switch pIdx + 1 < args.count ? args[pIdx + 1] : "" {
+            case "standard": profile = .standard
+            case "quick": profile = .quick
+            case "readonly": profile = .readOnly
+            case let other:
+                FileHandle.standardError.write(Data("Unknown profile “\(other)”: expected standard, quick or readonly.\n".utf8))
+                exit(2)
+            }
         }
         
         var size: UInt64 = 1073741824
         var sizeStr = "1 GiB"
         let sIdx = args.firstIndex(of: "--size") ?? -1
-        if sIdx >= 0, sIdx + 1 < args.count {
-            let sStr = args[sIdx + 1]
-            if sStr == "256M" { size = 268435456; sizeStr = "256 MiB" }
-            else if sStr == "4G" { size = 4294967296; sizeStr = "4 GiB" }
+        if sIdx >= 0 {
+            switch sIdx + 1 < args.count ? args[sIdx + 1] : "" {
+            case "1G": break
+            case "256M": size = 268435456; sizeStr = "256 MiB"
+            case "4G": size = 4294967296; sizeStr = "4 GiB"
+            case let other:
+                FileHandle.standardError.write(Data("Unknown size “\(other)”: expected 256M, 1G or 4G.\n".utf8))
+                exit(2)
+            }
         }
         
         var targetPath = "/System/Volumes/Data"
