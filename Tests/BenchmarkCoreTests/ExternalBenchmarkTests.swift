@@ -4,6 +4,12 @@ import Foundation
 import DiskHealthCore
 
 @Suite struct ExternalBenchmarkTests {
+    /// The in-flight list is never written to the real Application Support folder by a test.
+    init() {
+        BenchInflight.fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("aman-disk-tests-\(ProcessInfo.processInfo.processIdentifier)")
+            .appendingPathComponent("bench-inflight.json")
+    }
 
     @Test func testUnmountedVolumeIsRejected() {
         let unmountedVolume = Volume(
