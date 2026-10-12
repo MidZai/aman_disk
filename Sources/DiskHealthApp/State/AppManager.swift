@@ -141,16 +141,28 @@ final class AppManager: ObservableObject {
         // Only whole disks matter: volumes, mounted disk images and partitions
         // appearing don't trigger a full discovery.
         let match = [kDADiskDescriptionMediaWholeKey as String: true] as CFDictionary
-        let callback: DADiskAppearedCallback = { _, context in
-            guard let context else { return }
-            let manager = Unmanaged<AppManager>.fromOpaque(context).takeUnretainedValue()
-            Task { @MainActor in manager.loadDisks() }
-        }
-        // AppManager lives as long as the app: an unretained reference is enough.
+        // The context is an unretained reference: deinit unregisters the callbacks and unschedules
+        // the session, so a released manager (tests create several) is never called back.
         let context = Unmanaged.passUnretained(self).toOpaque()
-        DARegisterDiskAppearedCallback(session, match, callback, context)
-        DARegisterDiskDisappearedCallback(session, match, callback, context)
+        DARegisterDiskAppearedCallback(session, match, Self.hotplugCallback, context)
+        DARegisterDiskDisappearedCallback(session, match, Self.hotplugCallback, context)
         DASessionScheduleWithRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+    }
+
+    private static let hotplugCallback: DADiskAppearedCallback = { _, context in
+        guard let context else { return }
+        let manager = Unmanaged<AppManager>.fromOpaque(context).takeUnretainedValue()
+        Task { @MainActor in manager.loadDisks() }
+    }
+
+    deinit {
+        refreshTimer?.invalidate()
+        loadTask?.cancel()
+        if let session = daSession {
+            let context = Unmanaged.passUnretained(self).toOpaque()
+            DAUnregisterCallback(session, unsafeBitCast(Self.hotplugCallback, to: UnsafeMutableRawPointer.self), context)
+            DASessionUnscheduleFromRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+        }
     }
 
     private func startTimer() {
@@ -182,9 +194,10 @@ final class AppManager: ObservableObject {
         if isAutoRefresh && benchmark.isRunning { return }
 
         loadTask?.cancel()
+        // Coalesces bursts of DiskArbitration events (plugging in, startup). Read before the task starts:
+        // touching a @Published property through a weak self while the manager is being deallocated crashed.
+        let delayNs: UInt64 = isLoading ? 50_000_000 : 1_000_000_000
         loadTask = Task { [weak self] in
-            // Coalesces bursts of DiskArbitration events (plugging in, startup).
-            let delayNs: UInt64 = (self?.isLoading == true) ? 50_000_000 : 1_000_000_000
             try? await Task.sleep(nanoseconds: delayNs)
             guard !Task.isCancelled, let self else { return }
             self.isRefreshing = true
