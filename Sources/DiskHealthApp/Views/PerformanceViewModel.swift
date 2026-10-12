@@ -50,7 +50,7 @@ final class PerformanceViewModel: ObservableObject {
         Task { await loadHistory() }
     }
 
-    /// Off the main thread: the check writes a small file on each volume.
+    /// Off the main thread: the check asks each volume whether it accepts writes (nothing is written).
     func resolveTargets() {
         resolveTask?.cancel()
         isResolvingTargets = true

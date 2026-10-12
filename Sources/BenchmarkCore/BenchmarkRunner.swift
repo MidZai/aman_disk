@@ -167,6 +167,8 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
     }
 
     private func run() {
+        // The test folder is created now, not when the Performance tab is shown.
+        try? FileManager.default.createDirectory(at: target.testDirectoryURL, withIntermediateDirectories: true)
         let path = target.testDirectoryURL.appendingPathComponent("DiskHealthBench-\(UUID().uuidString).tmp").path
         BenchInflight.write(BenchInflight.read() + [path])
         let thermalStart = thermalState()
@@ -315,6 +317,7 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
             os_log("Failed to remove test file: %{public}@", type: .error, error.localizedDescription)
         }
         BenchInflight.write(BenchInflight.read().filter { $0 != path })
+        BenchCleanup.removeTestFolderIfEmpty(target.testDirectoryURL)
 
         var bytesWritten: UInt64 = fileSize // test file
         for r in testsResults where r.direction == .write {

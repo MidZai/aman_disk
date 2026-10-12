@@ -23,6 +23,17 @@ public enum BenchCleanup {
                     try? fileManager.removeItem(at: fileURL)
                 }
             }
+            removeTestFolderIfEmpty(baseURL)
         }
+    }
+
+    public static let testFolderName = "DiskHealthBench.noindex"
+
+    /// Removes a `DiskHealthBench.noindex` folder once nothing is left in it (success, error or cancellation).
+    public static func removeTestFolderIfEmpty(_ folder: URL) {
+        guard folder.lastPathComponent == testFolderName,
+              let contents = try? FileManager.default.contentsOfDirectory(atPath: folder.path),
+              contents.isEmpty else { return }
+        try? FileManager.default.removeItem(at: folder)
     }
 }

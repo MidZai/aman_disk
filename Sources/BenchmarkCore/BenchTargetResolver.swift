@@ -40,6 +40,18 @@ public struct BenchTarget: Identifiable {
 }
 
 public enum BenchTargetResolver {
+    /// True when `directory`, or the nearest ancestor that exists, is writable. Writes nothing.
+    static func canWrite(at directory: URL) -> Bool {
+        let fileManager = FileManager.default
+        var url = directory.standardizedFileURL
+        while !fileManager.fileExists(atPath: url.path) {
+            let parent = url.deletingLastPathComponent()
+            if parent.path == url.path { return false }
+            url = parent
+        }
+        return fileManager.isWritableFile(atPath: url.path)
+    }
+
     public static func resolveTargets(volumes: [Volume], disks: [PhysicalDisk], bundleIdentifier: String = "io.github.aman-disk.AmanDisk", fileSize: UInt64 = 1073741824) -> [BenchTarget] {
         var targets: [BenchTarget] = []
         
@@ -113,17 +125,11 @@ public enum BenchTargetResolver {
                 testDirURL = url.appendingPathComponent("DiskHealthBench.noindex")
             }
             
-            if reason == nil {
-                // Check if we can create the directory
-                do {
-                    try fileManager.createDirectory(at: testDirURL, withIntermediateDirectories: true, attributes: nil)
-                    // Check if writable
-                    let testFile = testDirURL.appendingPathComponent("test_write_access.tmp")
-                    try Data().write(to: testFile)
-                    try fileManager.removeItem(at: testFile)
-                } catch {
-                    reason = .accessDenied
-                }
+            if reason == nil && !canWrite(at: testDirURL) {
+                // Nothing is written on the volume until the user starts a test: the check only
+                // asks the file system whether the test folder (or its nearest existing parent)
+                // accepts writes.
+                reason = .accessDenied
             }
             
             targets.append(BenchTarget(

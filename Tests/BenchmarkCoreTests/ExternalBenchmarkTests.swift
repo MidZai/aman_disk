@@ -122,3 +122,66 @@ import DiskHealthCore
         #expect(benchFiles.isEmpty)
     }
 }
+
+// Review fixes: nothing is written on a volume before the user starts a test, nothing is left after.
+extension ExternalBenchmarkTests {
+    private static func volume(at dir: URL) -> Volume {
+        Volume(bsdName: "disk9s1", name: "Scratch", mountPoint: dir.path, format: "APFS",
+               totalBytes: 100_000_000_000, availableBytes: 50_000_000_000, physicalDiskBSDNames: ["disk9"])
+    }
+
+    private static func physical() -> PhysicalDisk {
+        PhysicalDisk(bsdName: "disk9", model: "Scratch SSD", sizeBytes: 100_000_000_000, isInternal: false,
+                     connection: .usb, driveConnection: .usb, volumeNames: ["Scratch"], protocolType: .usb,
+                     mediumType: .solidState, healthCapability: .unsupported(reason: .usbBridge))
+    }
+
+    @Test func resolvingTargetsWritesNothing() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bench_resolve_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let targets = BenchTargetResolver.resolveTargets(volumes: [Self.volume(at: dir)], disks: [Self.physical()], fileSize: 1_048_576)
+        #expect(targets.count == 1)
+        #expect(targets[0].rejectionReason == nil)
+        #expect(targets[0].testDirectoryURL.path == dir.appendingPathComponent("DiskHealthBench.noindex").path)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
+    }
+
+    @Test func readOnlyLocationIsRejectedWithoutWriting() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bench_ro_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: dir.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path) }
+
+        let targets = BenchTargetResolver.resolveTargets(volumes: [Self.volume(at: dir)], disks: [Self.physical()], fileSize: 1_048_576)
+        #expect(targets[0].rejectionReason == .accessDenied)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty)
+    }
+
+    @Test func completedTestLeavesNothingBehind() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bench_clean_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let target = BenchTarget(volume: Self.volume(at: dir), testDirectoryURL: dir.appendingPathComponent("DiskHealthBench.noindex"),
+                                 rejectionReason: nil, availableBytes: 50_000_000_000, isEncrypted: false, fileSystem: "APFS")
+        let spec = BenchTestSpec(id: "TEST_SEQ", label: "TEST", pattern: .sequential, blockSize: 65536, queueDepth: 1, recordsLatency: false)
+        let runner = BenchmarkRunner(target: target, profile: .quick, fileSize: 1_048_576, physicalDisk: Self.physical(), specGrid: [spec])
+
+        final class Waiter: BenchmarkRunnerDelegate, @unchecked Sendable {
+            var result: BenchmarkResult?
+            let sema = DispatchSemaphore(value: 0)
+            func benchmarkDidUpdateState(_ state: BenchmarkState) {}
+            func benchmarkDidFinish(result: BenchmarkResult) { self.result = result; sema.signal() }
+        }
+        let waiter = Waiter()
+        runner.delegate = waiter
+        runner.start()
+        waiter.sema.wait()
+
+        #expect(waiter.result?.completed == true)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty, "test folder must be removed when empty")
+    }
+}
