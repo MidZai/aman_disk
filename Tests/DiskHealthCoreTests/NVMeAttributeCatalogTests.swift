@@ -63,3 +63,12 @@ import Foundation
         #expect(warnAttrs.first { $0.id == 0x05 }?.state == .warning)
     }
 }
+
+// Review fixes: arithmetic on bytes read from the drive must not trap.
+extension NVMeAttributeCatalogTests {
+    @Test func spareThresholdNearMaxDoesNotCrash() {
+        let log = NVMeSmartLog(criticalWarning: 0, compositeTemperatureKelvin: 300, availableSpare: 255, availableSpareThreshold: 255, percentageUsed: 0, dataUnitsRead: 0, dataUnitsWritten: 0, hostReadCommands: 0, hostWriteCommands: 0, controllerBusyTimeMinutes: 0, powerCycles: 0, powerOnHours: 0, unsafeShutdowns: 0, mediaErrors: 0, errorLogEntries: 0)
+        let attrs = NVMeAttributeCatalog.attributes(from: log, identify: nil)
+        #expect(attrs.first { $0.id == 0x03 }?.state == .normal)
+    }
+}
