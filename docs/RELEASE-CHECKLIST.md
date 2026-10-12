@@ -101,4 +101,5 @@ Ce document récapitule l'ensemble des vérifications manuelles à effectuer ava
   - Ouverture fluide depuis `/Applications`.
   - Vérification du comportement Gatekeeper et consignes de premier lancement documentées.
 - [ ] **Cask Homebrew** :
-  - Mettre à jour le fichier `packaging/homebrew/aman-disk.rb` avec le SHA-256 final du fichier DMG publié.
+  - Mettre à jour `version` dans `packaging/homebrew/aman-disk.rb`.
+  - Remplacer `sha256 :no_check` par le SHA-256 du DMG publié (`shasum -a 256 dist/Aman-Disk-<version>.dmg`) : l'URL du cask pointe sur `Aman-Disk-<version>.dmg`, le nom produit par `scripts/make-dmg.sh`.
