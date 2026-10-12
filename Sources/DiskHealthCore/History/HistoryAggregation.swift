@@ -79,7 +79,7 @@ public enum HistoryAggregation {
         var weightedSum = 0.0
         var count = 0
         for s in withTemp {
-            let t = s.temperatureC!
+            guard let t = s.temperatureC else { continue }
             let lo = s.temperatureMinC ?? t
             let hi = s.temperatureMaxC ?? t
             minTemp = Swift.min(minTemp ?? lo, lo)
@@ -120,12 +120,13 @@ public enum HistoryAggregation {
         var currentSegment = 0
         for i in 0..<samples.count {
             let sample = samples[i]
+            guard let temp = sample.temperatureC else { continue }
             if i > 0 && sample.date.timeIntervalSince(samples[i - 1].date) > threshold {
                 currentSegment += 1
             }
             points.append(AggregatedPoint(
                 date: sample.date,
-                temperature: Double(sample.temperatureC!),
+                temperature: Double(temp),
                 segment: currentSegment,
                 minTemperature: sample.temperatureMinC.map(Double.init),
                 maxTemperature: sample.temperatureMaxC.map(Double.init)

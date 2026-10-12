@@ -167,7 +167,7 @@ private struct SidebarView: View {
     @ViewBuilder
     private func disconnectedDiskRow(for item: DisconnectedDisk) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "externaldrive.badge.xmark")
+            Image(systemName: "externaldrive.badge.xmark").accessibilityHidden(true)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.disk.physical.model)
@@ -262,7 +262,7 @@ private struct DetailView: View {
 
     private func disconnectedPlaceholder(lastSeen: Date?) -> some View {
         VStack(spacing: 10) {
-            Image(systemName: "externaldrive.badge.xmark")
+            Image(systemName: "externaldrive.badge.xmark").accessibilityHidden(true)
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(.tertiary)
             Text(L("This drive is no longer connected", "Ce disque n'est plus connecté"))
@@ -279,7 +279,7 @@ private struct DetailView: View {
 
     private func placeholder(_ text: String, systemImage: String) -> some View {
         VStack(spacing: 10) {
-            Image(systemName: systemImage)
+            Image(systemName: systemImage).accessibilityHidden(true)
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(.tertiary)
             Text(text)
@@ -478,7 +478,7 @@ struct SupportButton: View {
             NSWorkspace.shared.open(AppInfo.supportURL)
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "heart.fill")
+                Image(systemName: "heart.fill").accessibilityHidden(true)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
@@ -493,7 +493,7 @@ struct SupportButton: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "arrow.up.right")
+                Image(systemName: "arrow.up.right").accessibilityHidden(true)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .opacity(isHovered ? 1 : 0.5)

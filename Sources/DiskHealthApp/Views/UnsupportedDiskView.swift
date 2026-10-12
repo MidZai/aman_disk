@@ -136,7 +136,7 @@ struct UnsupportedDiskView: View {
 
     private var usbNoSmartCard: some View {
         HStack(alignment: .top, spacing: 14) {
-            Image(systemName: "info.circle")
+            Image(systemName: "info.circle").accessibilityHidden(true)
                 .font(.system(size: 22))
                 .foregroundColor(.secondary)
                 .frame(width: 24, height: 24)
@@ -179,7 +179,7 @@ struct UnsupportedDiskView: View {
 
     private var nonUSBCard: some View {
         HStack(alignment: .top, spacing: 14) {
-            Image(systemName: iconName)
+            Image(systemName: iconName).accessibilityHidden(true)
                 .font(.system(size: 22))
                 .foregroundColor(.orange)
                 .frame(width: 24, height: 24)
@@ -321,7 +321,7 @@ struct UnsupportedDiskView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(physical.volumeNames, id: \.self) { name in
                         HStack(spacing: 10) {
-                            Image(systemName: "externaldrive")
+                            Image(systemName: "externaldrive").accessibilityHidden(true)
                                 .font(.body)
                                 .foregroundStyle(.secondary)
                             Text(name)
@@ -389,7 +389,7 @@ struct USBEnclosureHelpSheet: View {
                 Button {
                     dismiss()
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    Image(systemName: "xmark.circle.fill").accessibilityHidden(true)
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
@@ -425,7 +425,7 @@ struct USBEnclosureHelpSheet: View {
                         } label: {
                             HStack(spacing: 5) {
                                 Text(Strings.viewCompatibilityList)
-                                Image(systemName: "arrow.up.right")
+                                Image(systemName: "arrow.up.right").accessibilityHidden(true)
                                     .font(.caption)
                             }
                         }
@@ -460,7 +460,7 @@ struct USBEnclosureHelpSheet: View {
 
     private var satDriverHelpSection: some View {
         HStack(alignment: .top, spacing: 14) {
-            Image(systemName: "wrench.and.screwdriver")
+            Image(systemName: "wrench.and.screwdriver").accessibilityHidden(true)
                 .font(.system(size: 20))
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 24, height: 24)
@@ -482,7 +482,7 @@ struct USBEnclosureHelpSheet: View {
                 } label: {
                     HStack(spacing: 5) {
                         Text(Strings.viewOnGitHub)
-                        Image(systemName: "arrow.up.right")
+                        Image(systemName: "arrow.up.right").accessibilityHidden(true)
                             .font(.caption)
                     }
                 }
@@ -494,7 +494,7 @@ struct USBEnclosureHelpSheet: View {
 
     private func helpSection(icon: String, title: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 14) {
-            Image(systemName: icon)
+            Image(systemName: icon).accessibilityHidden(true)
                 .font(.system(size: 20))
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 24, height: 24)

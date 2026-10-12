@@ -44,7 +44,7 @@ public enum BenchTargetResolver {
         var targets: [BenchTarget] = []
         
         let fileManager = FileManager.default
-        let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        guard let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else { return [] }
         
         for volume in volumes {
             if volume.mountPoint.isEmpty || !fileManager.fileExists(atPath: volume.mountPoint) {

@@ -70,7 +70,7 @@ private struct DiskHeaderView: View {
                 Label {
                     Text(disk.health.status.localizedLabel)
                 } icon: {
-                    Image(systemName: disk.health.status.symbolName)
+                    Image(systemName: disk.health.status.symbolName).accessibilityHidden(true)
                         .foregroundStyle(disk.health.status.color)
                 }
                 .font(.headline)
@@ -86,7 +86,7 @@ private struct DiskHeaderView: View {
 
                 if disk.physical.isSATTranslationActive {
                     HStack(spacing: 4) {
-                        Image(systemName: "checkmark.shield")
+                        Image(systemName: "checkmark.shield").accessibilityHidden(true)
                             .font(.caption)
                         Text(Strings.readViaSATSMARTDriver)
                             .font(.caption)
@@ -119,7 +119,7 @@ private struct DiskHeaderView: View {
                             Button {
                                 showSerial.toggle()
                             } label: {
-                                Image(systemName: showSerial ? "eye.slash" : "eye")
+                                Image(systemName: showSerial ? "eye.slash" : "eye").accessibilityHidden(true)
                                     .foregroundStyle(.secondary)
                             }
                             .buttonStyle(.plain)
@@ -199,7 +199,7 @@ private struct ReasonsCallout: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: health.status.symbolName)
+            Image(systemName: health.status.symbolName).accessibilityHidden(true)
                 .font(.title3)
                 .foregroundStyle(health.status.color)
             VStack(alignment: .leading, spacing: 6) {
@@ -228,14 +228,14 @@ private struct SmartEnabledCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
                 .font(.title3)
                 .foregroundStyle(.green)
             Text(Strings.smartEnabledNotice)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             Button(action: onDismiss) {
-                Image(systemName: "xmark")
+                Image(systemName: "xmark").accessibilityHidden(true)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)

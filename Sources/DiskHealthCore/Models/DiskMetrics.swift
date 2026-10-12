@@ -62,7 +62,9 @@ public struct DiskMetrics: Equatable, Codable {
                 case .hostWritesBytes: written = attr.value(for: role)
                 case .hostReadsBytes: read = attr.value(for: role)
                 case .lifeRemainingPercentNormalized: life = max(0, min(100, Int(attr.current)))
-                case .reallocated, .pending: sectors = (sectors ?? 0) &+ attr.rawValue
+                case .reallocated, .pending:
+                    let (sum, overflow) = (sectors ?? 0).addingReportingOverflow(attr.rawValue)
+                    sectors = overflow ? UInt64.max : sum
                 case .uncorrectable, .none: break
                 }
             }

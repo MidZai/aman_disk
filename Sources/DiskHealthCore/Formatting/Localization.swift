@@ -187,6 +187,10 @@ public enum Localization {
         return map
     }()
 
+    /// Host-app translations consulted first for languages other than English and French
+    /// (Aman Check registers its own tables here; Aman Disk leaves it nil).
+    public static var extraLookup: ((_ english: String, _ french: String, _ language: AppLanguage) -> String?)?
+
     public static func translate(english: String, french: String, language: AppLanguage) -> String {
         switch language {
         case .english:
@@ -194,6 +198,10 @@ public enum Localization {
         case .french:
             return french
         default:
+            // 0. Host-app tables (Aman Check)
+            if let extra = extraLookup?(english, french, language) {
+                return extra
+            }
             // 1. Exact match via StringKey dictionary
             if let key = keyMap[english] ?? keyMap[french] ?? keyMap[english.lowercased()] ?? keyMap[french.lowercased()] {
                 let dict = Translations.dictionary(for: language)

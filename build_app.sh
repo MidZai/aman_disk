@@ -70,6 +70,8 @@ cat > "$CONTENTS_DIR/Info.plist" << PLIST
     <string>14.0</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>Aman Disk a besoin de cette permission pour détecter et surveiller l'état de vos disques durs externes et clés USB.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <!-- Resident app (menu bar): macOS must not quit it on its own when the window is closed

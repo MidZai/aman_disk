@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 import DiskHealthCore
 import CBenchIO
 import IOKit.ps
@@ -308,7 +309,11 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
     private func finish(path: String, activity: NSObjectProtocol, startTemp: Int?, thermalStart: String, onBattery: Bool) {
         tempSampler?.stop()
         ProcessInfo.processInfo.endActivity(activity)
-        try? FileManager.default.removeItem(atPath: path)
+        do {
+            try FileManager.default.removeItem(atPath: path)
+        } catch {
+            os_log("Failed to remove test file: %{public}@", type: .error, error.localizedDescription)
+        }
         BenchInflight.write(BenchInflight.read().filter { $0 != path })
 
         var bytesWritten: UInt64 = fileSize // test file

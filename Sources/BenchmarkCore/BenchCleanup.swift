@@ -4,7 +4,7 @@ import DiskHealthCore
 public enum BenchCleanup {
     public static func run(volumes: [Volume], bundleIdentifier: String = "io.github.aman-disk.AmanDisk") {
         let fileManager = FileManager.default
-        let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        guard let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else { return }
         
         var baseURLs: [URL] = []
         baseURLs.append(cachesURL.appendingPathComponent(bundleIdentifier).appendingPathComponent("DiskHealthBench.noindex"))

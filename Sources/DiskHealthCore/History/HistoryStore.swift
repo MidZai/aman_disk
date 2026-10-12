@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 
 /// History of readings, one file per drive.
 ///
@@ -96,7 +97,11 @@ public final class HistoryStore: @unchecked Sendable {
             data.append(line)
             data.append(UInt8(ascii: "\n"))
         }
-        try? data.write(to: fileURL(for: key), options: .atomic)
+        do {
+            try data.write(to: fileURL(for: key), options: .atomic)
+        } catch {
+            os_log("Failed to write history: %{public}@", type: .error, error.localizedDescription)
+        }
     }
 
     /// Appends a line at the end of the file. Call on `queue`.

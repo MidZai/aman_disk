@@ -86,7 +86,7 @@ struct DisconnectedDiskView: View {
 
     private var headerCard: some View {
         HStack(alignment: .top, spacing: 16) {
-            Image(systemName: "externaldrive.badge.xmark")
+            Image(systemName: "externaldrive.badge.xmark").accessibilityHidden(true)
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(.secondary)
 

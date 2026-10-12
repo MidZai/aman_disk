@@ -19,7 +19,10 @@ public enum IOKitDiagnostics {
             return "<masqué>"
         }
         if let dict = value as? [String: Any] {
-            let inner = dict.keys.sorted().map { "\($0)=\(maskValue(key: $0, value: dict[$0]!))" }
+            let inner = dict.keys.sorted().compactMap { k -> String? in
+                guard let v = dict[k] else { return nil }
+                return "\(k)=\(maskValue(key: k, value: v))"
+            }
             return "{" + inner.joined(separator: ", ") + "}"
         }
         if let array = value as? [Any] {

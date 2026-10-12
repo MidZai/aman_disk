@@ -20,7 +20,7 @@ Native macOS app for Apple Silicon and Intel Macs · Universal binary · Complet
 </p>
 
 <p align="center">
-  <sub>Free and open source · macOS 14 or later · Apple Silicon and Intel · <a href="https://github.com/MidZai/aman_disk/releases/latest">Latest version</a></sub>
+  <sub>Free and open source · macOS 14 or later · Apple Silicon and Intel · <a href="https://github.com/MidZai/aman_disk/releases/latest">Latest version</a> · <a href="https://midzai.github.io/aman_check/">Website</a> · Sister project: <a href="https://github.com/MidZai/aman_check">Aman Check</a>, a condition report for used Macs</sub>
 </p>
 
 <p align="center">
@@ -57,6 +57,7 @@ Native macOS app for Apple Silicon and Intel Macs · Universal binary · Complet
 1. Download the DMG (`Aman-Disk-<version>.dmg`) from the [latest release](https://github.com/MidZai/aman_disk/releases/latest).
 2. Open it and drag **Aman Disk** into the **Applications** folder.
 3. Open Aman Disk. The first time, macOS blocks it: follow the steps below. You only need to do this once.
+4. When an external drive is plugged in, macOS asks whether Aman Disk may access **removable volumes**. Allow it: that permission is how the app sees external drives. It still only reads.
 
 ### macOS says Aman Disk can't be opened
 

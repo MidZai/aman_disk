@@ -4,7 +4,7 @@ import DiskHealthCore
 
 enum DiskIconProvider {
     static func icon(for physical: PhysicalDisk) -> some View {
-        Image(systemName: physical.isInternal ? "internaldrive" : "externaldrive")
+        Image(systemName: physical.isInternal ? "internaldrive" : "externaldrive").accessibilityHidden(true)
             .foregroundStyle(.secondary)
             .fontWeight(.light)
     }

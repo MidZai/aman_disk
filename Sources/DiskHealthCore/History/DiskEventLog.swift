@@ -22,7 +22,7 @@ public final class DiskEventLog: @unchecked Sendable {
     public static var shared = DiskEventLog()
 
     private let folderURL: URL
-    private let lock = NSLock()
+    private let queue = DispatchQueue(label: "io.github.aman-disk.events")
 
     public init(baseURL: URL? = nil) {
         let base = baseURL ?? (FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory)
@@ -31,29 +31,58 @@ public final class DiskEventLog: @unchecked Sendable {
     }
 
     private func fileURL(for key: String) -> URL {
+        folderURL.appendingPathComponent("\(key).jsonl")
+    }
+    
+    private func oldFileURL(for key: String) -> URL {
         folderURL.appendingPathComponent("\(key).json")
     }
 
     public func events(for key: String) -> [DiskEvent] {
-        lock.lock(); defer { lock.unlock() }
-        return load(key)
+        queue.sync { return load(key) }
     }
 
     public func append(_ event: DiskEvent, for key: String) {
-        lock.lock(); defer { lock.unlock() }
-        let events = load(key) + [event]
-        try? FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(events) {
-            try? data.write(to: fileURL(for: key), options: .atomic)
+        queue.async {
+            try? FileManager.default.createDirectory(at: self.folderURL, withIntermediateDirectories: true)
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            guard let data = try? encoder.encode(event),
+                  var str = String(data: data, encoding: .utf8) else { return }
+            str.append("\n")
+            
+            let url = self.fileURL(for: key)
+            if let handle = try? FileHandle(forWritingTo: url) {
+                defer { try? handle.close() }
+                try? handle.seekToEnd()
+                if let lineData = str.data(using: .utf8) {
+                    try? handle.write(contentsOf: lineData)
+                }
+            } else {
+                try? str.write(to: url, atomically: true, encoding: .utf8)
+            }
         }
     }
 
     private func load(_ key: String) -> [DiskEvent] {
-        guard let data = try? Data(contentsOf: fileURL(for: key)) else { return [] }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode([DiskEvent].self, from: data)) ?? []
+        
+        var results: [DiskEvent] = []
+        if let data = try? Data(contentsOf: oldFileURL(for: key)) {
+            if let oldEvents = try? decoder.decode([DiskEvent].self, from: data) {
+                results.append(contentsOf: oldEvents)
+            }
+        }
+        
+        if let string = try? String(contentsOf: fileURL(for: key)) {
+            for line in string.split(whereSeparator: \.isNewline) {
+                if let data = line.data(using: .utf8),
+                   let event = try? decoder.decode(DiskEvent.self, from: data) {
+                    results.append(event)
+                }
+            }
+        }
+        return results
     }
 }

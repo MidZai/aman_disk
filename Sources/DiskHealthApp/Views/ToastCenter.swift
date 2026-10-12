@@ -61,12 +61,12 @@ public class ToastCenter: ObservableObject {
 }
 
 public struct ToastView: View {
-    @ObservedObject var center = ToastCenter.shared
+    @StateObject var center = ToastCenter.shared
     
     public var body: some View {
         if let toast = center.currentToast {
             HStack(spacing: 8) {
-                Image(systemName: toast.systemImage)
+                Image(systemName: toast.systemImage).accessibilityHidden(true)
                 Text(toast.message)
                     .font(.callout)
             }

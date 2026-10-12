@@ -59,7 +59,7 @@ struct TemperatureHistoryView: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Image(systemName: "thermometer.medium")
+            Image(systemName: "thermometer.medium").accessibilityHidden(true)
                 .font(.title2)
                 .foregroundStyle(.tertiary)
             Text(hasLoaded ? L("Not enough measurements yet.", "Pas encore assez de mesures.") : L("Loading…", "Chargement…"))

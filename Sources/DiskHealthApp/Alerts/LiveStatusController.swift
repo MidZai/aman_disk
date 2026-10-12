@@ -74,7 +74,7 @@ final class LiveStatusController {
     private static let alertStatesKey = "alertStates"
     
     let poster = SystemNotificationPoster()
-    private var engine: AlertEngine!
+    private var engine: AlertEngine
     private var cancellable: AnyCancellable?
     private weak var appManager: AppManager?
     private var lastDockState: DockIconRenderer.State?

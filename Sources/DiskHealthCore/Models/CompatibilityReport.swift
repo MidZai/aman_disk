@@ -239,30 +239,50 @@ public struct CompatibilityReport: Codable, Equatable, Sendable {
 
     public static func generateJSON(report: CompatibilityReport, knownSerials: [String] = []) throws -> Data {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let rawData = try encoder.encode(report)
-        guard var jsonStr = String(data: rawData, encoding: .utf8) else {
+        
+        guard let jsonObject = try? JSONSerialization.jsonObject(with: rawData, options: []) else {
             return rawData
         }
-
-        for s in knownSerials where !s.isEmpty && s.count >= 3 {
-            jsonStr = jsonStr.replacingOccurrences(of: s, with: "<masqué>")
+        
+        var toMask: [String] = []
+        for s in knownSerials where !s.isEmpty && s.count >= 5 {
+            toMask.append(s)
         }
-
+        
         let homeDir = NSHomeDirectory()
         if !homeDir.isEmpty && homeDir != "/" {
-            jsonStr = jsonStr.replacingOccurrences(of: homeDir, with: "<masqué>")
+            toMask.append(homeDir)
         }
         let userName = NSUserName()
         if !userName.isEmpty && userName != "root" && userName.count >= 3 {
-            jsonStr = jsonStr.replacingOccurrences(of: "/Users/\(userName)", with: "/Users/<masqué>")
+            toMask.append("/Users/\(userName)")
         }
-
         if let hostName = Host.current().localizedName, !hostName.isEmpty, hostName.count >= 3 {
-            jsonStr = jsonStr.replacingOccurrences(of: hostName, with: "<masqué>")
+            toMask.append(hostName)
         }
-
-        return jsonStr.data(using: .utf8) ?? rawData
+        
+        func redact(value: Any) -> Any {
+            if let str = value as? String {
+                var maskedStr = str
+                for mask in toMask {
+                    maskedStr = maskedStr.replacingOccurrences(of: mask, with: "<masqué>")
+                }
+                return maskedStr
+            } else if let dict = value as? [String: Any] {
+                var newDict: [String: Any] = [:]
+                for (k, v) in dict {
+                    newDict[k] = redact(value: v)
+                }
+                return newDict
+            } else if let array = value as? [Any] {
+                return array.map { redact(value: $0) }
+            }
+            return value
+        }
+        
+        let redactedObject = redact(value: jsonObject)
+        return (try? JSONSerialization.data(withJSONObject: redactedObject, options: [.prettyPrinted, .sortedKeys])) ?? rawData
     }
 }

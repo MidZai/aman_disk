@@ -213,7 +213,7 @@ private struct SmartRow: View {
                 Button {
                     showInfo.toggle()
                 } label: {
-                    Image(systemName: "info.circle")
+                    Image(systemName: "info.circle").accessibilityHidden(true)
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)

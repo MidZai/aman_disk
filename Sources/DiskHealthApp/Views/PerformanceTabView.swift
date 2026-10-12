@@ -312,7 +312,7 @@ private struct HistoryRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle").accessibilityHidden(true)
                     .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                 Text(Formatters.date(result.date))
                     .frame(minWidth: 150, alignment: .leading)

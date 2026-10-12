@@ -272,17 +272,17 @@ public struct PhysicalDisk: Codable, Identifiable, Hashable {
     public var usbLinkSpeedLabel: String? {
         guard driveConnection == .usb || protocolType == .usb else { return nil }
         if let bps = usbLinkSpeedBps {
-            if bps >= 40_000_000_000 {
+            if bps >= 36_000_000_000 {
                 return "USB4 — 40\(Formatters.unitSpace)Gb/s"
-            } else if bps >= 20_000_000_000 {
+            } else if bps >= 18_000_000_000 {
                 return "USB 3.2 Gen 2x2 — 20\(Formatters.unitSpace)Gb/s"
-            } else if bps >= 10_000_000_000 {
+            } else if bps >= 9_000_000_000 {
                 return "USB 3.2 Gen 2 — 10\(Formatters.unitSpace)Gb/s"
-            } else if bps >= 5_000_000_000 {
+            } else if bps >= 4_500_000_000 {
                 return "USB 3.0 — 5\(Formatters.unitSpace)Gb/s"
-            } else if bps >= 480_000_000 {
+            } else if bps >= 400_000_000 {
                 return "USB 2.0 — 480\(Formatters.unitSpace)Mb/s"
-            } else if bps >= 12_000_000 {
+            } else if bps >= 10_000_000 {
                 return "USB 1.1 — 12\(Formatters.unitSpace)Mb/s"
             }
         }

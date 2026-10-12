@@ -39,7 +39,7 @@ struct InspectorView: View {
                                 Button {
                                     showSerial.toggle()
                                 } label: {
-                                    Image(systemName: showSerial ? "eye.slash" : "eye")
+                                    Image(systemName: showSerial ? "eye.slash" : "eye").accessibilityHidden(true)
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel(showSerial ? L("Hide serial number", "Masquer le numéro de série") : L("Show serial number", "Afficher le numéro de série"))

@@ -249,10 +249,12 @@ public enum DemoData {
         
         let identifyData = makeATAIdentify(model: "APPLE SSD SM0512G", rotationRate: 1)
         
-        let parsedSmart = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false)
-        let health = ATAHealthEvaluator.evaluate(snapshot: parsedSmart!)
+        guard let parsedSmart = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false) else {
+            fatalError("Demo ATA fixture is invalid")
+        }
+        let health = ATAHealthEvaluator.evaluate(snapshot: parsedSmart)
         
-        return DemoDisk(physical: physical, snapshot: .ata(parsedSmart!), health: health)
+        return DemoDisk(physical: physical, snapshot: .ata(parsedSmart), health: health)
     }
 
     private static func makeDisk6() -> DemoDisk {
@@ -277,10 +279,12 @@ public enum DemoData {
         
         let identifyData = makeATAIdentify(model: "WDC WD10EZEX-00BN5A0", rotationRate: 7200)
         
-        let parsedSmart = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false)
-        let health = ATAHealthEvaluator.evaluate(snapshot: parsedSmart!)
+        guard let parsedSmart = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false) else {
+            fatalError("Demo ATA fixture is invalid")
+        }
+        let health = ATAHealthEvaluator.evaluate(snapshot: parsedSmart)
         
-        return DemoDisk(physical: physical, snapshot: .ata(parsedSmart!), health: health)
+        return DemoDisk(physical: physical, snapshot: .ata(parsedSmart), health: health)
     }
 
     private static func makeDiskThunderboltNVMe() -> DemoDisk {
@@ -386,9 +390,11 @@ public enum DemoData {
             (1, 6), (3, 0), (4, 20), (5, 36), (9, 0), (12, 0), (194, 0), (197, 0), (198, 0)
         ])
         let identifyData = makeATAIdentify(model: "Seagate Backup Plus", rotationRate: 5400)
-        let parsedSmart = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false)
-        let health = ATAHealthEvaluator.evaluate(snapshot: parsedSmart!)
-        return DemoDisk(physical: physical, snapshot: .ata(parsedSmart!), health: health)
+        guard let parsedSmart = ATASmartParser.parse(smartData: smartData, thresholdsData: thresholdsData, identifyData: identifyData, statusExceeded: false) else {
+            fatalError("Demo ATA fixture is invalid")
+        }
+        let health = ATAHealthEvaluator.evaluate(snapshot: parsedSmart)
+        return DemoDisk(physical: physical, snapshot: .ata(parsedSmart), health: health)
     }
 
     private static func makeDiskUSBSSDNotSupported() -> DemoDisk {

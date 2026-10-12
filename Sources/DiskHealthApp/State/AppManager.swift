@@ -165,6 +165,11 @@ final class AppManager: ObservableObject {
     }
 
     func loadDisks(isAutoRefresh: Bool = false) {
+        if let vols = try? FileManager.default.contentsOfDirectory(atPath: "/Volumes") {
+            for vol in vols where vol != "Macintosh HD" {
+                _ = try? FileManager.default.contentsOfDirectory(atPath: "/Volumes/" + vol)
+            }
+        }
         if Self.isDemo {
             disks = DemoData.disks.map {
                 RealDisk(physical: $0.physical, snapshot: $0.snapshot, health: $0.health, lastRead: Date())
