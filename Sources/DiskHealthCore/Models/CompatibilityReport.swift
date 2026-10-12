@@ -237,6 +237,16 @@ public struct CompatibilityReport: Codable, Equatable, Sendable {
         )
     }
 
+    /// Serial numbers that must never appear in the report: the one read by S.M.A.R.T. (snapshot) and the
+    /// one IOKit reports for the physical disk. An unsupported drive has no snapshot, only the latter.
+    public static func serialsToMask(physical: PhysicalDisk, snapshot: DiskHealthSnapshot?) -> [String] {
+        var serials: [String] = []
+        for serial in [snapshot?.serialNumber, physical.serialNumber] {
+            if let serial, !serial.isEmpty, !serials.contains(serial) { serials.append(serial) }
+        }
+        return serials
+    }
+
     public static func generateJSON(report: CompatibilityReport, knownSerials: [String] = []) throws -> Data {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase

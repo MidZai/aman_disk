@@ -145,3 +145,30 @@ import Foundation
         #expect(jsonStr.contains("\"key\" : \"0x05\""))
     }
 }
+
+// Review fixes: an unsupported drive has no snapshot, its serial comes from the physical description.
+extension CompatibilityReportTests {
+    @Test func physicalSerialIsMaskedWithoutSnapshot() throws {
+        let serial = "WD-WCC4N987654321"
+        let physical = PhysicalDisk(
+            bsdName: "disk4", model: "WD My Passport 2627", sizeBytes: 2_000_000_000_000, isInternal: false,
+            connection: .usb, driveConnection: .usb, volumeNames: [], protocolType: .usb, mediumType: .rotational,
+            healthCapability: .unsupported(reason: .usbBridge), serialNumber: serial
+        )
+        let collected = CompatibilityReport.collect(physical: physical, snapshot: nil, amanVersion: "1.0.0")
+        let report = CompatibilityReport(
+            amanVersion: collected.amanVersion, macosVersion: collected.macosVersion, architecture: collected.architecture,
+            model: collected.model, bsdName: collected.bsdName, connection: collected.connection,
+            storageDriver: collected.storageDriver, smartAvailability: collected.smartAvailability,
+            errorCode: collected.errorCode, satTranslationActive: collected.satTranslationActive,
+            protocolCharacteristics: collected.protocolCharacteristics,
+            deviceCharacteristics: ["Product Name": "My Passport", "Serial Number": serial],
+            usbHostDevice: collected.usbHostDevice, rawSmartAttributes: collected.rawSmartAttributes,
+            iokitParentChain: collected.iokitParentChain
+        )
+        let serials = CompatibilityReport.serialsToMask(physical: physical, snapshot: nil)
+        #expect(serials == [serial])
+        let json = try #require(String(data: CompatibilityReport.generateJSON(report: report, knownSerials: serials), encoding: .utf8))
+        #expect(!json.contains(serial))
+    }
+}

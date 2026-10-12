@@ -114,10 +114,7 @@ enum ExportService {
         let report = CompatibilityReport.collect(physical: physical, snapshot: snapshot, amanVersion: AppInfo.version)
         guard let url = saveCompatibilityReportURL(physical: physical) else { return }
 
-        var serials: [String] = []
-        if let s = snapshot?.serialNumber, !s.isEmpty {
-            serials.append(s)
-        }
+        let serials = CompatibilityReport.serialsToMask(physical: physical, snapshot: snapshot)
 
         do {
             let data = try CompatibilityReport.generateJSON(report: report, knownSerials: serials)
