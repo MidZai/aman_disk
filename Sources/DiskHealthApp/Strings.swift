@@ -80,6 +80,7 @@ enum Strings {
     }
     static let benchCancelled = L("Test cancelled. The test file was deleted.", "Test annulé. Le fichier de test a été supprimé.")
     static let benchDisconnected = L("Drive disconnected during test", "Disque déconnecté pendant le test")
+    static let benchIOError = L("The drive reported a read/write error during the test. This can be a sign of a failing drive or cable.", "Le disque a signalé une erreur de lecture/écriture pendant le test. Cela peut indiquer un disque ou un câble défaillant.")
     static func lastSeen(date: String) -> String {
         L("Last seen: \(date)", "Vu pour la dernière fois : \(date)")
     }

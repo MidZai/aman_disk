@@ -105,6 +105,8 @@ final class BenchmarkController: ObservableObject {
             ToastCenter.shared.show(message: Strings.benchCancelled, systemImage: "xmark.circle")
         case "disconnected":
             ToastCenter.shared.show(message: Strings.benchDisconnected, systemImage: "externaldrive.badge.xmark")
+        case "ioError":
+            ToastCenter.shared.show(message: Strings.benchIOError, systemImage: "exclamationmark.triangle")
         default:
             ToastCenter.shared.show(message: L("The test failed. The test file was deleted.", "Le test a échoué. Le fichier de test a été supprimé."), systemImage: "exclamationmark.triangle")
         }

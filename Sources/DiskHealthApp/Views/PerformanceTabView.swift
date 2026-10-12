@@ -299,6 +299,7 @@ private struct ResultSummary: View {
         case "temperature": return L("Stopped: temperature", "Arrêté : température")
         case "cancelled": return L("Interrupted", "Interrompu")
         case "disconnected": return Strings.benchDisconnected
+        case "ioError": return Strings.benchIOError
         default: return L("Failed", "Échec")
         }
     }

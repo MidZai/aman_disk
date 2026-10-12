@@ -101,6 +101,16 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
 
     private var isCancelled: Bool { lock.withLock { _cancelled } }
 
+    /// Stop reason recorded for an I/O error code: nil for a cancellation, “disconnected” only when
+    /// the volume is gone (mount point missing or ENXIO), “ioError” for a read/write error on a volume
+    /// that is still there (a failing drive or cable), “error:N” otherwise.
+    public static func stopReason(forErrorCode code: Int32, mountPointExists: Bool) -> String? {
+        if code == -100 { return nil }
+        if !mountPointExists || code == ENXIO { return "disconnected" }
+        if code == EIO { return "ioError" }
+        return "error:\(code)"
+    }
+
     public func start() {
         // State published at most 10 times per second, and only when it changed.
         let t = DispatchSource.makeTimerSource(queue: .main)
@@ -221,8 +231,7 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
         let err = cbench_prepare_file(ctx, path, fileSize)
         prepMonitor.cancel()
         if err != 0 {
-            let isDisconnected = err == 6 /* ENXIO */ || err == 5 /* EIO */ || err == 2 /* ENOENT */ || err == 9 /* EBADF */ || !FileManager.default.fileExists(atPath: target.volume.mountPoint)
-            stop(reason: isDisconnected ? "disconnected" : (err == -100 ? nil : "error:\(err)"))
+            stop(reason: Self.stopReason(forErrorCode: err, mountPointExists: FileManager.default.fileExists(atPath: target.volume.mountPoint)))
             return
         }
 
@@ -272,8 +281,7 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
 
                     if pErr != 0 || outRes.error != 0 {
                         let e = outRes.error != 0 ? outRes.error : pErr
-                        let isDisconnected = e == 6 /* ENXIO */ || e == 5 /* EIO */ || e == 2 /* ENOENT */ || e == 9 /* EBADF */ || !FileManager.default.fileExists(atPath: target.volume.mountPoint)
-                        stop(reason: isDisconnected ? "disconnected" : (e == -100 ? nil : "error:\(e)"))
+                        stop(reason: Self.stopReason(forErrorCode: e, mountPointExists: FileManager.default.fileExists(atPath: target.volume.mountPoint)))
                         return
                     }
 

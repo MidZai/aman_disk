@@ -185,3 +185,14 @@ extension ExternalBenchmarkTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).isEmpty, "test folder must be removed when empty")
     }
 }
+
+// Review fixes: an I/O error on a volume that is still mounted is not a disconnection.
+extension ExternalBenchmarkTests {
+    @Test func ioErrorWithMountPointPresentIsNotADisconnection() {
+        #expect(BenchmarkRunner.stopReason(forErrorCode: 5 /* EIO */, mountPointExists: true) == "ioError")
+        #expect(BenchmarkRunner.stopReason(forErrorCode: 5 /* EIO */, mountPointExists: false) == "disconnected")
+        #expect(BenchmarkRunner.stopReason(forErrorCode: 6 /* ENXIO */, mountPointExists: true) == "disconnected")
+        #expect(BenchmarkRunner.stopReason(forErrorCode: 28 /* ENOSPC */, mountPointExists: true) == "error:28")
+        #expect(BenchmarkRunner.stopReason(forErrorCode: -100, mountPointExists: true) == nil)
+    }
+}
