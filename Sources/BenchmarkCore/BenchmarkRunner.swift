@@ -351,7 +351,7 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
             fileSystem: target.fileSystem,
             encrypted: target.isEncrypted,
             onBattery: onBattery,
-            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
+            lowPowerMode: Self.isLowPowerModeEnabled,
             thermalStateStart: thermalStart,
             temperatureStartC: startTemp,
             temperatureMaxC: tempSampler?.maxTempC,
@@ -377,5 +377,13 @@ public final class BenchmarkRunner: TemperatureSamplerDelegate, @unchecked Senda
             self.delegate?.benchmarkDidUpdateState(.done)
             self.delegate?.benchmarkDidFinish(result: result)
         }
+    }
+}
+
+extension BenchmarkRunner {
+    /// Low Power Mode only exists on the Mac from macOS 12 on (Aman Legacy runs on 10.13).
+    static var isLowPowerModeEnabled: Bool {
+        if #available(macOS 12, *) { return ProcessInfo.processInfo.isLowPowerModeEnabled }
+        return false
     }
 }
